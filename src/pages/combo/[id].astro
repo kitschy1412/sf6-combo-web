@@ -1,0 +1,167 @@
+---
+import { supabase, type Combo } from '../../lib/supabase';
+import { wilsonScore, scoreLabel } from '../../lib/wilson';
+
+export const prerender = false;
+
+const { id } = Astro.params;
+
+const { data } = await supabase
+  .from('combos')
+  .select('*')
+  .eq('id', id)
+  .single();
+
+const combo = data as Combo | null;
+if (!combo) return Astro.redirect('/');
+
+const { data: votes } = await supabase
+  .from('votes')
+  .select('is_working')
+  .eq('combo_id', combo.id);
+
+const total = votes?.length ?? 0;
+const working = votes?.filter((v) => v.is_working).length ?? 0;
+const score = wilsonScore(working, total);
+const label = scoreLabel(score);
+const workingPct = total > 0 ? Math.round((working / total) * 100) : 0;
+
+const embedUrl = `https://www.youtube.com/embed/${combo.youtube_id}?start=${combo.start_sec}&autoplay=0`;
+---
+
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>{combo.title} | SF6 Combo Archive</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: sans-serif; background: #0f0f0f; color: #eee; }
+      header { padding: 1.5rem 2rem; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 1rem; }
+      header a { color: #f5a623; text-decoration: none; font-size: 0.9rem; }
+      main { max-width: 800px; margin: 0 auto; padding: 2rem; }
+      .video-wrap { position: relative; padding-bottom: 56.25%; height: 0; margin-bottom: 2rem; border-radius: 8px; overflow: hidden; }
+      .video-wrap iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+      h1 { font-size: 1.4rem; margin-bottom: 1rem; }
+      .inputs {
+        font-family: monospace; font-size: 1rem; padding: 1rem;
+        background: #1a1a1a; border-radius: 8px; margin-bottom: 1.5rem;
+        border-left: 3px solid #f5a623; word-break: break-all;
+      }
+      .meta { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1.5rem; }
+      .meta-item { padding: 0.4rem 0.8rem; background: #1a1a1a; border-radius: 6px; font-size: 0.85rem; }
+      .meta-item span { color: #888; margin-right: 0.3rem; }
+      .tag { padding: 0.3rem 0.6rem; background: #2a2a2a; border-radius: 4px; font-size: 0.8rem; color: #ccc; }
+      .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 2rem; }
+
+      /* 投票セクション */
+      .vote-section {
+        margin-top: 2rem; padding: 1.5rem;
+        background: #1a1a1a; border-radius: 12px; border: 1px solid #333;
+      }
+      .vote-section h2 { font-size: 1rem; margin-bottom: 1rem; color: #ccc; }
+      .vote-label { font-size: 1.2rem; margin-bottom: 0.8rem; }
+      .vote-bar-wrap { background: #2a2a2a; border-radius: 6px; height: 8px; margin-bottom: 0.5rem; overflow: hidden; }
+      .vote-bar { height: 100%; background: #4caf50; border-radius: 6px; transition: width 0.4s; }
+      .vote-count { font-size: 0.8rem; color: #888; margin-bottom: 1.2rem; }
+      .vote-buttons { display: flex; gap: 1rem; }
+      .btn-vote {
+        flex: 1; padding: 0.8rem; border: none; border-radius: 8px;
+        font-size: 1rem; cursor: pointer; font-weight: bold;
+        transition: opacity 0.2s;
+      }
+      .btn-vote:disabled { opacity: 0.4; cursor: not-allowed; }
+      .btn-working { background: #4caf50; color: #fff; }
+      .btn-broken  { background: #f44336; color: #fff; }
+      .vote-msg { margin-top: 0.8rem; font-size: 0.85rem; color: #aaa; min-height: 1.2em; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href={`/${combo.character}`}>← {combo.character} 一覧に戻る</a>
+    </header>
+    <main>
+      <div class="video-wrap">
+        <iframe src={embedUrl} title={combo.title} allowfullscreen />
+      </div>
+
+      <h1>{combo.title}</h1>
+      <div class="inputs">{combo.inputs}</div>
+
+      <div class="meta">
+        <div class="meta-item"><span>ダメージ</span>{combo.damage}</div>
+        <div class="meta-item"><span>ゲージ消費</span>{combo.gauge}</div>
+        <div class="meta-item"><span>バージョン</span>{combo.patch_version}</div>
+      </div>
+
+      {combo.situation.length > 0 && (
+        <div class="tags">
+          {combo.situation.map((s: string) => <span class="tag">{s}</span>)}
+        </div>
+      )}
+
+      <!-- 投票セクション -->
+      <div class="vote-section">
+        <h2>このコンボ、今のバージョンで繋がりますか？</h2>
+        <div class="vote-label" id="vote-label">{label}</div>
+        <div class="vote-bar-wrap">
+          <div class="vote-bar" id="vote-bar" style={`width: ${workingPct}%`}></div>
+        </div>
+        <div class="vote-count" id="vote-count">
+          {total > 0
+            ? `できる ${working} / ${total} 票`
+            : 'まだ投票がありません'}
+        </div>
+        <div class="vote-buttons">
+          <button class="btn-vote btn-working" id="btn-yes">✅ 今もできる</button>
+          <button class="btn-vote btn-broken"  id="btn-no" >❌ できない</button>
+        </div>
+        <div class="vote-msg" id="vote-msg"></div>
+      </div>
+    </main>
+
+    <script define:vars={{ comboId: combo.id }}>
+      const btnYes  = document.getElementById('btn-yes');
+      const btnNo   = document.getElementById('btn-no');
+      const bar     = document.getElementById('vote-bar');
+      const count   = document.getElementById('vote-count');
+      const label   = document.getElementById('vote-label');
+      const msg     = document.getElementById('vote-msg');
+
+      async function vote(isWorking) {
+        btnYes.disabled = true;
+        btnNo.disabled  = true;
+        msg.textContent = '送信中...';
+
+        const res = await fetch('/api/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ combo_id: comboId, is_working: isWorking }),
+        });
+
+        const data = await res.json();
+
+        if (res.status === 429) {
+          msg.textContent = data.error;
+          btnYes.disabled = false;
+          btnNo.disabled  = false;
+          return;
+        }
+
+        const pct = data.total > 0 ? Math.round((data.working / data.total) * 100) : 0;
+        bar.style.width   = pct + '%';
+        count.textContent = `できる ${data.working} / ${data.total} 票`;
+        msg.textContent   = '投票ありがとうございました！';
+
+        const s = data.score;
+        label.textContent =
+          s >= 0.8 ? '✅ 高信頼' :
+          s >= 0.6 ? '🟡 確認中' :
+          s >= 0.3 ? '🔴 要注意' : '❓ 未検証';
+      }
+
+      btnYes.addEventListener('click', () => vote(true));
+      btnNo.addEventListener ('click', () => vote(false));
+    </script>
+  </body>
+</html>

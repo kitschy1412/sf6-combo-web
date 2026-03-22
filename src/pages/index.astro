@@ -1,17 +1,60 @@
 ---
+import { supabase } from '../lib/supabase';
 
+const { data: combos } = await supabase
+  .from('combos')
+  .select('character')
+  .order('character');
+
+// キャラクターごとに件数をカウント
+const characterMap = new Map<string, number>();
+for (const combo of combos ?? []) {
+  characterMap.set(combo.character, (characterMap.get(combo.character) ?? 0) + 1);
+}
+const characters = [...characterMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="SF6のコンボをYouTubeタイムスタンプ付きで検索・閲覧できるサイト" />
+    <title>SF6 Combo Archive</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: sans-serif; background: #0f0f0f; color: #eee; }
+      header { padding: 2rem; border-bottom: 1px solid #333; }
+      header h1 { font-size: 1.8rem; color: #f5a623; }
+      header p { margin-top: 0.5rem; color: #aaa; font-size: 0.9rem; }
+      main { max-width: 960px; margin: 0 auto; padding: 2rem; }
+      h2 { margin-bottom: 1.5rem; font-size: 1.2rem; color: #ccc; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
+      a.card {
+        display: flex; flex-direction: column; align-items: center;
+        padding: 1.2rem; background: #1a1a1a; border: 1px solid #333;
+        border-radius: 8px; text-decoration: none; color: #eee;
+        transition: border-color 0.2s;
+      }
+      a.card:hover { border-color: #f5a623; }
+      .card .name { font-size: 1rem; font-weight: bold; margin-bottom: 0.3rem; }
+      .card .count { font-size: 0.8rem; color: #888; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SF6 Combo Archive</h1>
+      <p>YouTubeタイムスタンプ付きコンボデータベース</p>
+    </header>
+    <main>
+      <h2>キャラクターを選択（{characters.length}キャラ）</h2>
+      <div class="grid">
+        {characters.map(([name, count]) => (
+          <a class="card" href={`/${encodeURIComponent(name)}`}>
+            <span class="name">{name}</span>
+            <span class="count">{count}コンボ</span>
+          </a>
+        ))}
+      </div>
+    </main>
+  </body>
 </html>
