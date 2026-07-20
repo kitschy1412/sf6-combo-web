@@ -1,0 +1,87 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Notation from '../../../components/Notation.astro';
+import { getSituationById, getEnderClassById, getOkizemeByEnderClass, KNOCKDOWN_SITUATIONS } from '../../../mock-data/rashid';
+
+export function getStaticPaths() {
+  return KNOCKDOWN_SITUATIONS.map(s => ({ params: { id: s.id } }));
+}
+
+const { id } = Astro.params;
+const sit = getSituationById(id!);
+if (!sit) return Astro.redirect('/mock/');
+const enderClass = getEnderClassById(sit.enderClassId);
+const okizeme = getOkizemeByEnderClass(sit.enderClassId);
+---
+
+<Layout title={`${sit.label} — モック`}>
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/character/rashid">Rashid</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">ダウン状況</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px; align-items:flex-start;">
+    <div style="flex:1;">
+      <div style="font-size:0.7rem; color:#888; letter-spacing:0.08em; margin-bottom:4px;">KNOCKDOWN SITUATION</div>
+      <h1 style="font-size:1.2rem;">{sit.label}</h1>
+      {sit.notes && <p style="margin:6px 0 0; color:#aaa; font-size:0.82rem;">{sit.notes}</p>}
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:0.7rem; color:#888; letter-spacing:0.08em;">〆分類</div>
+      <div style="color:#fff; font-weight:700;">{enderClass?.displayName}</div>
+      <div class="dmg" style="color:#aaa; font-size:0.85rem;">{enderClass?.frameAdvantage}</div>
+    </div>
+  </div>
+
+  <section style="margin-top:22px;">
+    <div class="section-head">
+      <h2>この状況で使える起き攻め</h2>
+      <a href="/mock/okizeme/new" class="btn btn-sm">＋ 起き攻めを追加</a>
+    </div>
+
+    {okizeme.length === 0 ? (
+      <div class="card" style="text-align:center; color:var(--muted); border-style:dashed;">
+        まだ起き攻めが登録されていません
+      </div>
+    ) : (
+      <div style="display:grid; gap:10px;">
+        {okizeme.map(o => (
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+              <div style="display:flex; gap:6px; align-items:center;">
+                {o.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
+                {o.sourceType === 'shared' && <span class="tag tag-shared">共有 / {o.ownerLabel}</span>}
+                <strong>{o.title}</strong>
+              </div>
+              <div style="display:flex; gap:4px;">
+                {o.flags.mid && <span class="tag tag-warn">中段</span>}
+                {o.flags.low && <span class="tag tag-personal">下段</span>}
+                {o.flags.throw && <span class="tag tag-shared">投げ</span>}
+                {o.flags.safeJump && <span class="tag">詐欺重ね</span>}
+              </div>
+            </div>
+            <Notation inputs={o.inputs} size="sm" />
+            <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:6px; font-size:0.82rem;">
+              {o.vsWakeup.guard && <div><span style="color:var(--muted); font-weight:600;">ガード:</span> {o.vsWakeup.guard}</div>}
+              {o.vsWakeup.mash && <div><span style="color:var(--muted); font-weight:600;">暴れ:</span> {o.vsWakeup.mash}</div>}
+              {o.vsWakeup.invincible && <div><span style="color:var(--muted); font-weight:600;">無敵:</span> {o.vsWakeup.invincible}</div>}
+              {o.vsWakeup.delayedWakeup && <div><span style="color:var(--muted); font-weight:600;">受身ずらし:</span> {o.vsWakeup.delayedWakeup}</div>}
+            </div>
+            {o.sourceType === 'shared' && (
+              <div class="vote-bar" style="margin-top:12px; padding:8px 10px;">
+                <button class="btn btn-sm">👍 Good {o.votes.good}</button>
+                <button class="btn btn-sm">👎 Bad {o.votes.bad}</button>
+                <button class="btn btn-sm btn-warn">⚠ 現ver不可 {o.votes.brokenInCurrentVer}</button>
+                <span style="flex:1;"></span>
+                <button class="btn btn-sm">自分用にコピー</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+</Layout>

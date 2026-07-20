@@ -1,0 +1,102 @@
+---
+// コンボツリー描画コンポーネント (自己再帰)
+// 1本道(葉のみ): 通常の Notation 風表示
+// 分岐あり: インデントツリーで ├ └ を表示。葉ごとにダメージ・〆分類を末尾に
+import Notation from './Notation.astro';
+import Self from './ComboTree.astro';
+import { getEnderClassById, type ComboNode } from '../mock-data/rashid';
+
+interface Props {
+  node: ComboNode;
+  /** 葉ごとのメタ(ダメージ・〆分類)を末尾に出すか */
+  showLeafMeta?: boolean;
+  /** 内部用: 再帰時の階層 */
+  depth?: number;
+}
+const { node, showLeafMeta = true, depth = 0 } = Astro.props;
+const isLeaf = !node.children || node.children.length === 0;
+const ender = node.enderClassId ? getEnderClassById(node.enderClassId) : null;
+---
+
+<div class={`ctree-node${depth === 0 ? ' ctree-root' : ''}`}>
+  <div class="ctree-line">
+    <Notation inputs={node.segment} />
+    {isLeaf ? (
+      showLeafMeta && (
+        <span class="ctree-leaf-meta">
+          {node.routeLabel && <span class="ctree-route-label">{node.routeLabel}</span>}
+          {node.damage != null && <span class="dmg">{node.damage.toLocaleString()}</span>}
+          {ender && <span class="ctree-ender">▲ {ender.displayName}</span>}
+        </span>
+      )
+    ) : (
+      depth === 0 && <span class="ctree-common-tag">共通プレフィックス</span>
+    )}
+  </div>
+  {!isLeaf && (
+    <div class="ctree-branches">
+      {node.children!.map((child, i) => {
+        const isLast = i === node.children!.length - 1;
+        return (
+          <div class={`ctree-branch${isLast ? ' is-last' : ''}`}>
+            <span class="ctree-elbow">{isLast ? '└' : '├'}─<span class="ctree-arrow">›</span></span>
+            <div class="ctree-branch-body">
+              <Self node={child} showLeafMeta={showLeafMeta} depth={depth + 1} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+</div>
+
+<style is:global>
+  .ctree-node { display: flex; flex-direction: column; gap: 4px; }
+  .ctree-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ctree-common-tag {
+    font-size: 0.68rem;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .ctree-branches { display: flex; flex-direction: column; gap: 8px; padding-top: 2px; padding-left: 4px; }
+  .ctree-branch { display: flex; align-items: flex-start; gap: 8px; }
+  .ctree-elbow {
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    user-select: none;
+    flex-shrink: 0;
+    padding-top: 5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ctree-arrow { color: #999; font-size: 1rem; }
+  .ctree-branch-body { flex: 1; min-width: 0; }
+  .ctree-leaf-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 4px;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
+  }
+  .ctree-route-label {
+    color: var(--muted-strong);
+    font-size: 0.78rem;
+    font-weight: 600;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1px 7px;
+    border-radius: 3px;
+  }
+  .ctree-ender {
+    color: var(--muted-strong);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+</style>

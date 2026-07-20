@@ -1,0 +1,1455 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Notation from '../../../components/Notation.astro';
+import NotationToggle from '../../../components/NotationToggle.astro';
+import ComboEditor from '../../../components/ComboEditor.astro';
+import {
+  COMBOS, ENDER_CLASSES, KNOCKDOWN_SITUATIONS,
+  getEnderClassById, getComboRoutes, hasBranches, getComboBrokenCount,
+  getOkizemeByEnderClass,
+} from '../../../mock-data/rashid';
+
+const { name } = Astro.params;
+const charName = name === 'rashid' ? 'Rashid' : (name ?? '');
+
+const counts = {
+  combos: COMBOS.length,
+  personal: COMBOS.filter(c => c.sourceType === 'personal').length,
+  shared: COMBOS.filter(c => c.sourceType === 'shared').length,
+  forked: COMBOS.filter(c => c.sourceType === 'forked').length,
+};
+const selfMadeCount = counts.personal + counts.shared;
+
+const majorVals = [...new Set(COMBOS.map(c => c.categoryMajor).filter(Boolean))] as string[];
+const minorsByMajor: Record<string, string[]> = {};
+for (const c of COMBOS) {
+  if (!c.categoryMajor) continue;
+  const list = (minorsByMajor[c.categoryMajor] ??= []);
+  if (c.categoryMinor && !list.includes(c.categoryMinor)) list.push(c.categoryMinor);
+}
+
+// 2段階グループ: 大分類 → 小分類[] → コンボ[]
+type MinorGroup = { minor: string; items: typeof COMBOS };
+type MajorGroup = { major: string; total: number; minors: MinorGroup[] };
+const majorGroups: MajorGroup[] = [];
+for (const c of COMBOS) {
+  const major = c.categoryMajor ?? '';
+  const minor = c.categoryMinor ?? '';
+  let mg = majorGroups.find(g => g.major === major);
+  if (!mg) { mg = { major, total: 0, minors: [] }; majorGroups.push(mg); }
+  let ming = mg.minors.find(m => m.minor === minor);
+  if (!ming) { ming = { minor, items: [] }; mg.minors.push(ming); }
+  ming.items.push(c);
+  mg.total++;
+}
+---
+
+<Layout title={`${charName} — モック`}>
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">{charName}</span>
+  </nav>
+
+  <div class="personal-page-notice">
+    <span class="notice-icon">👤</span>
+    <div>
+      <strong>これはあなたの個人ページです</strong>
+      <span class="notice-sub">コンボを整理して、準備ができたら「アップロード」で公開できます</span>
+    </div>
+  </div>
+
+  <div class="page-head" style="border-radius:6px 6px 0 0;">
+    <div style="display:flex; gap:14px; align-items:baseline;">
+      <h1>{charName.toUpperCase()}</h1>
+      <span class="meta">v1.25 ・ {counts.combos}コンボ群 ・ {ENDER_CLASSES.length}分類 ・ {KNOCKDOWN_SITUATIONS.length}状況</span>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button type="button" id="btn-add-combo-top" class="btn btn-sm btn-primary" style="background:#fff; color:#111; border-color:#fff;">＋ コンボ</button>
+      <a href="/mock/okizeme/new" class="btn btn-sm" style="background:transparent; color:#fff; border-color:#444;">＋ 起き攻め</a>
+      <a href="/mock/situation/new" class="btn btn-sm" style="background:transparent; color:#fff; border-color:#444;">＋ ダウン状況</a>
+    </div>
+  </div>
+
+  <div class="filter-bar filter-bar-row" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:24px;">
+    <button type="button" id="filter-self-only" class="chip chip-toggle" aria-pressed="false">
+      <span class="chip-toggle-mark" aria-hidden="true"></span>
+      自身作成のみ
+      <span class="chip-toggle-count">{selfMadeCount}/{counts.combos}</span>
+    </button>
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">分類</span>
+    <select id="filter-major" class="select select-inline">
+      <option value="">大分類すべて</option>
+      {majorVals.map(m => <option value={m}>{m}</option>)}
+    </select>
+    <select id="filter-minor" class="select select-inline">
+      <option value="">小分類すべて</option>
+      {Object.entries(minorsByMajor).flatMap(([maj, minors]) =>
+        minors.map(min => <option value={min} data-major={maj}>{min}</option>)
+      )}
+    </select>
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">タグ</span>
+    <button class="chip">画面端</button>
+    <button class="chip">画面中央</button>
+    <button class="chip">DR始動</button>
+    <button class="chip">確反</button>
+  </div>
+
+  <section style="margin-bottom:32px;">
+    <div class="section-head">
+      <h2>コンボ</h2>
+      <span style="font-size:0.76rem; color:var(--muted);">≡ をドラッグで並び替え／行間ホバーで挿入</span>
+    </div>
+
+    <NotationToggle character={charName} />
+
+    <table class="data-table" id="combo-table">
+      <colgroup>
+        <col style="width:24px;" />
+        <col style="width:172px;" />
+        <col />
+        <col style="width:128px;" />
+        <col style="width:104px;" />
+        <col style="width:120px;" />
+        <col style="width:64px;" />
+        <col style="width:90px;" />
+      </colgroup>
+      {majorGroups.map(({ major, total, minors }) => (
+        <>
+          <!-- ── 大分類ヘッダー ── -->
+          <tbody class="combo-major-head" data-head-major={major}>
+            <tr>
+              <td colspan="8" class="combo-major-cell">
+                <div class="combo-major-inner">
+                  <span class="combo-major-title">{major || '未分類'}</span>
+                  <span class="combo-major-count">{total}コンボ</span>
+                  <button type="button" class="btn-add-minor" data-major={major}>＋ 小分類追加</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+
+          <!-- ── 列名（大分類の下） ── -->
+          <tbody class="combo-col-head" data-head-major={major}>
+            <tr>
+              <th style="padding-left:8px; padding-right:0;"></th>
+              <th>タイトル</th>
+              <th>コマンド</th>
+              <th>状況</th>
+              <th>投稿者</th>
+              <th>〆分類</th>
+              <th class="col-num">ダメージ</th>
+              <th></th>
+            </tr>
+          </tbody>
+
+          {minors.map(({ minor, items }) => (
+            <>
+              <!-- ── 小分類サブヘッダー ── -->
+              <tbody class="combo-section-head" data-head-major={major} data-head-minor={minor}>
+                <tr>
+                  <td colspan="8" class="combo-minor-cell">
+                    <div class="combo-minor-inner">
+                      <span class="combo-minor-title">{minor || '未分類'}</span>
+                      <span class="combo-minor-rule" />
+                      <span class="combo-minor-count">{items.length}件</span>
+                      <div class="combo-minor-actions">
+                        <button type="button" class="btn-minor-rename" data-major={major} data-minor={minor} title="小分類名を変更">✎ 名前変更</button>
+                        <button type="button" class="btn-add-combo-minor" data-major={major} data-minor={minor}>＋ コンボ追加</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+              <!-- ── 空ドロップゾーン（コンボなし小分類用） ── -->
+              <tbody class={`combo-group combo-drop-zone${items.length === 0 ? ' dz-empty' : ''}`} data-major={major} data-minor={minor}>
+                <tr>
+                  <td colspan="8" class="drop-zone-cell">
+                    <span class="drop-zone-hint">コンボをここにドラッグして追加</span>
+                  </td>
+                </tr>
+              </tbody>
+              {items.map((c) => {
+        const routes = getComboRoutes(c);
+        const branched = hasBranches(c);
+        const broken = getComboBrokenCount(c);
+        return (
+          <tbody class="combo-group" data-combo-id={c.id} data-source={c.sourceType} data-major={c.categoryMajor ?? ''} data-minor={c.categoryMinor ?? ''}>
+            <tr class="insert-here-row">
+              <td colspan="8"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
+            </tr>
+            {!branched && (() => {
+              const r = routes[0];
+              const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+              const okizemeList = r.leaf.enderClassId ? getOkizemeByEnderClass(r.leaf.enderClassId) : [];
+              return (
+                <>
+                  <tr>
+                    <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
+                    <td><a href={`/mock/combo/${c.id}`} class="row-link col-title">{c.title}</a></td>
+                    <td><Notation inputs={r.fullInputs} size="sm" /></td>
+                    <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
+                    <td class="col-poster">
+                      {c.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
+                      {c.sourceType === 'shared' && <span class="poster-name">{c.ownerLabel}</span>}
+                      {c.sourceType === 'forked' && <><span class="tag">fork</span><span class="poster-name">{c.ownerLabel}</span></>}
+                      {c.visibility === 'private' && <span class="tag tag-private">🔒</span>}
+                      {c.visibility === 'unlisted' && <span class="tag tag-unlisted">🔗</span>}
+                    </td>
+                    <td class="col-ender">
+                      <span title={ender?.displayName}>{ender ? ender.displayName : '—'}</span>
+                      {okizemeList.length > 0 && (
+                        <button type="button" class="okizeme-toggle" data-okizeme-toggle={r.leaf.id}
+                          title={`起き攻め ${okizemeList.length}件を展開`}>
+                          起き攻め{okizemeList.length}件
+                        </button>
+                      )}
+                    </td>
+                    <td class="col-num"><span class="dmg">{(r.leaf.damage ?? 0).toLocaleString()}</span></td>
+                    <td class="col-actions">
+                      {broken > 0 && <span class="tag tag-warn">⚠ 不可{broken}</span>}
+                      {c.visibility !== 'public' && (
+                        <button type="button" class="btn-upload" data-combo-id={c.id}>アップロード</button>
+                      )}
+                    </td>
+                  </tr>
+                  {okizemeList.length > 0 && (
+                    <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} style="display:none;">
+                      <td colspan="8" class="okizeme-panel-cell">
+                        <div class="okizeme-panel">
+                          <div class="okizeme-panel-hd">
+                            <span class="okizeme-panel-count">起き攻め {okizemeList.length}件</span>
+                            {ender && <span class="okizeme-panel-ender">{ender.displayName}{ender.frameAdvantage ? ` / ${ender.frameAdvantage}` : ''}</span>}
+                          </div>
+                          <div class="okizeme-cards">
+                            {okizemeList.map(o => (
+                              <div class="okizeme-card">
+                                <div class="okizeme-card-hd">
+                                  <span class="okizeme-card-title">{o.title}</span>
+                                  <span class="okizeme-card-flags">
+                                    {o.flags.mid && <span class="okizeme-flag">中段</span>}
+                                    {o.flags.low && <span class="okizeme-flag">下段</span>}
+                                    {o.flags.throw && <span class="okizeme-flag">投げ</span>}
+                                    {o.flags.safeJump && <span class="okizeme-flag okizeme-flag-safe">詐欺</span>}
+                                  </span>
+                                </div>
+                                <div class="okizeme-card-inputs"><Notation inputs={o.inputs} size="sm" /></div>
+                                <div class="okizeme-card-wk">
+                                  {o.vsWakeup.guard && <div><span class="wk-label">GD</span>{' '}{o.vsWakeup.guard}</div>}
+                                  {o.vsWakeup.mash && <div><span class="wk-label">暴れ</span>{' '}{o.vsWakeup.mash}</div>}
+                                  {o.vsWakeup.invincible && <div><span class="wk-label">無敵</span>{' '}{o.vsWakeup.invincible}</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })()}
+
+            {branched && (
+              <>
+                <tr class="combo-parent-row">
+                  <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
+                  <td>
+                    <a href={`/mock/combo/${c.id}`} class="row-link col-title">
+                      {c.title}
+                    </a>
+                    <button type="button" class="branch-toggle" data-combo-id={c.id} title="分岐ルートを展開/折り畳み">
+                      <span class="branch-toggle-icon">▶</span>
+                      <span class="tag" style="background:#111; color:#fff; font-size:0.66rem;">{routes.length}ルート</span>
+                    </button>
+                  </td>
+                  <td colspan="2" style="color:var(--muted); font-size:0.82rem;">
+                    <Notation inputs={c.root.segment} size="sm" />
+                    <span style="margin-left:8px; color:var(--muted);">…の後に分岐</span>
+                  </td>
+                  <td class="col-poster">
+                    {c.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
+                    {c.sourceType === 'shared' && <span class="poster-name">{c.ownerLabel}</span>}
+                    {c.sourceType === 'forked' && <><span class="tag">fork</span><span class="poster-name">{c.ownerLabel}</span></>}
+                    {c.visibility === 'private' && <span class="tag tag-private">🔒</span>}
+                    {c.visibility === 'unlisted' && <span class="tag tag-unlisted">🔗</span>}
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td class="col-actions">
+                    {broken > 0 && <span class="tag tag-warn">⚠ 不可{broken}</span>}
+                    {c.visibility !== 'public' && (
+                      <button type="button" class="btn-upload" data-combo-id={c.id}>アップロード</button>
+                    )}
+                  </td>
+                </tr>
+                {routes.map((r, ri) => {
+                  const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+                  const tailInputs = r.pathSegments[r.pathSegments.length - 1];
+                  const ghostInputs = r.pathSegments.slice(0, -1).join(' > ');
+                  const isLastRoute = ri === routes.length - 1;
+                  const okizemeList = r.leaf.enderClassId ? getOkizemeByEnderClass(r.leaf.enderClassId) : [];
+                  return (
+                    <>
+                      <tr class="combo-child-row" data-branch-of={c.id} style="display:none;">
+                        <td class="cell-handle"></td>
+                        <td style="padding-left:32px; color:var(--muted-strong); font-size:0.85rem;">
+                          <span style="color:var(--muted); font-family:'JetBrains Mono',monospace;">{isLastRoute ? '└─' : '├─'}</span>
+                          {' '}
+                          <a href={`/mock/combo/${c.id}#${r.leaf.id}`} class="row-link" style="display:inline; color:var(--text);">
+                            {r.leaf.routeLabel ?? '(無名ルート)'}
+                          </a>
+                        </td>
+                        <td><Notation inputs={tailInputs} ghostInputs={ghostInputs} branchElbow={isLastRoute ? '└─›' : '├─›'} size="sm" /></td>
+                        <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
+                        <td></td>
+                        <td class="col-ender">
+                          <span title={ender?.displayName}>{ender ? ender.displayName : '—'}</span>
+                          {okizemeList.length > 0 && (
+                            <button type="button" class="okizeme-toggle" data-okizeme-toggle={r.leaf.id}
+                              title={`起き攻め ${okizemeList.length}件を展開`}>
+                              <span class="okizeme-toggle-icon">◇</span>{okizemeList.length}
+                            </button>
+                          )}
+                        </td>
+                        <td class="col-num"><span class="dmg">{(r.leaf.damage ?? 0).toLocaleString()}</span></td>
+                        <td>{(r.leaf.votes?.brokenInCurrentVer ?? 0) > 0 && <span class="tag tag-warn">⚠ {r.leaf.votes!.brokenInCurrentVer}</span>}</td>
+                      </tr>
+                      {okizemeList.length > 0 && (
+                        <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} data-okizeme-branch-of={c.id} style="display:none;">
+                          <td colspan="8" class="okizeme-panel-cell">
+                            <div class="okizeme-panel">
+                              <div class="okizeme-panel-hd">
+                                <span class="okizeme-panel-count">起き攻め {okizemeList.length}件</span>
+                                {ender && <span class="okizeme-panel-ender">{ender.displayName}{ender.frameAdvantage ? ` / ${ender.frameAdvantage}` : ''}</span>}
+                              </div>
+                              <div class="okizeme-cards">
+                                {okizemeList.map(o => (
+                                  <div class="okizeme-card">
+                                    <div class="okizeme-card-hd">
+                                      <span class="okizeme-card-title">{o.title}</span>
+                                      <span class="okizeme-card-flags">
+                                        {o.flags.mid && <span class="okizeme-flag">中段</span>}
+                                        {o.flags.low && <span class="okizeme-flag">下段</span>}
+                                        {o.flags.throw && <span class="okizeme-flag">投げ</span>}
+                                        {o.flags.safeJump && <span class="okizeme-flag okizeme-flag-safe">詐欺</span>}
+                                      </span>
+                                    </div>
+                                    <div class="okizeme-card-inputs"><Notation inputs={o.inputs} size="sm" /></div>
+                                    <div class="okizeme-card-wk">
+                                      {o.vsWakeup.guard && <div><span class="wk-label">GD</span>{' '}{o.vsWakeup.guard}</div>}
+                                      {o.vsWakeup.mash && <div><span class="wk-label">暴れ</span>{' '}{o.vsWakeup.mash}</div>}
+                                      {o.vsWakeup.invincible && <div><span class="wk-label">無敵</span>{' '}{o.vsWakeup.invincible}</div>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </>
+            )}
+          </tbody>
+        );
+      })}
+            </>
+          ))}
+        </>
+      ))}
+
+      <!-- インラインエディタ（初期は非表示、＋クリックで表示。tbodyとしてテーブル内を移動できる） -->
+      <tbody id="inline-editor-host" class="inline-editor-tbody" style="display:none;">
+        <tr class="editor-drag-chip-row">
+          <td colspan="8" style="padding:4px 8px;">
+            <div class="editor-drag-chip">
+              <button type="button" id="editor-drag-handle" class="editor-drag-btn" title="ドラッグして挿入位置を変更">≡</button>
+              <strong>新規コンボを追加</strong>
+              <span id="insert-pos-label"></span>
+            </div>
+          </td>
+        </tr>
+        <tr class="editor-card-row">
+          <td colspan="8" style="padding:0;">
+            <div class="card card-emph" style="padding:14px 16px; margin:8px 0; background:var(--surface);">
+              <ComboEditor mode="inline" />
+            </div>
+          </td>
+        </tr>
+      </tbody>
+
+      <!-- 末尾の挿入ポイント（最後のコンボの後に挿入するための領域） -->
+      <tbody class="combo-tail">
+        <tr class="insert-here-row">
+          <td colspan="8"><button type="button" class="insert-here-btn" data-insert-pos="end">＋ ここに挿入</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section style="margin-bottom:32px;">
+    <div class="section-head">
+      <h2>〆分類（起き攻めのカテゴリ）</h2>
+      <a href="/mock/ender-class/list" class="btn btn-sm">分類を管理</a>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px;">
+      {ENDER_CLASSES.map(ec => (
+        <div class="card">
+          <div style="font-weight:700; margin-bottom:4px;">{ec.displayName}</div>
+          <div style="font-size:0.78rem; color:var(--muted);">
+            <span class="dmg" style="color:var(--text); font-size:0.85rem;">{ec.frameAdvantage}</span>
+            <span style="margin:0 6px; color:var(--border-strong);">|</span>
+            コンボ {ec.comboCount} ・ 起き攻め {ec.okizemeCount}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>ダウン状況</h2>
+      <a href="/mock/situation/new" class="btn btn-sm">＋ 追加</a>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>状況</th>
+          <th>〆分類</th>
+          <th>備考</th>
+        </tr>
+      </thead>
+      <tbody>
+        {KNOCKDOWN_SITUATIONS.map(s => (
+          <tr>
+            <td><a href={`/mock/situation/${s.id}`} class="row-link col-title">{s.label}</a></td>
+            <td><span class="tag">{getEnderClassById(s.enderClassId)?.displayName}</span></td>
+            <td style="color:var(--muted); font-size:0.82rem;">{s.notes ?? ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+
+  <style>
+    /* ── 個人ページ通知バナー ── */
+    .personal-page-notice {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--info-bg);
+      color: var(--info-fg);
+      border: 1px solid rgba(29,78,216,0.2);
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+    }
+    .personal-page-notice strong { font-size: 0.88rem; }
+    .notice-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .notice-sub {
+      margin-left: 8px;
+      font-size: 0.78rem;
+      color: #3b6fd4;
+    }
+
+    /* ── アップロードボタン ── */
+    .col-actions {
+      white-space: nowrap;
+    }
+    .btn-upload {
+      display: inline-flex;
+      align-items: center;
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: var(--muted-strong);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+      line-height: 1.6;
+    }
+    .btn-upload:hover {
+      background: var(--good-bg);
+      color: var(--good-fg);
+      border-color: var(--good-fg);
+    }
+
+    /* ── 列名行（各大分類の直下） ── */
+    .combo-col-head th {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-align: left;
+      padding: 6px 8px;
+      background: transparent;
+      border-bottom: 1px solid var(--border);
+    }
+    .combo-col-head th.col-num { text-align: right; padding-right: 10px; }
+
+    /* ── フィルタバー（1行統合レイアウト） ── */
+    .filter-bar-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      row-gap: 6px;
+    }
+    .filter-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--border-strong);
+      margin: 0 4px;
+    }
+    .select-inline {
+      height: 26px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      width: auto;
+      min-width: 132px;
+    }
+    /* チップ・トグル（チェック付きピル） */
+    .chip-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chip-toggle-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+      background: #fff;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .chip-toggle[aria-pressed="true"] .chip-toggle-mark {
+      background: #111;
+      border-color: #111;
+    }
+    .chip-toggle[aria-pressed="true"] .chip-toggle-mark::after {
+      content: '';
+      width: 7px;
+      height: 4px;
+      border-left: 2px solid #fff;
+      border-bottom: 2px solid #fff;
+      transform: rotate(-45deg) translate(1px, -1px);
+    }
+    .chip-toggle-count {
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .chip-toggle[aria-pressed="true"] .chip-toggle-count {
+      color: var(--text);
+    }
+
+    /* ── 大分類ヘッダー（独立した重厚なセクション帯） ── */
+    .combo-major-cell {
+      padding: 0 !important;
+      border-bottom: none !important;
+      background: transparent !important;
+    }
+    .combo-major-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 14px 14px;
+      margin-top: 20px;
+      border-left: 4px solid #f59e0b;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .combo-major-head:first-of-type .combo-major-inner { margin-top: 0; }
+    .combo-major-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+    .combo-major-count {
+      font-size: 0.76rem;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── 小分類サブヘッダー（バンド型・配下のコンボが明確に） ── */
+    .combo-minor-cell {
+      padding: 0 !important;
+      border-bottom: none !important;
+      background: transparent !important;
+    }
+    .combo-minor-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 16px 7px 22px;
+      margin-top: 6px;
+      background: var(--surface2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border-strong);
+      position: relative;
+    }
+    .combo-minor-inner::before {
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 14px;
+      background: var(--muted);
+      border-radius: 2px;
+    }
+    .combo-minor-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--text-soft);
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .combo-minor-rule { display: none; }
+    .combo-minor-count {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ── コンボ行に左レール（小分類内であることを視覚的に示す） ── */
+    .combo-group tr:not(.insert-here-row) td:first-child {
+      border-left: 2px solid transparent;
+    }
+    .combo-group:hover tr:not(.insert-here-row) td:first-child {
+      border-left-color: var(--border-strong);
+    }
+
+    /* ── テーブル: 列幅を固定してコマンド欄を最大化 ── */
+    #combo-table { table-layout: fixed; }
+    #combo-table th,
+    #combo-table td { padding-left: 8px; padding-right: 8px; }
+    #combo-table th { font-size: 0.7rem; padding-left: 8px; padding-right: 8px; }
+
+    /* ── タイトル列: 小さめ・折返し可 ── */
+    #combo-table .col-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      line-height: 1.35;
+      display: block;
+      word-break: break-word;
+    }
+
+    /* ── 投稿者列: 統一スタイル ── */
+    .col-poster {
+      font-size: 0.74rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .col-poster .tag { vertical-align: middle; font-size: 0.68rem; padding: 1px 6px; }
+    .col-poster .poster-name { margin-left: 4px; vertical-align: middle; }
+
+    /* ── 〆分類列: 折返し防止＋小さめ ── */
+    .col-ender {
+      font-size: 0.76rem;
+      color: var(--muted-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── ダメージ列: コンパクト ── */
+    #combo-table .col-num { font-size: 0.85rem; padding-right: 10px; }
+    #combo-table .col-num .dmg { font-size: 0.88rem; }
+
+    /* ── 状況タグ: コンパクト＋折返し可 ── */
+    #combo-table td .tag { font-size: 0.68rem; padding: 1px 6px; }
+
+    .combo-parent-row td { background: var(--surface); font-weight: 600; }
+    .combo-parent-row td a { color: var(--text); }
+    .combo-child-row td { background: #fff; }
+
+    /* ── 分岐トグルボタン ── */
+    .branch-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px 6px 2px 4px;
+      border-radius: 4px;
+      margin-left: 6px;
+      font-family: inherit;
+      transition: background 0.1s;
+    }
+    .branch-toggle:hover { background: var(--surface3); }
+    .branch-toggle-icon {
+      font-size: 0.6rem;
+      color: var(--muted);
+      transition: transform 0.18s;
+      line-height: 1;
+    }
+    .branch-toggle.is-open .branch-toggle-icon { transform: rotate(90deg); }
+
+    /* ── 並び替えハンドル ── */
+    .cell-handle {
+      width: 24px;
+      padding-left: 6px !important;
+      padding-right: 0 !important;
+      text-align: center;
+    }
+    .row-drag-handle {
+      display: inline-block;
+      color: var(--border-strong);
+      cursor: grab;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 4px 2px;
+      user-select: none;
+      transition: color 0.12s;
+    }
+    .combo-group:hover .row-drag-handle { color: var(--muted); }
+    .row-drag-handle:hover { color: var(--text) !important; }
+    .row-drag-handle:active { cursor: grabbing; }
+
+    /* SortableJS用のドラッグ状態スタイル */
+    .sortable-ghost {
+      opacity: 0.3;
+      background: var(--surface) !important;
+    }
+    .sortable-ghost td { background: var(--surface) !important; }
+    .sortable-chosen .row-drag-handle { color: var(--text) !important; }
+    .sortable-drag {
+      opacity: 0.9 !important;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+      background: #fff;
+    }
+
+    /* ── ホバー時のみ見える挿入ポイント ── */
+    .insert-here-row td {
+      padding: 0 !important;
+      border: none !important;
+      background: transparent !important;
+      height: 10px;
+    }
+    .insert-here-btn {
+      display: block;
+      width: 100%;
+      height: 10px;
+      line-height: 10px;
+      background: transparent;
+      border: none;
+      color: transparent;
+      font-size: 0.68rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+      font-family: inherit;
+      text-align: center;
+      transition: color 0.1s, background 0.1s;
+      border-radius: 3px;
+    }
+    .insert-here-row:hover .insert-here-btn,
+    .insert-here-btn:hover {
+      color: var(--text);
+      background: var(--accent-soft);
+    }
+    .insert-here-btn.is-active {
+      color: var(--text);
+      background: var(--accent-soft);
+    }
+    /* ドラッグ中は挿入ポイントを完全に隠す（誤クリック防止） */
+    body.is-dragging-combo .insert-here-row { pointer-events: none; }
+    body.is-dragging-combo .insert-here-btn { display: none; }
+
+    /* ── インラインエディタ（テーブル内 tbody として配置） ── */
+    .inline-editor-tbody > tr > td { background: transparent !important; border: none !important; }
+
+    /* チップ＝ヘッダ。通常時は地味な見た目、ドラッグ中は黒いピル */
+    .editor-drag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 14px 4px 6px;
+      font-size: 0.85rem;
+      max-width: 100%;
+      transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+    }
+    .editor-drag-chip strong { font-size: 0.9rem; }
+    .editor-drag-chip #insert-pos-label {
+      color: var(--muted);
+      font-size: 0.72rem;
+      margin-left: 6px;
+    }
+
+    /* ドラッグ中：カードを隠して、チップを黒ピル化 */
+    .inline-editor-tbody.is-being-dragged .editor-card-row { display: none; }
+    .inline-editor-tbody.is-being-dragged .editor-drag-chip {
+      background: #111;
+      color: #fff;
+      border-radius: 999px;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+    }
+    .inline-editor-tbody.is-being-dragged .editor-drag-chip .editor-drag-btn {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.25);
+      color: #fff;
+      height: 22px;
+      padding: 0 8px;
+      font-size: 0.9rem;
+    }
+    .inline-editor-tbody.is-being-dragged .editor-drag-chip #insert-pos-label {
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* ── エディタ自体のドラッグハンドル ── */
+    .editor-drag-btn {
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      color: var(--muted-strong);
+      font-size: 1.05rem;
+      padding: 2px 10px;
+      border-radius: 4px;
+      cursor: grab;
+      user-select: none;
+      font-family: inherit;
+      line-height: 1;
+      height: 26px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .editor-drag-btn:hover { background: var(--surface3); color: var(--text); }
+    .editor-drag-btn:active { cursor: grabbing; }
+
+    body.editor-dragging {
+      cursor: grabbing !important;
+      user-select: none !important;
+    }
+    body.editor-dragging * { user-select: none !important; }
+
+    /* ── 起き攻めトグルボタン ── */
+    .col-ender { white-space: normal; }
+    .okizeme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+      padding: 0 5px;
+      cursor: pointer;
+      font-size: 0.65rem;
+      color: var(--muted);
+      font-family: inherit;
+      line-height: 1.6;
+      margin-left: 4px;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+      vertical-align: middle;
+    }
+    .okizeme-toggle:hover { background: var(--surface3); color: var(--text); border-color: var(--muted); }
+    .okizeme-toggle.is-open {
+      background: var(--accent-soft);
+      color: var(--text);
+      border-color: #f59e0b;
+    }
+
+
+    /* ── 起き攻めパネル ── */
+    .okizeme-panel-cell {
+      padding: 0 !important;
+      background: var(--surface2) !important;
+      border-top: none !important;
+      border-bottom: 1px solid var(--border) !important;
+    }
+    .okizeme-panel {
+      padding: 10px 16px 12px 24px;
+    }
+    .okizeme-panel-hd {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .okizeme-panel-count {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--muted-strong);
+      letter-spacing: 0.04em;
+    }
+    .okizeme-panel-ender {
+      font-size: 0.7rem;
+      color: var(--muted);
+      background: var(--surface3);
+      padding: 1px 7px;
+      border-radius: 3px;
+    }
+    .okizeme-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .okizeme-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .okizeme-card-hd {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .okizeme-card-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .okizeme-card-flags { display: flex; gap: 3px; flex-wrap: wrap; }
+    .okizeme-flag {
+      font-size: 0.62rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--surface3);
+      color: var(--muted-strong);
+      font-weight: 600;
+    }
+    .okizeme-flag-safe { background: #d97706/20; color: #f59e0b; }
+    .okizeme-card-inputs { margin-bottom: 4px; }
+    .okizeme-card-wk {
+      font-size: 0.7rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .wk-label {
+      display: inline-block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      color: var(--muted-strong);
+      background: var(--surface3);
+      padding: 0 4px;
+      border-radius: 2px;
+      margin-right: 4px;
+    }
+
+    /* ── 小分類アクションボタン群 ── */
+    .combo-minor-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .btn-minor-rename,
+    .btn-add-combo-minor {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-family: inherit;
+      color: var(--muted-strong);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+      line-height: 1.5;
+    }
+    .btn-minor-rename:hover { background: var(--surface3); color: var(--text); border-color: var(--muted); }
+    .btn-add-combo-minor {
+      border-color: #f59e0b;
+      color: #b45309;
+    }
+    .btn-add-combo-minor:hover { background: #fef3c7; color: #92400e; border-color: #d97706; }
+
+    /* ── 大分類ヘッダーの小分類追加ボタン ── */
+    .btn-add-minor {
+      display: inline-flex;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 3px 12px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: #111;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s;
+      line-height: 1.55;
+    }
+    .btn-add-minor:hover {
+      background: #f59e0b;
+      border-color: #f59e0b;
+      color: #111;
+      box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
+    }
+
+    /* ── 空小分類のドロップゾーン ── */
+    .drop-zone-cell {
+      padding: 10px 16px 10px 24px !important;
+      background: transparent !important;
+      border: none !important;
+    }
+    .drop-zone-hint {
+      display: inline-block;
+      width: 100%;
+      padding: 8px 12px;
+      border: 2px dashed var(--border-strong);
+      border-radius: 5px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    /* ドロップゾーンは dz-empty クラスがあるときだけ表示 */
+    .combo-drop-zone { display: none; }
+    .combo-drop-zone.dz-empty { display: table-row-group; }
+    /* ドラッグ中はオレンジ強調 */
+    body.is-dragging-combo .combo-drop-zone.dz-empty .drop-zone-hint {
+      border-color: #f59e0b;
+      background: #fef9ee;
+      color: #92400e;
+    }
+  </style>
+
+  <script>
+    import Sortable from 'sortablejs';
+
+    // ── 分岐ツリー 折り畳みトグル ──
+    document.querySelectorAll<HTMLButtonElement>('.branch-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const comboId = btn.dataset.comboId;
+        const isOpen = btn.classList.toggle('is-open');
+        document.querySelectorAll<HTMLElement>(`tr[data-branch-of="${comboId}"]`).forEach(row => {
+          row.style.display = isOpen ? '' : 'none';
+        });
+        // 折り畳み時: 子行の起き攻めパネルをすべて閉じる
+        if (!isOpen) {
+          document.querySelectorAll<HTMLElement>(`[data-okizeme-branch-of="${comboId}"]`).forEach(panel => {
+            panel.style.display = 'none';
+            const panelId = panel.dataset.okizemePanel;
+            if (panelId) {
+              const toggleBtn = document.querySelector<HTMLElement>(`[data-okizeme-toggle="${panelId}"]`);
+              toggleBtn?.classList.remove('is-open');
+            }
+          });
+        }
+      });
+    });
+
+    // ── 起き攻め展開トグル ──
+    document.querySelectorAll<HTMLButtonElement>('.okizeme-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const leafId = btn.dataset.okizemeToggle;
+        const isOpen = btn.classList.toggle('is-open');
+        const panel = document.querySelector<HTMLElement>(`[data-okizeme-panel="${leafId}"]`);
+        if (panel) panel.style.display = isOpen ? '' : 'none';
+      });
+    });
+
+    // ── 自身作成のみ / 大分類 / 小分類 フィルタ ──
+    const filters = { selfOnly: false, major: '', minor: '' };
+    function applyFilters() {
+      document.querySelectorAll<HTMLElement>('tbody.combo-group').forEach(grp => {
+        const src = grp.dataset.source ?? '';
+        const okSource = !filters.selfOnly || src === 'personal' || src === 'shared';
+        const okMajor = !filters.major || grp.dataset.major === filters.major;
+        const okMinor = !filters.minor || grp.dataset.minor === filters.minor;
+        grp.style.display = (okSource && okMajor && okMinor) ? '' : 'none';
+      });
+      // 小分類サブヘッダ: 配下に表示中のコンボが1件以上あれば表示
+      document.querySelectorAll<HTMLElement>('tbody.combo-section-head').forEach(head => {
+        const hMajor = head.dataset.headMajor ?? '';
+        const hMinor = head.dataset.headMinor ?? '';
+        const hasVisible = Array.from(
+          document.querySelectorAll<HTMLElement>('tbody.combo-group')
+        ).some(grp => grp.style.display !== 'none' && grp.dataset.major === hMajor && grp.dataset.minor === hMinor);
+        head.style.display = hasVisible ? '' : 'none';
+      });
+      // 大分類ヘッダ: 配下に表示中のコンボが1件以上あれば表示
+      document.querySelectorAll<HTMLElement>('tbody.combo-major-head').forEach(head => {
+        const hMajor = head.dataset.headMajor ?? '';
+        const hasVisible = Array.from(
+          document.querySelectorAll<HTMLElement>('tbody.combo-group')
+        ).some(grp => grp.style.display !== 'none' && grp.dataset.major === hMajor);
+        head.style.display = hasVisible ? '' : 'none';
+      });
+    }
+
+    const selfOnlyBtn = document.getElementById('filter-self-only') as HTMLButtonElement | null;
+    selfOnlyBtn?.addEventListener('click', () => {
+      const next = selfOnlyBtn.getAttribute('aria-pressed') !== 'true';
+      selfOnlyBtn.setAttribute('aria-pressed', String(next));
+      selfOnlyBtn.classList.toggle('chip-on', next);
+      filters.selfOnly = next;
+      applyFilters();
+    });
+
+    const majorSel = document.getElementById('filter-major') as HTMLSelectElement | null;
+    const minorSel = document.getElementById('filter-minor') as HTMLSelectElement | null;
+    if (majorSel && minorSel) {
+      majorSel.addEventListener('change', () => {
+        filters.major = majorSel.value;
+        // 小分類の候補を大分類で絞り込み
+        Array.from(minorSel.options).forEach(opt => {
+          if (!opt.value) return;
+          opt.hidden = !!filters.major && opt.dataset.major !== filters.major;
+        });
+        // 選択中の小分類が候補から外れたらリセット
+        const cur = Array.from(minorSel.options).find(o => o.value === minorSel.value);
+        if (cur?.hidden) { minorSel.value = ''; filters.minor = ''; }
+        applyFilters();
+      });
+      minorSel.addEventListener('change', () => {
+        filters.minor = minorSel.value;
+        applyFilters();
+      });
+    }
+
+    // ── インラインエディタ展開（エディタ自体がテーブル内を移動する） ──
+    const editorHost = document.getElementById('inline-editor-host') as HTMLTableSectionElement;
+    const comboTableEl = document.getElementById('combo-table')!;
+    let activeBtn: HTMLElement | null = null;
+    let editorOpen = false;
+
+    function updatePosLabel() {
+      if (!editorOpen) return;
+      const realGroups = Array.from(document.querySelectorAll<HTMLElement>('tbody.combo-group'));
+      const beforeCount = realGroups.filter(g => {
+        const pos = editorHost.compareDocumentPosition(g);
+        return (pos & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
+      }).length;
+      let label: string;
+      if (beforeCount === 0) label = '先頭に挿入';
+      else if (beforeCount === realGroups.length) label = '末尾に挿入';
+      else label = `${beforeCount} 番目の後に挿入`;
+      document.getElementById('insert-pos-label')!.textContent = label;
+    }
+
+    function openEditorAt(btn: HTMLElement) {
+      activeBtn?.classList.remove('is-active');
+      activeBtn = btn;
+      btn.classList.add('is-active');
+
+      const pos = btn.dataset.insertPos;
+      if (pos === 'end') {
+        const tail = comboTableEl.querySelector('tbody.combo-tail');
+        if (tail) tail.before(editorHost);
+        else comboTableEl.appendChild(editorHost);
+      } else {
+        const ownerGroup = btn.closest<HTMLElement>('tbody.combo-group');
+        if (ownerGroup) ownerGroup.before(editorHost);
+      }
+      editorHost.style.display = '';
+      editorOpen = true;
+      updatePosLabel();
+      editorHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function closeEditor() {
+      editorHost.style.display = 'none';
+      editorOpen = false;
+      activeBtn?.classList.remove('is-active');
+      activeBtn = null;
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.insert-here-btn').forEach(btn => {
+      btn.addEventListener('click', () => openEditorAt(btn));
+    });
+
+    document.getElementById('btn-add-combo-top')?.addEventListener('click', () => {
+      const firstBtn = document.querySelector<HTMLElement>('tbody.combo-group .insert-here-btn');
+      if (firstBtn) openEditorAt(firstBtn);
+    });
+
+    editorHost.addEventListener('combo-editor:cancel', () => closeEditor());
+
+    // ── エディタ自体（tbody）をテーブル内で移動させる ──
+    const editorDragBtn = document.getElementById('editor-drag-handle');
+    editorDragBtn?.addEventListener('pointerdown', (downEv: PointerEvent) => {
+      downEv.preventDefault();
+      if (!editorOpen) return;
+
+      document.body.classList.add('editor-dragging');
+      editorHost.classList.add('is-being-dragged');
+
+      const onMove = (ev: PointerEvent) => {
+        // エディタ自体の上にカーソルがある場合は無視（自分を検出してしまうため）
+        editorHost.style.pointerEvents = 'none';
+        const elBelow = document.elementFromPoint(ev.clientX, ev.clientY);
+        editorHost.style.pointerEvents = '';
+
+        if (!elBelow) return;
+        const target = elBelow as HTMLElement;
+        if (editorHost.contains(target)) return;
+
+        const tail = target.closest<HTMLElement>('tbody.combo-tail');
+        const targetGroup = target.closest<HTMLElement>('tbody.combo-group');
+
+        if (tail) {
+          if (tail.previousElementSibling !== editorHost) {
+            tail.before(editorHost);
+            updatePosLabel();
+          }
+        } else if (targetGroup && targetGroup !== editorHost) {
+          const rect = targetGroup.getBoundingClientRect();
+          const above = ev.clientY < rect.top + rect.height / 2;
+          if (above && targetGroup.previousElementSibling !== editorHost) {
+            targetGroup.before(editorHost);
+            updatePosLabel();
+          } else if (!above && targetGroup.nextElementSibling !== editorHost) {
+            targetGroup.after(editorHost);
+            updatePosLabel();
+          }
+        }
+      };
+
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.body.classList.remove('editor-dragging');
+        editorHost.classList.remove('is-being-dragged');
+      };
+
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+
+    // ── 小分類のどのセクションにcobo-groupが属するか判定 ──
+    function getComboSection(el: HTMLElement): { major: string; minor: string } {
+      let prev = el.previousElementSibling as HTMLElement | null;
+      while (prev) {
+        if (prev.classList.contains('combo-section-head')) {
+          return { major: prev.dataset.headMajor ?? '', minor: prev.dataset.headMinor ?? '' };
+        }
+        prev = prev.previousElementSibling as HTMLElement | null;
+      }
+      return { major: '', minor: '' };
+    }
+
+    // ── ドロップゾーンの表示/非表示を更新 ──
+    // excludeItem: ドラッグ中のアイテム（まだ DOM に残っているため件数から除外）
+    function updateDropZones(excludeItem?: HTMLElement) {
+      document.querySelectorAll<HTMLElement>('tbody.combo-section-head').forEach(head => {
+        const major = head.dataset.headMajor ?? '';
+        const minor = head.dataset.headMinor ?? '';
+        const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
+          `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
+        )).filter(el => el !== excludeItem);
+        const dz = document.querySelector<HTMLElement>(
+          `tbody.combo-drop-zone[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
+        );
+        if (dz) dz.classList.toggle('dz-empty', realCombos.length === 0);
+        const countEl = head.querySelector('.combo-minor-count');
+        if (countEl) countEl.textContent = `${realCombos.length}件`;
+      });
+    }
+
+    // ページ初期表示時に同期
+    updateDropZones();
+
+    // ── SortableJS で並び替え ──
+    const comboTable = document.getElementById('combo-table');
+    if (comboTable) {
+      Sortable.create(comboTable, {
+        handle: '.row-drag-handle',
+        draggable: 'tbody.combo-group:not(.combo-drop-zone)',
+        animation: 180,
+        easing: 'cubic-bezier(0.2, 0, 0.2, 1)',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        forceFallback: true,
+        fallbackTolerance: 3,
+        onStart: (evt) => {
+          document.body.classList.add('is-dragging-combo');
+          updateDropZones(evt.item as HTMLElement);
+        },
+        onEnd: (evt) => {
+          document.body.classList.remove('is-dragging-combo');
+          updatePosLabel();
+          const movedItem = evt.item as HTMLElement;
+          const { major, minor } = getComboSection(movedItem);
+          movedItem.dataset.major = major;
+          movedItem.dataset.minor = minor;
+          updateDropZones();
+          applyFilters();
+        },
+      });
+    }
+
+    // ── 小分類追加 ──
+    function createSectionHead(major: string, minor: string): HTMLElement {
+      const tbody = document.createElement('tbody');
+      tbody.className = 'combo-section-head';
+      tbody.dataset.headMajor = major;
+      tbody.dataset.headMinor = minor;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="combo-minor-cell">
+            <div class="combo-minor-inner">
+              <span class="combo-minor-title">${minor || '未分類'}</span>
+              <span class="combo-minor-rule"></span>
+              <span class="combo-minor-count">0件</span>
+              <div class="combo-minor-actions">
+                <button type="button" class="btn-minor-rename" data-major="${major}" data-minor="${minor}" title="小分類名を変更">✎ 名前変更</button>
+                <button type="button" class="btn-add-combo-minor" data-major="${major}" data-minor="${minor}">＋ コンボ追加</button>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      return tbody;
+    }
+
+    function createDropZone(major: string, minor: string): HTMLElement {
+      const tbody = document.createElement('tbody');
+      tbody.className = 'combo-group combo-drop-zone dz-empty';
+      tbody.dataset.major = major;
+      tbody.dataset.minor = minor;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" class="drop-zone-cell">
+            <span class="drop-zone-hint">コンボをここにドラッグして追加</span>
+          </td>
+        </tr>`;
+      return tbody;
+    }
+
+    function attachMinorActionHandlers(container: HTMLElement) {
+      container.querySelectorAll<HTMLButtonElement>('.btn-minor-rename').forEach(btn => {
+        btn.addEventListener('click', () => handleMinorRename(btn));
+      });
+      container.querySelectorAll<HTMLButtonElement>('.btn-add-combo-minor').forEach(btn => {
+        btn.addEventListener('click', () => handleAddComboToMinor(btn));
+      });
+    }
+
+    // ── 小分類名変更 ──
+    function handleMinorRename(btn: HTMLButtonElement) {
+      const major = btn.dataset.major ?? '';
+      const oldMinor = btn.dataset.minor ?? '';
+      const newName = window.prompt('新しい小分類名を入力してください：', oldMinor);
+      if (!newName || newName === oldMinor) return;
+
+      // 同じ大分類内の全section-head・combo-group・drop-zoneを更新
+      document.querySelectorAll<HTMLElement>(`tbody.combo-section-head[data-head-major="${CSS.escape(major)}"][data-head-minor="${CSS.escape(oldMinor)}"]`).forEach(el => {
+        el.dataset.headMinor = newName;
+        const titleEl = el.querySelector('.combo-minor-title');
+        if (titleEl) titleEl.textContent = newName;
+        el.querySelectorAll<HTMLButtonElement>('[data-minor]').forEach(b => { b.dataset.minor = newName; });
+      });
+      document.querySelectorAll<HTMLElement>(`tbody.combo-group[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(oldMinor)}"]`).forEach(el => {
+        el.dataset.minor = newName;
+      });
+    }
+
+    // ── 小分類内にコンボ追加（エディタを末尾に配置） ──
+    function handleAddComboToMinor(btn: HTMLButtonElement) {
+      const major = btn.dataset.major ?? '';
+      const minor = btn.dataset.minor ?? '';
+      const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
+        `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
+      ));
+      if (realCombos.length > 0) {
+        realCombos[realCombos.length - 1].after(editorHost);
+      } else {
+        const dz = document.querySelector<HTMLElement>(
+          `tbody.combo-drop-zone[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
+        );
+        (dz ?? document.querySelector<HTMLElement>(`tbody.combo-section-head[data-head-major="${CSS.escape(major)}"][data-head-minor="${CSS.escape(minor)}"]`))?.after(editorHost);
+      }
+      editorHost.style.display = '';
+      editorOpen = true;
+      updatePosLabel();
+      editorHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // ── 大分類への小分類追加 ──
+    document.querySelectorAll<HTMLButtonElement>('.btn-add-minor').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const major = btn.dataset.major ?? '';
+        const name = window.prompt('新しい小分類の名前を入力してください：', '');
+        if (!name) return;
+
+        // 同じ大分類の最後のセクション（またはドロップゾーン）の後に挿入
+        const allHeads = Array.from(document.querySelectorAll<HTMLElement>(
+          `tbody.combo-section-head[data-head-major="${CSS.escape(major)}"]`
+        ));
+        let insertAfter: Element | null = null;
+        if (allHeads.length > 0) {
+          const lastHead = allHeads[allHeads.length - 1];
+          // その小分類の最後のcombo-groupを探す
+          const minor = lastHead.dataset.headMinor ?? '';
+          const combosInLast = Array.from(document.querySelectorAll<HTMLElement>(
+            `tbody.combo-group[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
+          ));
+          insertAfter = combosInLast.length > 0
+            ? combosInLast[combosInLast.length - 1]
+            : lastHead;
+        } else {
+          insertAfter = btn.closest<HTMLElement>('tbody.combo-major-head');
+        }
+
+        const newHead = createSectionHead(major, name);
+        const newDz = createDropZone(major, name);
+        if (insertAfter) {
+          insertAfter.after(newHead);
+          newHead.after(newDz);
+        } else {
+          const tail = comboTableEl.querySelector('tbody.combo-tail');
+          tail?.before(newHead);
+          newHead.after(newDz);
+        }
+        attachMinorActionHandlers(newHead);
+      });
+    });
+
+    // 既存ボタンにハンドラを付ける
+    attachMinorActionHandlers(document.body);
+
+    // ── アップロードボタン（visibility を public に切替） ──
+    document.querySelectorAll<HTMLButtonElement>('.btn-upload').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const comboId = btn.dataset.comboId;
+        const tbody = comboId
+          ? document.querySelector<HTMLElement>(`tbody.combo-group[data-combo-id="${CSS.escape(comboId)}"]`)
+          : btn.closest<HTMLElement>('tbody.combo-group');
+        if (!tbody) return;
+
+        const posterCell = tbody.querySelector<HTMLElement>('.col-poster');
+        if (posterCell) {
+          posterCell.querySelector<HTMLElement>('.tag-private, .tag-unlisted')?.remove();
+          const badge = document.createElement('span');
+          badge.className = 'tag tag-public';
+          badge.textContent = '🌐 公開';
+          posterCell.appendChild(badge);
+        }
+        btn.remove();
+      });
+    });
+  </script>
+</Layout>

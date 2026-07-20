@@ -1,0 +1,42 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'SF6コンボをタイムスタンプ付きで検索・閲覧できるサイト' } = Astro.props;
+---
+
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <header style="background:#111; color:#fff; position:sticky; top:0; z-index:100;">
+      <div style="max-width:1200px; margin:0 auto; padding:0 24px; height:52px; display:flex; align-items:center; gap:16px;">
+        <a href="/" style="display:flex; align-items:center; gap:10px; flex:1; text-decoration:none; color:#fff;">
+          <span style="font-weight:700; font-size:1.05rem; letter-spacing:0.02em;">SF6 Combo Archive</span>
+          <span style="background:rgba(255,255,255,0.1); font-size:0.65rem; padding:2px 6px; border-radius:3px; letter-spacing:0.08em; color:#aaa;">BETA</span>
+        </a>
+        <a href="/mock/" style="font-size:0.8rem; color:#aaa; text-decoration:none;">モック</a>
+      </div>
+    </header>
+
+    <main style="max-width:1200px; margin:0 auto; padding:28px 24px 60px;">
+      <slot />
+    </main>
+
+    <footer style="border-top:1px solid var(--border); padding:20px 24px; text-align:center; color:var(--muted); font-size:0.78rem;">
+      SF6 Combo Archive — コミュニティによる動作確認型コンボデータベース
+    </footer>
+  </body>
+</html>

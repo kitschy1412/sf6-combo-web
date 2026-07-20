@@ -19,6 +19,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   }
 
   const { combo_id, is_working } = json;
+  const has_error: boolean = typeof json.has_error === 'boolean' ? json.has_error : false;
   const ip = clientAddress ?? request.headers.get('x-forwarded-for') ?? 'unknown';
   const ip_hash = await hashIp(ip);
 
@@ -39,20 +40,21 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     );
   }
 
-  await supabase.from('votes').insert({ combo_id, is_working, ip_hash });
+  await supabase.from('votes').insert({ combo_id, is_working, has_error, ip_hash });
 
   // 最新の集計を返す
   const { data: votes } = await supabase
     .from('votes')
-    .select('is_working')
+    .select('is_working, has_error')
     .eq('combo_id', combo_id);
 
   const total = votes?.length ?? 0;
   const working = votes?.filter((v) => v.is_working).length ?? 0;
+  const errors = votes?.filter((v) => v.has_error).length ?? 0;
   const score = wilsonScore(working, total);
 
   return new Response(
-    JSON.stringify({ working, total, score }),
+    JSON.stringify({ working, total, errors, score }),
     { status: 200, headers: { 'Content-Type': 'application/json' } }
   );
 };

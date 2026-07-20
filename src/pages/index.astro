@@ -1,60 +1,118 @@
 ---
+import Layout from '../layouts/Layout.astro';
 import { supabase } from '../lib/supabase';
 
 const { data: combos } = await supabase
   .from('combos')
-  .select('character')
-  .order('character');
+  .select('character, created_at');
 
-// キャラクターごとに件数をカウント
-const characterMap = new Map<string, number>();
+// キャラクターごとのコンボ数と最終更新日を集計
+const characterMap = new Map<string, { count: number; lastUpdated: string }>();
 for (const combo of combos ?? []) {
-  characterMap.set(combo.character, (characterMap.get(combo.character) ?? 0) + 1);
+  const ex = characterMap.get(combo.character);
+  if (!ex) {
+    characterMap.set(combo.character, { count: 1, lastUpdated: combo.created_at });
+  } else {
+    characterMap.set(combo.character, {
+      count: ex.count + 1,
+      lastUpdated: ex.lastUpdated < combo.created_at ? combo.created_at : ex.lastUpdated,
+    });
+  }
 }
 const characters = [...characterMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+const totalCombos = [...characterMap.values()].reduce((s, v) => s + v.count, 0);
+
+function formatDate(isoStr: string): string {
+  const d = new Date(isoStr);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// キャラクター初期バッジカラー（プロトタイプの8色パレット）
+const COLORS = [
+  { bg: 'rgba(245,166,35,0.1)',  text: '#f5a623' },
+  { bg: 'rgba(230,57,70,0.1)',   text: '#f87171' },
+  { bg: 'rgba(79,195,247,0.1)',  text: '#4fc3f7' },
+  { bg: 'rgba(167,243,208,0.08)',text: '#6ee7b7' },
+  { bg: 'rgba(196,181,253,0.08)',text: '#c4b5fd' },
+  { bg: 'rgba(249,115,22,0.08)', text: '#fb923c' },
+  { bg: 'rgba(253,224,71,0.08)', text: '#fde047' },
+  { bg: 'rgba(56,189,248,0.08)', text: '#38bdf8' },
+];
+function getColor(name: string) {
+  return COLORS[name.charCodeAt(0) % COLORS.length];
+}
 ---
 
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <meta name="description" content="SF6のコンボをYouTubeタイムスタンプ付きで検索・閲覧できるサイト" />
-    <title>SF6 Combo Archive</title>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: sans-serif; background: #0f0f0f; color: #eee; }
-      header { padding: 2rem; border-bottom: 1px solid #333; }
-      header h1 { font-size: 1.8rem; color: #f5a623; }
-      header p { margin-top: 0.5rem; color: #aaa; font-size: 0.9rem; }
-      main { max-width: 960px; margin: 0 auto; padding: 2rem; }
-      h2 { margin-bottom: 1.5rem; font-size: 1.2rem; color: #ccc; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; }
-      a.card {
-        display: flex; flex-direction: column; align-items: center;
-        padding: 1.2rem; background: #1a1a1a; border: 1px solid #333;
-        border-radius: 8px; text-decoration: none; color: #eee;
-        transition: border-color 0.2s;
-      }
-      a.card:hover { border-color: #f5a623; }
-      .card .name { font-size: 1rem; font-weight: bold; margin-bottom: 0.3rem; }
-      .card .count { font-size: 0.8rem; color: #888; }
-    </style>
-  </head>
-  <body>
-    <header>
-      <h1>SF6 Combo Archive</h1>
-      <p>YouTubeタイムスタンプ付きコンボデータベース</p>
-    </header>
-    <main>
-      <h2>キャラクターを選択（{characters.length}キャラ）</h2>
-      <div class="grid">
-        {characters.map(([name, count]) => (
-          <a class="card" href={`/${encodeURIComponent(name)}`}>
-            <span class="name">{name}</span>
-            <span class="count">{count}コンボ</span>
-          </a>
-        ))}
-      </div>
-    </main>
-  </body>
-</html>
+<Layout title="SF6 Combo Archive">
+  <!-- ページヘッダー -->
+  <div style="margin-bottom:32px;">
+    <h1 class="font-bebas" style="font-size:2.4rem; letter-spacing:0.1em; color:var(--text); margin-bottom:6px;">
+      キャラクターを選択
+    </h1>
+    <p style="color:var(--muted); font-size:0.85rem; font-family:'Rajdhani',sans-serif; letter-spacing:0.04em;">
+      <span style="color:#888;">{characters.length}</span> キャラクター &nbsp;·&nbsp; コンボをYouTubeタイムスタンプ付きで確認
+    </p>
+  </div>
+
+  <!-- リストヘッダー -->
+  <div style="display:grid; grid-template-columns:1fr 100px 120px 28px; gap:0; border-bottom:1px solid rgba(245,166,35,0.2); padding-bottom:8px; margin-bottom:4px;">
+    <div class="section-label" style="padding-left:12px; margin-bottom:0;">キャラクター</div>
+    <div class="section-label" style="text-align:center; margin-bottom:0;">コンボ数</div>
+    <div class="section-label" style="text-align:center; margin-bottom:0;">最終更新</div>
+    <div></div>
+  </div>
+
+  <!-- キャラクターリスト -->
+  <div style="display:flex; flex-direction:column; gap:2px;">
+    {characters.map(([name, { count, lastUpdated }]) => {
+      const color = getColor(name);
+      return (
+        <a
+          href={`/${encodeURIComponent(name)}`}
+          class="char-list-row"
+          style="grid-template-columns:1fr 100px 120px 28px;"
+        >
+          <!-- キャラ名＋バッジ -->
+          <div style="display:flex; align-items:center; gap:12px; padding-left:4px;">
+            <div
+              class="char-initial"
+              style={`background:${color.bg}; color:${color.text}; width:36px; height:36px; font-size:1.1rem;`}
+            >
+              {name.charAt(0).toUpperCase()}
+            </div>
+            <div style="font-family:'Rajdhani',sans-serif; font-weight:700; font-size:1rem; color:#eee;">
+              {name}
+            </div>
+          </div>
+
+          <!-- コンボ数 -->
+          <div style="text-align:center;">
+            <span class="font-bebas" style="font-size:1.3rem; color:var(--gold);">{count}</span>
+            <span style="font-size:0.72rem; color:var(--muted); margin-left:2px;">コンボ</span>
+          </div>
+
+          <!-- 最終更新 -->
+          <div style="text-align:center; font-size:0.8rem; color:#888; font-family:'Rajdhani',sans-serif;">
+            {formatDate(lastUpdated)}
+          </div>
+
+          <!-- 矢印 -->
+          <div style="text-align:center; color:var(--muted); font-size:0.9rem;">›</div>
+        </a>
+      );
+    })}
+  </div>
+
+  <!-- 統計サマリー -->
+  <div style="display:flex; gap:24px; margin-top:40px; padding:20px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+    <div>
+      <div class="section-label">総コンボ数</div>
+      <div class="gold-text font-bebas" style="font-size:1.8rem;">{totalCombos}</div>
+    </div>
+    <div style="width:1px; background:var(--border);"></div>
+    <div>
+      <div class="section-label">キャラクター数</div>
+      <div class="font-bebas" style="font-size:1.8rem; color:#34d399;">{characters.length}</div>
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,192 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import ComboTree from '../../../components/ComboTree.astro';
+import Notation from '../../../components/Notation.astro';
+import {
+  getComboById, getEnderClassById, getOkizemeByEnderClass,
+  getComboRoutes, hasBranches, getComboMaxDamage, getComboBrokenCount,
+  COMBOS,
+} from '../../../mock-data/rashid';
+
+export function getStaticPaths() {
+  return COMBOS.map(c => ({ params: { id: c.id } }));
+}
+
+const { id } = Astro.params;
+const combo = getComboById(id!);
+if (!combo) return Astro.redirect('/mock/');
+
+const routes = getComboRoutes(combo);
+const branched = hasBranches(combo);
+const maxDamage = getComboMaxDamage(combo);
+const minDamage = Math.min(...routes.map(r => r.leaf.damage ?? 0));
+const totalBroken = getComboBrokenCount(combo);
+const isShared = combo.sourceType === 'shared';
+
+// 表示する起き攻めは「全葉の〆分類」全部
+const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId).filter(Boolean))) as string[];
+---
+
+<Layout title={`${combo.title} — モック`}>
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/character/rashid">Rashid</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">コンボ詳細</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px 6px 0 0; align-items:flex-start;">
+    <div style="flex:1;">
+      <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
+        {combo.categoryMajor && <span class="tag" style="background:#e8f0fe; color:#1a56db;">{combo.categoryMajor}</span>}
+        {combo.categoryMinor && <span class="tag" style="background:#e8f0fe; color:#1a56db; opacity:0.85;">{combo.categoryMinor}</span>}
+        {combo.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
+        {combo.sourceType === 'shared' && <span class="tag tag-shared">共有 / {combo.ownerLabel}</span>}
+        {combo.sourceType === 'forked' && <span class="tag">fork / {combo.ownerLabel}</span>}
+        {combo.visibility === 'private' && <span class="tag tag-private">🔒 非公開</span>}
+        {combo.visibility === 'unlisted' && <span class="tag tag-unlisted">🔗 限定公開</span>}
+        {combo.visibility === 'public' && combo.sourceType !== 'shared' && <span class="tag tag-public">🌐 公開</span>}
+        {branched && <span class="tag" style="background:#111; color:#fff;">{routes.length}ルート分岐</span>}
+        <span class="meta">v{combo.patchVersion}</span>
+      </div>
+      <h1 style="font-size:1.2rem;">{combo.title}</h1>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:0.7rem; color:#888; letter-spacing:0.08em;">DAMAGE</div>
+      <div class="dmg" style="font-size:1.8rem; color:#fff; line-height:1.1;">
+        {branched && minDamage !== maxDamage
+          ? <>{minDamage.toLocaleString()}<span style="color:#888; font-size:1rem;">〜</span>{maxDamage.toLocaleString()}</>
+          : maxDamage.toLocaleString()}
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:18px;">
+    <ComboTree node={combo.root} />
+  </div>
+
+  <div style="display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap;">
+    {combo.sourceType === 'shared' && <button class="btn btn-primary">自分用にコピー（fork）</button>}
+    {combo.sourceType !== 'shared' && <button class="btn">編集</button>}
+    {combo.sourceType === 'personal' && <button class="btn btn-primary">アップロード（公開）</button>}
+    <button class="btn">編集提案</button>
+    <span style="flex:1;"></span>
+    {combo.youtubeId && <a href="#" class="btn">▶ YouTube ({combo.startSec}s〜)</a>}
+  </div>
+
+  <!-- 各ルートの詳細 -->
+  <section style="margin-bottom:24px;">
+    <div class="section-head">
+      <h2>{branched ? `${routes.length}ルートの詳細` : 'コンボ詳細'}</h2>
+      {branched && <span style="font-size:0.78rem; color:var(--muted);">ルートごとに数値・〆分類・投票が独立</span>}
+    </div>
+    <div style="display:grid; gap:14px;">
+      {routes.map(r => {
+        const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+        const rVotes = r.leaf.votes ?? { good: 0, bad: 0, brokenInCurrentVer: 0 };
+        return (
+          <div class={`card${branched ? ' card-emph' : ''}`} id={r.leaf.id}>
+            {branched && (
+              <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; gap:8px;">
+                <h3 style="font-size:1rem; font-weight:700;">
+                  {r.leaf.routeLabel ?? '(無名ルート)'}
+                </h3>
+                <span class="dmg" style="font-size:1.3rem;">{(r.leaf.damage ?? 0).toLocaleString()}</span>
+              </div>
+            )}
+            {branched && (
+              <div style="margin-bottom:12px;">
+                <div style="font-size:0.74rem; color:var(--muted); margin-bottom:4px; font-weight:600;">フルコマンド</div>
+                <Notation inputs={r.fullInputs} size="sm" />
+              </div>
+            )}
+
+            <table class="data-table" style="margin-bottom:12px;">
+              <thead>
+                <tr><th>SAゲージ</th><th>Dゲージ</th><th>〆分類</th><th>状況タグ</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="dmg">{r.leaf.gauge ?? 0}</span></td>
+                  <td><span class="dmg">{r.leaf.driveGauge ?? 0}</span></td>
+                  <td>{ender ? <span class="tag" style="background:#111; color:#fff;">{ender.displayName}</span> : '—'}</td>
+                  <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {r.leaf.notes && (
+              <div style="font-size:0.85rem; color:var(--muted-strong); margin-bottom:12px; padding:8px 12px; background:var(--surface); border-radius:5px;">
+                {r.leaf.notes}
+              </div>
+            )}
+
+            {isShared ? (
+              <div class="vote-bar" style="margin:0;">
+                <span class="vote-label">このルートへの投票</span>
+                <button class="btn btn-sm">👍 Good ({rVotes.good})</button>
+                <button class="btn btn-sm">👎 Bad ({rVotes.bad})</button>
+                <button class="btn btn-sm btn-warn">⚠ 現verでは不可 ({rVotes.brokenInCurrentVer})</button>
+              </div>
+            ) : (
+              <div style="font-size:0.78rem; color:var(--muted); text-align:center; padding:8px;">
+                {combo.sourceType === 'personal' ? '自分のメモ' : 'forkコピー'}のため投票UIなし
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <!-- 紐づく起き攻め (全〆分類の合算) -->
+  {enderClassesUsed.length > 0 && (
+    <section style="margin-bottom:20px;">
+      <div class="section-head">
+        <h2>このコンボから繋がる起き攻め</h2>
+        <a href="/mock/okizeme/new" class="btn btn-sm">＋ 追加</a>
+      </div>
+      <div style="font-size:0.8rem; color:var(--muted); margin-bottom:10px;">
+        各ルートの〆分類経由で紐づくセットプレイ全てを表示
+      </div>
+      {enderClassesUsed.map(ecId => {
+        const ec = getEnderClassById(ecId);
+        const okiList = getOkizemeByEnderClass(ecId);
+        return (
+          <div style="margin-bottom:14px;">
+            <div style="font-size:0.85rem; font-weight:700; margin-bottom:6px; color:var(--muted-strong);">
+              ▲ {ec?.displayName} <span style="font-weight:400; color:var(--muted);">({okiList.length}件)</span>
+            </div>
+            {okiList.length === 0 ? (
+              <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; font-size:0.85rem;">
+                登録なし
+              </div>
+            ) : (
+              <div style="display:grid; gap:8px;">
+                {okiList.map(o => (
+                  <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+                      <div style="display:flex; gap:6px; align-items:center;">
+                        {o.sourceType === 'personal' && <span class="tag tag-personal">自分</span>}
+                        {o.sourceType === 'shared' && <span class="tag tag-shared">{o.ownerLabel}</span>}
+                        <strong>{o.title}</strong>
+                      </div>
+                      <div style="display:flex; gap:4px;">
+                        {o.flags.mid && <span class="tag tag-warn">中段</span>}
+                        {o.flags.low && <span class="tag tag-personal">下段</span>}
+                        {o.flags.throw && <span class="tag tag-shared">投げ</span>}
+                        {o.flags.safeJump && <span class="tag">詐欺</span>}
+                      </div>
+                    </div>
+                    <Notation inputs={o.inputs} size="sm" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  )}
+</Layout>

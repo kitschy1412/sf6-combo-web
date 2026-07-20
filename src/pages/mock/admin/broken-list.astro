@@ -1,0 +1,75 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { getBrokenList } from '../../../mock-data/rashid';
+
+const rows = getBrokenList();
+---
+
+<Layout title="現verでは不可 一覧 — モック">
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">「現verでは不可」一覧</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px;">
+    <h1>「現verでは不可」報告 一覧</h1>
+    <span class="meta">{rows.length}件</span>
+  </div>
+
+  <p style="color:var(--muted-strong); margin:14px 0 16px; font-size:0.88rem;">
+    パッチで繋がらなくなったコンボ・起き攻めの報告票数順。アップロード者本人 or 管理人が削除判断できます。
+  </p>
+
+  <div class="filter-bar" style="margin-bottom:16px;">
+    <span class="filter-label">VIEW</span>
+    <button class="chip chip-on">管理人ビュー（全件）</button>
+    <button class="chip">自分がアップしたもの</button>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>種別</th>
+        <th>タイトル</th>
+        <th>投稿者</th>
+        <th class="col-num">不可票</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows.length === 0 ? (
+        <tr><td colspan="5" style="text-align:center; color:var(--muted);">該当なし</td></tr>
+      ) : rows.map(r => (
+        <tr>
+          <td>
+            {r.kind === 'combo'
+              ? <span class="tag tag-shared">コンボ</span>
+              : <span class="tag tag-personal">起攻め</span>}
+          </td>
+          <td>
+            <a href={r.kind === 'combo' ? `/mock/combo/${r.id}${r.routeId ? '#'+r.routeId : ''}` : '#'} class="row-link col-title">{r.title}</a>
+            {r.routeLabel && (
+              <div style="font-size:0.74rem; color:var(--muted); margin-top:2px;">
+                <span style="font-family:'JetBrains Mono',monospace; margin-right:4px;">└─</span>
+                {r.routeLabel}
+              </div>
+            )}
+          </td>
+          <td style="color:var(--muted-strong); font-size:0.85rem;">{r.owner}</td>
+          <td class="col-num"><span class="tag tag-warn">⚠ {r.votes}</span></td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button type="button" class="btn btn-sm">確認</button>
+            <button type="button" class="btn btn-sm btn-warn">削除</button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <div class="card" style="margin-top:18px; background:var(--surface); font-size:0.85rem; color:var(--muted-strong);">
+    <strong style="color:var(--text);">運用メモ:</strong>
+    削除前に確認ボタンで実機で再現を試す。誤投票の場合があるため、5票以上を目安に削除判断するルールを設けると良い。
+    自分が投稿したコンボについては、票数に関わらずいつでも削除可能。
+  </div>
+</Layout>

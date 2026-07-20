@@ -1,0 +1,57 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { ENDER_CLASSES } from '../../../mock-data/rashid';
+---
+
+<Layout title="〆分類管理 — モック">
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/character/rashid">Rashid</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">〆分類管理</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px;">
+    <h1>〆分類管理</h1>
+    <button type="button" class="btn btn-sm" style="background:#fff; color:#111;">＋ 新規分類</button>
+  </div>
+
+  <p style="color:var(--muted-strong); margin:14px 0 18px; font-size:0.88rem;">
+    起き攻めセットをまとめるカテゴリです。「弱イーグル〆」など、同じ起き攻めが使える状況を分類化します。
+  </p>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>表示名 / Key</th>
+        <th>フレーム有利</th>
+        <th class="col-num">コンボ</th>
+        <th class="col-num">起き攻め</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {ENDER_CLASSES.map(ec => (
+        <tr>
+          <td>
+            <div class="col-title">{ec.displayName}</div>
+            <code style="font-size:0.72rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">{ec.key}</code>
+          </td>
+          <td><span class="dmg">{ec.frameAdvantage}</span></td>
+          <td class="col-num">{ec.comboCount}</td>
+          <td class="col-num">{ec.okizemeCount}</td>
+          <td style="text-align:right;">
+            <button type="button" class="btn btn-sm">編集</button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <div class="card" style="margin-top:18px; background:var(--surface); font-size:0.85rem; color:var(--muted-strong);">
+    <strong style="color:var(--text);">設計メモ:</strong>
+    分類を作っておくと、コンボ追加時に「〆分類」セレクトで選択でき、その分類に属する起き攻めが自動で紐づきます。
+    例: 「弱イーグルスパイク〆」分類に重ねを4種類登録 → 「2MK始動」「DR始動」など弱イーグルで〆る全コンボから同じ起き攻め4種が引ける。
+  </div>
+</Layout>

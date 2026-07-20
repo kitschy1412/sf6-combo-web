@@ -1,0 +1,87 @@
+---
+interface Props {
+  character: string;
+}
+const { character } = Astro.props;
+---
+
+<!-- トグルバー: data-character でキャラ名をクライアント側に渡す -->
+<div id="notation-toggle-bar" data-character={character} style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:10px 0; margin-bottom:16px;">
+
+  <!-- 方向入力トグル -->
+  <div style="display:flex; align-items:center; gap:6px;">
+    <span class="ntoggle-label">方向</span>
+    <button class="ntoggle-btn" data-group="direction" data-value="numpad">数字</button>
+    <button class="ntoggle-btn" data-group="direction" data-value="arrows">矢印</button>
+  </div>
+
+  <!-- 必殺技名トグル -->
+  <div style="display:flex; align-items:center; gap:6px;">
+    <span class="ntoggle-label">必殺技</span>
+    <button class="ntoggle-btn" data-group="movename" data-value="command">コマンド</button>
+    <button class="ntoggle-btn" data-group="movename" data-value="name">技名</button>
+  </div>
+
+</div>
+
+<script>
+  import { numpadToArrows } from '../lib/notation';
+  import { getMoveTable } from '../lib/movenames';
+
+  const bar = document.getElementById('notation-toggle-bar');
+  const character = bar?.dataset.character ?? '';
+  const moveTable = getMoveTable(character);
+
+  // ── 変換ロジック ───────────────────────────────────────────
+  function convertSegment(seg: string, dirMode: string, nameMode: string): string {
+    // 技名モード: テーブルにあれば技名を返す（方向変換は不要）
+    if (nameMode === 'name' && moveTable[seg]) {
+      return moveTable[seg];
+    }
+    // 方向変換モード
+    if (dirMode === 'arrows') {
+      return numpadToArrows(seg);
+    }
+    return seg;
+  }
+
+  function applyToPage(): void {
+    const dirMode  = localStorage.getItem('sf6-dir')  ?? 'numpad';
+    const nameMode = localStorage.getItem('sf6-name') ?? 'command';
+
+    // (旧) .notation[data-original]: テキストとして一括変換するパターン
+    document.querySelectorAll<HTMLElement>('.notation[data-original]').forEach((el) => {
+      const original = el.dataset.original ?? '';
+      el.textContent = original
+        .split(' > ')
+        .map((seg) => convertSegment(seg, dirMode, nameMode))
+        .join(' > ');
+    });
+
+    // (新) .cmd-chip[data-token]: チップ単位で表示テキストを置換
+    document.querySelectorAll<HTMLElement>('.cmd-chip[data-token]').forEach((el) => {
+      const tok = el.dataset.token ?? '';
+      el.textContent = convertSegment(tok, dirMode, nameMode);
+    });
+
+    // ボタンのアクティブ状態を更新
+    document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn[data-group="direction"]').forEach((btn) => {
+      btn.classList.toggle('ntoggle-active', btn.dataset.value === dirMode);
+    });
+    document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn[data-group="movename"]').forEach((btn) => {
+      btn.classList.toggle('ntoggle-active', btn.dataset.value === nameMode);
+    });
+  }
+
+  // ── トグルクリック ─────────────────────────────────────────
+  document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.group === 'direction' ? 'sf6-dir' : 'sf6-name';
+      localStorage.setItem(key, btn.dataset.value ?? '');
+      applyToPage();
+    });
+  });
+
+  // 初期適用
+  applyToPage();
+</script>

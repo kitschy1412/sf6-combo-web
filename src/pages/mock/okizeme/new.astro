@@ -1,0 +1,181 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Notation from '../../../components/Notation.astro';
+import { ENDER_CLASSES } from '../../../mock-data/rashid';
+---
+
+<Layout title="起き攻め入力 — モック">
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/character/rashid">Rashid</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">新規起き攻め</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px;">
+    <h1>起き攻めセットを追加</h1>
+    <span class="meta">Rashid</span>
+  </div>
+
+  <p style="color:var(--muted-strong); margin:14px 0 20px; font-size:0.88rem;">
+    起き攻めは「〆分類」に紐づけて登録します。同じ分類に属する全てのコンボ・状況から自動で参照されます。
+  </p>
+
+  <form style="display:grid; gap:16px;" onsubmit="event.preventDefault(); alert('（モック）保存しました');">
+
+    <div class="card card-emph">
+      <label class="field-label" style="font-size:0.82rem; color:var(--text); margin-bottom:6px;">所属する〆分類 *</label>
+      <select class="select">
+        <option value="">（選択してください）</option>
+        {ENDER_CLASSES.map(ec => (
+          <option value={ec.id} selected={ec.id==='ec_weak_eagle'}>{ec.displayName} ({ec.frameAdvantage})</option>
+        ))}
+        <option value="__new__">＋ 新しい〆分類を作る…</option>
+      </select>
+      <div class="field-help">
+        この起き攻めは「弱イーグル〆」「2MK&gt;弱イーグル〆コンボ」など、選択した分類が末端にある全コンボ・状況から参照されます。
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">タイトル</label>
+      <input type="text" class="input" value="詐欺重ね 2LK 中段崩し" />
+    </div>
+
+    <div>
+      <label class="field-label">重ね技 / セットプレイ</label>
+      <input id="okz-inputs" type="text" class="input" value="前ジャンプ > J.HK > 2LK > 5MP > 214LK" style="font-family:'JetBrains Mono',monospace;" />
+      <div class="card" style="margin-top:8px; padding:10px 14px; background:var(--surface);">
+        <span style="font-size:0.75rem; color:var(--muted); margin-right:8px;">プレビュー:</span>
+        <Notation inputs="前ジャンプ > J.HK > 2LK > 5MP > 214LK" size="sm" />
+      </div>
+      <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:7px;">
+          <span style="font-size:0.72rem; font-weight:700; color:var(--muted); letter-spacing:0.06em; text-transform:uppercase;">SA ゲージ消費</span>
+          <span style="font-size:0.7rem; font-weight:700; background:var(--surface3); color:var(--muted-strong); padding:1px 6px; border-radius:3px; letter-spacing:0.04em;">自動</span>
+          <input id="okz-sa-gauge" type="text" readonly class="input" value="0" style="width:60px; background:var(--surface); color:var(--text-soft); font-family:'JetBrains Mono',monospace; font-weight:700; text-align:center; cursor:default;" />
+        </div>
+        <div style="display:flex; align-items:center; gap:7px;">
+          <span style="font-size:0.72rem; font-weight:700; color:var(--muted); letter-spacing:0.06em; text-transform:uppercase;">D ゲージ消費</span>
+          <span style="font-size:0.7rem; font-weight:700; background:var(--surface3); color:var(--muted-strong); padding:1px 6px; border-radius:3px; letter-spacing:0.04em;">自動</span>
+          <input id="okz-d-gauge" type="text" readonly class="input" value="0" style="width:60px; background:var(--surface); color:var(--text-soft); font-family:'JetBrains Mono',monospace; font-weight:700; text-align:center; cursor:default;" />
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">セットプレイ性質（複数可）</label>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button type="button" class="chip chip-on" data-toggle>下段</button>
+        <button type="button" class="chip" data-toggle>中段</button>
+        <button type="button" class="chip" data-toggle>投げ</button>
+        <button type="button" class="chip chip-on" data-toggle>詐欺重ね</button>
+        <button type="button" class="chip" data-toggle>逆ガード</button>
+        <button type="button" class="chip" data-toggle>柔道</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="display:flex; border-bottom:1px solid var(--border); background:var(--surface);">
+        {[
+          ['guard','ガードした時'],
+          ['mash','暴れた時'],
+          ['invincible','無敵技を出した時'],
+          ['delayed','受身ずらし'],
+        ].map(([k, label], i) => (
+          <button type="button" class={`okz-tab${i===0?' okz-tab-on':''}`} data-tab={k}>{label}</button>
+        ))}
+      </div>
+      <div data-tab-pane="guard" style="padding:14px;">
+        <label class="field-label">ガードした時の対応</label>
+        <textarea class="textarea" rows="3">ガード後 -2F 五分。投げ重ねに繋ぐか、間合いを離して様子見。</textarea>
+      </div>
+      <div data-tab-pane="mash" style="padding:14px; display:none;">
+        <label class="field-label">暴れた時の対応</label>
+        <textarea class="textarea" rows="3">5HK が暴れ潰し兼用。当たれば DR から追撃可。</textarea>
+      </div>
+      <div data-tab-pane="invincible" style="padding:14px; display:none;">
+        <label class="field-label">無敵技を出した時の対応</label>
+        <textarea class="textarea" rows="3">バクステで透かして確反。OD技には注意（持続による反撃あり）。</textarea>
+      </div>
+      <div data-tab-pane="delayed" style="padding:14px; display:none;">
+        <label class="field-label">受身ずらしされた時の対応</label>
+        <textarea class="textarea" rows="3">5HK 重ね直しで対応可。タイミングは2F遅らせる。</textarea>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
+      <div>
+        <label class="field-label">YouTube URL（任意）</label>
+        <input type="text" class="input" placeholder="https://youtu.be/..." />
+      </div>
+      <div>
+        <label class="field-label">開始秒</label>
+        <input type="number" class="input" placeholder="0" />
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--surface);">
+      <div class="section-label">保存先</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <label style="display:flex; gap:10px; padding:12px; border:1px solid var(--border-strong); border-radius:5px; cursor:pointer; background:#fff;">
+          <input type="radio" name="dest" checked />
+          <div><div style="font-weight:700;">自分のメモ</div><div style="font-size:0.76rem; color:var(--muted);">非公開</div></div>
+        </label>
+        <label style="display:flex; gap:10px; padding:12px; border:1px solid #111; border-radius:5px; cursor:pointer; background:#fff;">
+          <input type="radio" name="dest" />
+          <div><div style="font-weight:700;">アップロード（公開）</div><div style="font-size:0.76rem; color:var(--muted);">投票対象</div></div>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <a href="/mock/character/rashid" class="btn">キャンセル</a>
+      <button type="submit" class="btn btn-primary">保存</button>
+    </div>
+  </form>
+
+  <style>
+    .okz-tab {
+      flex:1; padding:10px; background:transparent; border:none;
+      border-right:1px solid var(--border);
+      color:var(--muted); font-family:inherit; font-weight:600; font-size:0.85rem;
+      cursor:pointer; transition:background 0.12s;
+    }
+    .okz-tab:last-child { border-right:none; }
+    .okz-tab:hover { background:rgba(0,0,0,0.03); color:var(--text); }
+    .okz-tab-on { background:#fff; color:var(--text); border-bottom:2px solid #111; margin-bottom:-1px; }
+  </style>
+
+  <script>
+    import { calcGaugesFromSegs } from '../../../lib/gauges';
+
+    const okzInputEl = document.getElementById('okz-inputs') as HTMLInputElement | null;
+    const saGaugeEl  = document.getElementById('okz-sa-gauge') as HTMLInputElement | null;
+    const dGaugeEl   = document.getElementById('okz-d-gauge') as HTMLInputElement | null;
+
+    function updateGauges() {
+      if (!okzInputEl || !saGaugeEl || !dGaugeEl) return;
+      const { saGauge, dGauge } = calcGaugesFromSegs([okzInputEl.value]);
+      saGaugeEl.value = String(saGauge);
+      dGaugeEl.value  = String(dGauge);
+    }
+    okzInputEl?.addEventListener('input', updateGauges);
+    updateGauges();
+
+    document.querySelectorAll<HTMLButtonElement>('.okz-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.okz-tab').forEach(b => b.classList.remove('okz-tab-on'));
+        btn.classList.add('okz-tab-on');
+        const k = btn.dataset.tab;
+        document.querySelectorAll<HTMLElement>('[data-tab-pane]').forEach(p => {
+          p.style.display = p.dataset.tabPane === k ? '' : 'none';
+        });
+      });
+    });
+    document.querySelectorAll<HTMLButtonElement>('button[data-toggle]').forEach(b => {
+      b.addEventListener('click', () => b.classList.toggle('chip-on'));
+    });
+  </script>
+</Layout>

@@ -1,0 +1,206 @@
+---
+import Layout from '../../../../../layouts/Layout.astro';
+import Notation from '../../../../../components/Notation.astro';
+import {
+  OKIZEME_NOTES,
+  getOkizemeNoteById,
+  getOkizemeNoteItems,
+  type Visibility,
+} from '../../../../../mock-data/notes';
+import { getEnderClassById } from '../../../../../mock-data/rashid';
+
+export function getStaticPaths() {
+  return OKIZEME_NOTES.map(n => ({ params: { id: n.id } }));
+}
+
+const { id } = Astro.params;
+const note = getOkizemeNoteById(id!);
+if (!note) return Astro.redirect('/mock/me/notes/');
+
+const items = getOkizemeNoteItems(note);
+
+function visibilityLabel(v: Visibility): string {
+  return v === 'public' ? '公開' : v === 'unlisted' ? '限定公開' : '非公開';
+}
+function visibilityStyle(v: Visibility): string {
+  if (v === 'public') return 'background:rgba(16,185,129,0.15); color:#34d399;';
+  if (v === 'unlisted') return 'background:rgba(251,191,36,0.15); color:#fbbf24;';
+  return 'background:rgba(113,113,122,0.3); color:#a1a1aa;';
+}
+---
+
+<Layout title={`${note.title} — 起き攻めノート — モック`}>
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/me/notes/">マイノート</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">{note.title}</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px; margin-bottom:8px; align-items:flex-start;">
+    <div style="flex:1;">
+      <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
+        <span class="tag" style="background:rgba(245,158,11,0.15); color:#fbbf24;">起き攻め</span>
+        <span class="tag" style={visibilityStyle(note.visibility)}>{visibilityLabel(note.visibility)}</span>
+      </div>
+      <h1 style="font-size:1.25rem;">{note.title}</h1>
+      {note.description && (
+        <p style="color:var(--muted-strong); font-size:0.85rem; margin:6px 0 0;">{note.description}</p>
+      )}
+    </div>
+    <div style="display:flex; gap:6px; flex-shrink:0;">
+      <button class="btn">編集</button>
+      <button class="btn" onclick="alert('（モック）削除しました')">削除</button>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:8px; align-items:center; margin-bottom:20px; font-size:0.82rem; color:var(--muted);">
+    <span>{items.length}件の起き攻め</span>
+    <span>·</span>
+    <span>並び順は ↑↓ で変更、「保存」で確定（モックは保存しません）</span>
+  </div>
+
+  <!-- 並び順編集リスト -->
+  <div id="note-items" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+    {items.map((oki, idx) => {
+      const ec = getEnderClassById(oki.enderClassId);
+      return (
+        <div class="note-item card" data-pos={idx} style="display:flex; gap:12px; align-items:flex-start;">
+          <!-- 順序操作 -->
+          <div style="display:flex; flex-direction:column; gap:4px; padding-top:2px; flex-shrink:0;">
+            <button
+              class="order-btn"
+              onclick="moveItem(this, -1)"
+              disabled={idx === 0}
+              style={`background:var(--surface3); border:none; border-radius:4px; color:${idx === 0 ? 'var(--muted)' : 'var(--text)'}; padding:3px 7px; cursor:${idx === 0 ? 'default' : 'pointer'}; font-size:0.8rem;`}
+              title="上へ"
+            >↑</button>
+            <div style="text-align:center; font-size:0.72rem; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted); padding:1px 0;">{idx + 1}</div>
+            <button
+              class="order-btn"
+              onclick="moveItem(this, 1)"
+              disabled={idx === items.length - 1}
+              style={`background:var(--surface3); border:none; border-radius:4px; color:${idx === items.length - 1 ? 'var(--muted)' : 'var(--text)'}; padding:3px 7px; cursor:${idx === items.length - 1 ? 'default' : 'pointer'}; font-size:0.8rem;`}
+              title="下へ"
+            >↓</button>
+          </div>
+
+          <!-- 起き攻め情報 -->
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px; flex-wrap:wrap;">
+              {ec && <span class="tag" style="background:#111; color:#fff; font-size:0.73rem;">{ec.displayName}</span>}
+              {oki.flags.mid && <span class="tag tag-warn">中段</span>}
+              {oki.flags.low && <span class="tag tag-personal">下段</span>}
+              {oki.flags.throw && <span class="tag tag-shared">投げ</span>}
+              {oki.flags.safeJump && <span class="tag">詐欺</span>}
+              {oki.sourceType === 'personal' && <span class="tag tag-personal">自分</span>}
+              {oki.sourceType === 'shared' && <span class="tag tag-shared">{oki.ownerLabel}</span>}
+            </div>
+            <div style="font-weight:700; font-size:0.92rem; margin-bottom:6px;">{oki.title}</div>
+            <Notation inputs={oki.inputs} size="sm" />
+            {Object.values(oki.vsWakeup).some(Boolean) && (
+              <div style="margin-top:8px; display:flex; flex-direction:column; gap:3px;">
+                {oki.vsWakeup.guard && (
+                  <div style="font-size:0.75rem; color:var(--muted-strong);">
+                    <span style="color:var(--muted); margin-right:4px;">ガード:</span>{oki.vsWakeup.guard}
+                  </div>
+                )}
+                {oki.vsWakeup.mash && (
+                  <div style="font-size:0.75rem; color:var(--muted-strong);">
+                    <span style="color:var(--muted); margin-right:4px;">暴れ:</span>{oki.vsWakeup.mash}
+                  </div>
+                )}
+                {oki.vsWakeup.invincible && (
+                  <div style="font-size:0.75rem; color:var(--muted-strong);">
+                    <span style="color:var(--muted); margin-right:4px;">無敵:</span>{oki.vsWakeup.invincible}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <!-- 投票 -->
+          <div style="text-align:right; flex-shrink:0;">
+            <div style="font-size:0.7rem; color:var(--muted); white-space:nowrap;">
+              👍 {oki.votes.good} / 👎 {oki.votes.bad}
+            </div>
+            {oki.votes.brokenInCurrentVer > 0 && (
+              <div style="font-size:0.7rem; color:#f87171; margin-top:2px;">⚠ {oki.votes.brokenInCurrentVer}</div>
+            )}
+          </div>
+
+          <!-- 除去ボタン -->
+          <button
+            onclick="removeItem(this)"
+            style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; padding:2px 4px; flex-shrink:0;"
+            title="ノートから除去"
+          >✕</button>
+        </div>
+      );
+    })}
+  </div>
+
+  <div style="display:flex; gap:8px; justify-content:flex-end; margin-bottom:32px;">
+    <button class="btn">起き攻めを追加</button>
+    <button class="btn btn-primary" onclick="alert('（モック）並び順を保存しました')">並び順を保存</button>
+  </div>
+
+  <div class="card" style="background:var(--surface); border-style:dashed; font-size:0.82rem; color:var(--muted);">
+    <strong style="color:var(--muted-strong);">モック注:</strong>
+    ↑↓ ボタンで並び替え可能（ページリロードでリセット）。✕ でノートから除去（削除ではなくノートとの紐付けを解除）。
+  </div>
+</Layout>
+
+<script>
+  function moveItem(btn: HTMLButtonElement, dir: -1 | 1) {
+    const item = btn.closest('.note-item') as HTMLElement;
+    const container = document.getElementById('note-items')!;
+    const items = Array.from(container.querySelectorAll('.note-item'));
+    const idx = items.indexOf(item);
+    const target = items[idx + dir] as HTMLElement | undefined;
+    if (!target) return;
+
+    if (dir === -1) {
+      container.insertBefore(item, target);
+    } else {
+      container.insertBefore(target, item);
+    }
+    refreshPositions();
+  }
+
+  function removeItem(btn: HTMLButtonElement) {
+    const item = btn.closest('.note-item') as HTMLElement;
+    item.remove();
+    refreshPositions();
+  }
+
+  function refreshPositions() {
+    const container = document.getElementById('note-items')!;
+    const items = Array.from(container.querySelectorAll('.note-item'));
+    const total = items.length;
+    items.forEach((el, i) => {
+      const numEl = el.querySelector<HTMLElement>('div[style*="text-align:center"]');
+      if (numEl) numEl.textContent = String(i + 1);
+
+      const btns = el.querySelectorAll<HTMLButtonElement>('.order-btn');
+      const upBtn = btns[0];
+      const downBtn = btns[1];
+      if (upBtn) {
+        upBtn.disabled = i === 0;
+        upBtn.style.color = i === 0 ? 'var(--muted)' : 'var(--text)';
+        upBtn.style.cursor = i === 0 ? 'default' : 'pointer';
+      }
+      if (downBtn) {
+        downBtn.disabled = i === total - 1;
+        downBtn.style.color = i === total - 1 ? 'var(--muted)' : 'var(--text)';
+        downBtn.style.cursor = i === total - 1 ? 'default' : 'pointer';
+      }
+    });
+  }
+
+  // @ts-ignore — expose to inline onclick
+  (window as any).moveItem = moveItem;
+  // @ts-ignore
+  (window as any).removeItem = removeItem;
+</script>
