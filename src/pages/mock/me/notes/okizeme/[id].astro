@@ -2,16 +2,11 @@
 import Layout from '../../../../../layouts/Layout.astro';
 import Notation from '../../../../../components/Notation.astro';
 import {
-  OKIZEME_NOTES,
   getOkizemeNoteById,
   getOkizemeNoteItems,
   type Visibility,
 } from '../../../../../mock-data/notes';
 import { getEnderClassById } from '../../../../../mock-data/rashid';
-
-export function getStaticPaths() {
-  return OKIZEME_NOTES.map(n => ({ params: { id: n.id } }));
-}
 
 const { id } = Astro.params;
 const note = getOkizemeNoteById(id!);

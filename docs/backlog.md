@@ -35,6 +35,17 @@
 
 ## データ / ロジック
 
+- [ ] Supabase の接続先を復旧する（`.env` の PUBLIC_SUPABASE_URL が名前解決できない）
+  - 現状: `yxzdpworzhhkgxsfoxjn.supabase.co` が DNS で NXDOMAIN。プロジェクト削除もしくは URL が古い
+  - 影響: Phase 0 の `/`・`/[character]`・`/combo/[id]` が「0件」表示になる（500 にはならず空で描画される）
+  - 受け入れ: `npm run test:scenarios` の S1 が skip されず、キャラ一覧→コンボ詳細まで通ること
+
+- [ ] 小分類リネーム時のデータ乖離を解消する設計を DATA.md に確定
+  - 対象: docs/DATA.md
+  - 現状: 分類は各コンボの自由文字列（categoryMajor/Minor）。小分類リネームは DOM の data-minor を書き換えるだけで元データと乖離し、空の小分類は実体を持てない。DATA.md の方式B（マスタテーブル）とモックがズレている
+  - 分類をマスタテーブル化するか、コンボ属性のまま一括更新にするかを決めて DATA.md に記録
+  - 受け入れ: リネーム・空分類・削除がデータ上どう表現されるか DATA.md に明記される
+
 ## Phase 2 準備（仕様詰め）
 
 ここに並ぶタスクは「議論をドキュメントに落とす」系。実装ではなく `docs/` 配下を更新する。

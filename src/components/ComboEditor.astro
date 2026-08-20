@@ -1,13 +1,18 @@
 ---
 import { ENDER_CLASSES, RASHID_PALETTE as PALETTE, TOKEN_TO_NAME, COMBOS } from '../mock-data/rashid';
+import type { ComboNode } from '../mock-data/rashid';
 
 interface Props {
   /** 'page' = 単独ページ（キャンセル→一覧へリンク）／'inline' = 一覧内展開（キャンセル→閉じるイベント） */
   mode?: 'page' | 'inline';
   /** 一覧戻りリンク（modeがpageの時のみ使用） */
   backHref?: string;
+  /** 編集対象コンボのツリー（渡された場合はこの値で tree を初期化） */
+  initialTree?: ComboNode;
+  /** 編集対象コンボのID（既存コンボ編集時に設定） */
+  comboId?: string;
 }
-const { mode = 'page', backHref = '/mock/character/rashid' } = Astro.props;
+const { mode = 'page', backHref = '/mock/character/rashid', initialTree, comboId } = Astro.props;
 
 const NAME_TO_TOKEN: Record<string, string> = Object.fromEntries(
   Object.entries(TOKEN_TO_NAME).map(([k, v]) => [v, k])
@@ -50,11 +55,11 @@ const CATEGORY_DATA = COMBOS
     <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
       <div>
         <label class="field-label">タイトル</label>
-        <input type="text" class="input" value="2MK始動 〆分岐コンボ群" />
+        <input type="text" class="input" id="combo-title" value="2MK始動 〆分岐コンボ群" />
       </div>
       <div>
         <label class="field-label">始動技種別</label>
-        <select class="select">
+        <select class="select" id="combo-starter">
           <option>通常技</option><option selected>下段</option><option>中段</option>
           <option>投げ</option><option>カウンター</option><option>確定反撃</option><option>CA/SA</option>
         </select>
@@ -107,14 +112,14 @@ const CATEGORY_DATA = COMBOS
       <div class="section-label">保存先</div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
         <label class="dest-radio-label">
-          <input type="radio" name="dest" checked />
+          <input type="radio" name="dest" id="dest-personal" checked />
           <div>
             <div style="font-weight:700; font-size:0.88rem;">自分のメモとして保存</div>
             <div style="font-size:0.76rem; color:var(--muted);">他の人には見えない。あとで公開も可。</div>
           </div>
         </label>
         <label class="dest-radio-label" style="border-color:#111;">
-          <input type="radio" name="dest" />
+          <input type="radio" name="dest" id="dest-upload" />
           <div>
             <div style="font-weight:700; font-size:0.88rem;">アップロード（公開）</div>
             <div style="font-size:0.76rem; color:var(--muted);">投票対象になる。重複はブロックされる。</div>
@@ -395,7 +400,7 @@ const CATEGORY_DATA = COMBOS
   }
 </style>
 
-<script is:inline define:vars={{ TOKEN_TO_NAME, NAME_TO_TOKEN, PALETTE_FOR_JS, ENDER_CLASSES_FOR_JS, CATEGORY_DATA }}>
+<script is:inline define:vars={{ TOKEN_TO_NAME, NAME_TO_TOKEN, PALETTE_FOR_JS, ENDER_CLASSES_FOR_JS, CATEGORY_DATA, INITIAL_TREE: initialTree ?? null, COMBO_ID: comboId ?? null }}>
   // ── State ──
   const uid = () => 'n_' + Math.random().toString(36).slice(2, 10);
   const ROUTE_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -420,15 +425,35 @@ const CATEGORY_DATA = COMBOS
   function applyDirMode(seg) {
     return dirMode === 'arrows' ? numpadToArrows(seg) : seg;
   }
-  let tree = {
-    id: uid(),
-    segment: '2MK > 236LP > 214LK',
-    damage: 2200,
-    saGauge: 0,
-    dGauge: 1,
-    enderClassId: 'ec_weak_eagle',
-    situationTags: ['画面中央'],
-  };
+  function makeDefaultTree() {
+    return {
+      id: uid(),
+      segment: '2MK > 236LP > 214LK',
+      damage: 2200,
+      saGauge: 0,
+      dGauge: 1,
+      enderClassId: 'ec_weak_eagle',
+      situationTags: ['画面中央'],
+    };
+  }
+
+  // データモデルの ComboNode をエディタ用ツリー形状へ正規化
+  // （gauge/driveGauge → saGauge/dGauge は葉メタ描画時に自動再計算されるため落とす。
+  //   votes/notes 等の閲覧専用フィールドも除外）
+  function normalizeDataNode(node) {
+    const out = { id: node.id || uid(), segment: node.segment ?? '' };
+    if (node.routeLabel != null) out.routeLabel = node.routeLabel;
+    if (node.damage != null) out.damage = node.damage;
+    if (node.enderClassId != null) out.enderClassId = node.enderClassId;
+    out.situationTags = Array.isArray(node.situationTags) ? [...node.situationTags] : [];
+    if (Array.isArray(node.children) && node.children.length) {
+      out.children = node.children.map(normalizeDataNode);
+    }
+    return out;
+  }
+
+  let tree = INITIAL_TREE ? normalizeDataNode(INITIAL_TREE) : makeDefaultTree();
+  let comboId = COMBO_ID ?? null;
   let focusedId = tree.id;
 
   // ── Helpers ──
@@ -445,6 +470,11 @@ const CATEGORY_DATA = COMBOS
     return null;
   }
   function isLeaf(n) { return !n.children || n.children.length === 0; }
+  function collectLeaves(node, pathSegs = []) {
+    const here = [...pathSegs, node.segment];
+    if (isLeaf(node)) return [{ leaf: node, pathSegs: here }];
+    return node.children.flatMap(c => collectLeaves(c, here));
+  }
   function parseTokens(s) { return String(s ?? '').split('>').map(t => t.trim()).filter(Boolean); }
 
   function getPathSegments(root, targetId) {
@@ -889,7 +919,31 @@ const CATEGORY_DATA = COMBOS
 
   document.getElementById('combo-form').addEventListener('submit', e => {
     e.preventDefault();
-    document.getElementById('dup-modal').style.display = 'flex';
+    const uploadRadio = document.getElementById('dest-upload');
+    if (uploadRadio && uploadRadio.checked) {
+      document.getElementById('dup-modal').style.display = 'flex';
+      return;
+    }
+
+    // 「自分のメモとして保存」→ 一覧へ新しいコンボ行を挿入するイベントを発火（モック挙動）
+    const leaves = collectLeaves(tree);
+    const rep = leaves.reduce((best, cur) => ((cur.leaf.damage ?? 0) > (best.leaf.damage ?? 0) ? cur : best), leaves[0]);
+    const detail = {
+      id: 'c_local_' + uid(),
+      title: document.getElementById('combo-title')?.value || '(無題コンボ)',
+      categoryMajor: document.getElementById('cat-major')?.value || '',
+      categoryMinor: document.getElementById('cat-minor')?.value || '',
+      starterType: document.getElementById('combo-starter')?.value || '',
+      root: JSON.parse(JSON.stringify(tree)),
+      fullInputsDisplay: displaySegment(rep.pathSegs.join(' > ')),
+      damage: rep.leaf.damage ?? 0,
+      enderDisplayName: rep.leaf.enderClassId ? (ENDER_DISPLAY[rep.leaf.enderClassId] ?? null) : null,
+      situationTags: rep.leaf.situationTags ?? [],
+      routeCount: leaves.length,
+    };
+    document.querySelector('.combo-editor')?.dispatchEvent(
+      new CustomEvent('combo-editor:save', { detail, bubbles: true })
+    );
   });
   document.getElementById('close-dup-modal').addEventListener('click', () => {
     document.getElementById('dup-modal').style.display = 'none';
@@ -982,6 +1036,37 @@ const CATEGORY_DATA = COMBOS
     updateMinorDatalist(major);
     renderCustomMinorChips(major);
   });
+
+  // ── ランタイム API（共有インラインエディタを既存コンボで読み込む／新規に戻す） ──
+  function setFieldValue(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.value = val ?? '';
+  }
+  window.comboEditorAPI = {
+    // 既存コンボを読み込んで編集モードにする
+    loadCombo(combo) {
+      if (!combo || !combo.root) return;
+      tree = normalizeDataNode(combo.root);
+      comboId = combo.id ?? null;
+      focusedId = tree.id;
+      const major = combo.categoryMajor ?? '';
+      setFieldValue('cat-major', major);
+      setFieldValue('cat-minor', combo.categoryMinor ?? '');
+      setFieldValue('combo-title', combo.title ?? '');
+      setFieldValue('combo-starter', combo.starterType ?? '');
+      updateMinorDatalist(major);
+      renderCustomMinorChips(major);
+      render();
+    },
+    // 新規コンボ入力用に初期状態へ戻す
+    reset() {
+      tree = makeDefaultTree();
+      comboId = null;
+      focusedId = tree.id;
+      render();
+    },
+    get comboId() { return comboId; },
+  };
 
   render();
 </script>

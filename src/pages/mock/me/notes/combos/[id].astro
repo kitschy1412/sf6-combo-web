@@ -2,16 +2,11 @@
 import Layout from '../../../../../layouts/Layout.astro';
 import Notation from '../../../../../components/Notation.astro';
 import {
-  COMBO_NOTES,
   getComboNoteById,
   getComboNoteItems,
   type Visibility,
 } from '../../../../../mock-data/notes';
 import { getEnderClassById, getComboRoutes, getComboMaxDamage } from '../../../../../mock-data/rashid';
-
-export function getStaticPaths() {
-  return COMBO_NOTES.map(n => ({ params: { id: n.id } }));
-}
 
 const { id } = Astro.params;
 const note = getComboNoteById(id!);

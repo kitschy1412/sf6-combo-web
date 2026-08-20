@@ -47,6 +47,7 @@ export type Combo = {
   youtubeId?: string;
   startSec?: number;
   patchVersion: string;
+  sortOrder?: number;              // 同一 (categoryMajor, categoryMinor) 内の並び順（昇順）。未設定分は配列順を初期順として扱う
   root: ComboNode;                 // ⭐ ツリーのルート
 };
 
@@ -1083,6 +1084,15 @@ export function getSituationById(id: string): KnockdownSituation | undefined {
 
 export function getOkizemeByEnderClass(enderClassId: string): OkizemeSetup[] {
   return OKIZEME_SETUPS.filter(o => o.enderClassId === enderClassId);
+}
+
+// 有利フレーム（例: "+34F"）単位での起き攻め分類。
+// 〆技が違っても有利フレームが同じなら同じ択が使えるため、〆分類名ではなくフレーム値でグルーピングする。
+export function getOkizemeByFrameAdvantage(frameAdvantage: string): OkizemeSetup[] {
+  const enderIds = new Set(
+    ENDER_CLASSES.filter(e => e.frameAdvantage === frameAdvantage).map(e => e.id)
+  );
+  return OKIZEME_SETUPS.filter(o => enderIds.has(o.enderClassId));
 }
 
 export function getEnderClassById(id: string): EnderClass | undefined {

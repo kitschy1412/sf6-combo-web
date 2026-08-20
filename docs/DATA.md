@@ -7,6 +7,15 @@
 - `combos` — コンボデータ。`youtube_id` + `start_sec` で埋め込みURL生成
 - `votes` — 投票（`combo_id`, `is_working`, `has_error`, `ip_hash`, `created_at`）
 
+## 並び順（sortOrder）
+
+一覧の D&D 並び替え（SortableJS）は現状 DOM 操作のみで、並び替えた結果はページリロードで失われる。
+永続化する場合の受け皿として `Combo.sortOrder?: number` を用意している（`src/mock-data/rashid.ts`）。
+
+- 同一 `(categoryMajor, categoryMinor)` の小分類内で昇順に並べるための相対値
+- `combos` テーブルに `sort_order integer` カラムを追加し、D&D の drop 確定時に同じ小分類内の並びをまとめて再採番して保存する想定
+- 未設定（`null`/`undefined`）の行は挿入順・作成日時などフォールバック順で末尾に配置
+
 ## YouTube 埋め込みURL
 ```
 https://www.youtube.com/embed/{youtube_id}?start={start_sec}
@@ -18,8 +27,8 @@ https://www.youtube.com/embed/{youtube_id}?start={start_sec}
 - `src/mock-data/` — 開発用モック（本番ビルド時は使わない）
 
 ## 環境変数
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
+- `PUBLIC_SUPABASE_URL`
+- `PUBLIC_SUPABASE_KEY`（anon キー）
 
 書き込みは `src/pages/api/vote.ts` のみ。サーバ側でIP制限を行うため anon キーで十分。
 

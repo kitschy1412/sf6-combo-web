@@ -16,7 +16,39 @@
 
 <!-- 完了タスクをここから追記していく -->
 
-## 2026-06-06
+## 2026-08-20
+
+- シナリオテストの導入と、そこで見つかった不整合の修正
+  - `tests/scenarios.mjs` を追加（`npm run test:scenarios`）。依存ゼロの Node スクリプトで、dev サーバに対して S1〜S8 の動線（公開閲覧 / Wiki型キャラページ / コンボ詳細 / マイノート / 起き攻め / 管理 / 投票APIのバリデーション / src/lib のロジック）を検証する。`/api/vote` は 400 になる不正リクエストのみ送り、DB へは書き込まない
+  - `mock/character/[name].astro`: モックデータは Rashid のみなので、未知のキャラ名は 200 で Rashid の中身を返すのをやめて `/mock/` へリダイレクト（他のモック詳細ページと同じ挙動に統一）
+  - `mock/combo/[id].astro`: `▶ YouTube` が `href="#"` のダミーだったのを実URLに変更し、`youtubeId` を持つコンボには開始秒つきの埋め込み iframe を追加（URL仕様は DATA.md 準拠）
+  - SSR（`output: 'server'`）では無視される `getStaticPaths` を `mock/combo/[id]` `mock/situation/[id]` `mock/me/notes/combos/[id]` `mock/me/notes/okizeme/[id]` の4ページから削除。ビルド時の router 警告が解消（併せて未使用になった import も削除）
+
+## 2026-07-20
+
+- コンボ単位の削除UIをモックに追加
+  - `character/[name].astro`: 各コンボ行アクション列に `.btn-delete` を追加。confirm 後に対象 `tbody.combo-group` を除去し `updateDropZones()`/`applyFilters()` で再同期。削除対象が編集中の場合は `closeEditor()` で編集状態も解除
+  - `combo/[id].astro`: 詳細ページ単体では対象行を持たないため、confirm 後に一覧ページへ `location.href` でリダイレクト（モック挙動）
+
+- 小分類・大分類の削除UIをモックに追加
+  - `character/[name].astro`: 小分類ヘッダに `.btn-minor-delete`、大分類ヘッダに `.btn-major-delete` を追加
+  - 配下に実コンボが1件でも残っていれば alert で保護し削除不可。空の場合のみ confirm 後に該当ヘッダ（＋大分類は配下の全小分類ヘッダ）とドロップゾーンを除去
+  - 動的に追加された小分類（`createSectionHead`）にも同じ削除ボタン・ハンドラを付与
+
+- 新規コンボ「保存」でモック上に行を挿入する
+  - `ComboEditor.astro`: 保存先ラジオに `#dest-personal`/`#dest-upload` の id を追加。submit 時、アップロード選択時は従来通り dup-modal、「自分のメモとして保存」選択時は `collectLeaves()`（新規ヘルパ、ツリーの全葉を収集）でダメージ最大の葉を代表ルートとして選び、`combo-editor:save` カスタムイベント（tree のディープコピーを含む）を発火
+  - `character/[name].astro`: `.btn-upload`/`.btn-edit`/`.btn-delete` のハンドラを再利用可能な関数に切り出し、新規行にも同じハンドラを付け直す `bindRowActions()` を追加。`combo-editor:save` を受け取り `COMBOS` 配列へ push（実行中のみ有効、リロードで消える）した上で `buildNewComboRow()` でエディタの挿入位置に行を生成・挿入し、エディタを閉じて `updateDropZones()`/`applyFilters()` で再同期
+  - 判断: 分岐ツリーで保存した場合も、行表示は「ダメージ最大の葉」を代表ルートとする簡易表示に留めた（分岐UIをテーブル行として動的複製するのは過剰と判断）。編集時は保存した完全なツリーが復元されるため情報は失われない
+
+- Combo 型に並び順（sortOrder）フィールドを追加
+  - `src/mock-data/rashid.ts`: `Combo.sortOrder?: number` を追加（同一 categoryMajor/categoryMinor 内の相対順、未設定は末尾扱い）
+  - `docs/DATA.md`: 「並び順（sortOrder）」節を新設。`combos.sort_order` カラム追加案と、D&D drop 確定時に小分類内を再採番する永続化方針を明記
+
+- コンボ編集フローをモックに実装（ComboEditor を編集対応に一般化）
+  - `ComboEditor.astro`: Props に `initialTree?: ComboNode` / `comboId?: string` を追加。`tree` を default 工場化（`makeDefaultTree`）し、`INITIAL_TREE` があれば `normalizeDataNode`（データ形状 ComboNode → エディタ形状。gauge/driveGauge は葉メタ描画時に自動再計算されるため落とす）で初期化
+  - 共有インラインエディタ用に `window.comboEditorAPI.{loadCombo, reset}` を公開。既存コンボのツリー・葉メタ・タイトル/分類/始動種別を実データで埋める
+  - `character/[name].astro`: 各コンボ行アクション列に「編集」ボタン（`.btn-edit`）を追加し `comboEditorAPI.loadCombo` へ接続。新規追加系導線は `reset()` で初期化。`?edit=<id>` クエリで対象を自動オープン
+  - `combo/[id].astro`: 死にボタンだった「編集」を `/mock/character/rashid?edit=<id>` リンクへ接続
 
 - `/mock/character/[name]` を「自分用ページ」として再定義
   - `src/pages/mock/character/[name].astro` に `.personal-page-notice` バナー（info-bg/info-fg）を追加

@@ -6,11 +6,13 @@ import ComboEditor from '../../../components/ComboEditor.astro';
 import {
   COMBOS, ENDER_CLASSES, KNOCKDOWN_SITUATIONS,
   getEnderClassById, getComboRoutes, hasBranches, getComboBrokenCount,
-  getOkizemeByEnderClass,
+  getOkizemeByFrameAdvantage,
 } from '../../../mock-data/rashid';
 
 const { name } = Astro.params;
-const charName = name === 'rashid' ? 'Rashid' : (name ?? '');
+// モックデータは Rashid のみ。未知のキャラ名は他のモックページと同様 /mock/ へ戻す
+if (name !== 'rashid') return Astro.redirect('/mock/');
+const charName = 'Rashid';
 
 const counts = {
   combos: COMBOS.length,
@@ -107,29 +109,51 @@ for (const c of COMBOS) {
       <span style="font-size:0.76rem; color:var(--muted);">≡ をドラッグで並び替え／行間ホバーで挿入</span>
     </div>
 
-    <NotationToggle character={charName} />
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <NotationToggle character={charName} />
+      <div class="col-vis-wrap">
+        <button type="button" id="col-vis-toggle" class="btn btn-sm">列表示 ▾</button>
+        <div id="col-vis-menu" class="col-vis-menu" style="display:none;">
+          <label class="col-vis-item"><input type="checkbox" data-col-vis="command" checked />コマンド</label>
+          <label class="col-vis-item"><input type="checkbox" data-col-vis="situation" checked />状況</label>
+          <label class="col-vis-item"><input type="checkbox" data-col-vis="poster" checked />投稿者</label>
+          <label class="col-vis-item"><input type="checkbox" data-col-vis="ender" checked />〆分類</label>
+          <label class="col-vis-item"><input type="checkbox" data-col-vis="frame" checked />有利フレーム</label>
+          <label class="col-vis-item"><input type="checkbox" data-col-vis="damage" checked />ダメージ</label>
+        </div>
+      </div>
+    </div>
 
+    <div class="combo-table-scroll">
     <table class="data-table" id="combo-table">
       <colgroup>
-        <col style="width:24px;" />
-        <col style="width:172px;" />
-        <col />
-        <col style="width:128px;" />
-        <col style="width:104px;" />
-        <col style="width:120px;" />
-        <col style="width:64px;" />
-        <col style="width:90px;" />
+        <col data-col="handle" style="width:24px;" />
+        <col data-col="title" style="width:190px;" />
+        <col data-col="command" />
+        <col data-col="situation" style="width:124px;" />
+        <col data-col="poster" style="width:96px;" />
+        <col data-col="ender" style="width:140px;" />
+        <col data-col="frame" style="width:84px;" />
+        <col data-col="damage" style="width:72px;" />
+        <col data-col="actions" style="width:96px;" />
       </colgroup>
       {majorGroups.map(({ major, total, minors }) => (
         <>
           <!-- ── 大分類ヘッダー ── -->
           <tbody class="combo-major-head" data-head-major={major}>
             <tr>
-              <td colspan="8" class="combo-major-cell">
+              <td colspan="9" class="combo-major-cell">
                 <div class="combo-major-inner">
+                  <button type="button" class="combo-major-toggle" data-major-toggle={major} aria-expanded="true" title="折りたたむ/開く">
+                    <span class="combo-toggle-icon">▼</span>
+                  </button>
                   <span class="combo-major-title">{major || '未分類'}</span>
+                  <button type="button" class="btn-major-rename" data-major={major} title="大分類名を変更">✎</button>
                   <span class="combo-major-count">{total}コンボ</span>
-                  <button type="button" class="btn-add-minor" data-major={major}>＋ 小分類追加</button>
+                  <div class="combo-major-actions">
+                    <button type="button" class="btn-add-minor" data-major={major}>＋ 小分類追加</button>
+                    <button type="button" class="btn-major-delete" data-major={major} title="この大分類を削除（配下が空の場合のみ）">削除</button>
+                  </div>
                 </div>
               </td>
             </tr>
@@ -144,6 +168,7 @@ for (const c of COMBOS) {
               <th>状況</th>
               <th>投稿者</th>
               <th>〆分類</th>
+              <th class="col-frame">有利フレーム</th>
               <th class="col-num">ダメージ</th>
               <th></th>
             </tr>
@@ -154,14 +179,18 @@ for (const c of COMBOS) {
               <!-- ── 小分類サブヘッダー ── -->
               <tbody class="combo-section-head" data-head-major={major} data-head-minor={minor}>
                 <tr>
-                  <td colspan="8" class="combo-minor-cell">
+                  <td colspan="9" class="combo-minor-cell">
                     <div class="combo-minor-inner">
+                      <button type="button" class="combo-minor-toggle" data-major={major} data-minor={minor} aria-expanded="true" title="折りたたむ/開く">
+                        <span class="combo-toggle-icon">▼</span>
+                      </button>
                       <span class="combo-minor-title">{minor || '未分類'}</span>
+                      <button type="button" class="btn-minor-rename" data-major={major} data-minor={minor} title="小分類名を変更">✎</button>
                       <span class="combo-minor-rule" />
                       <span class="combo-minor-count">{items.length}件</span>
                       <div class="combo-minor-actions">
-                        <button type="button" class="btn-minor-rename" data-major={major} data-minor={minor} title="小分類名を変更">✎ 名前変更</button>
                         <button type="button" class="btn-add-combo-minor" data-major={major} data-minor={minor}>＋ コンボ追加</button>
+                        <button type="button" class="btn-minor-delete" data-major={major} data-minor={minor} title="この小分類を削除（空の場合のみ）">削除</button>
                       </div>
                     </div>
                   </td>
@@ -170,7 +199,7 @@ for (const c of COMBOS) {
               <!-- ── 空ドロップゾーン（コンボなし小分類用） ── -->
               <tbody class={`combo-group combo-drop-zone${items.length === 0 ? ' dz-empty' : ''}`} data-major={major} data-minor={minor}>
                 <tr>
-                  <td colspan="8" class="drop-zone-cell">
+                  <td colspan="9" class="drop-zone-cell">
                     <span class="drop-zone-hint">コンボをここにドラッグして追加</span>
                   </td>
                 </tr>
@@ -182,19 +211,19 @@ for (const c of COMBOS) {
         return (
           <tbody class="combo-group" data-combo-id={c.id} data-source={c.sourceType} data-major={c.categoryMajor ?? ''} data-minor={c.categoryMinor ?? ''}>
             <tr class="insert-here-row">
-              <td colspan="8"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
+              <td colspan="9"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
             </tr>
             {!branched && (() => {
               const r = routes[0];
               const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
-              const okizemeList = r.leaf.enderClassId ? getOkizemeByEnderClass(r.leaf.enderClassId) : [];
+              const okizemeList = ender?.frameAdvantage ? getOkizemeByFrameAdvantage(ender.frameAdvantage) : [];
               return (
                 <>
                   <tr>
                     <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
-                    <td><a href={`/mock/combo/${c.id}`} class="row-link col-title">{c.title}</a></td>
+                    <td><a href={`/mock/combo/${c.id}`} class="row-link col-title" title={c.title}>{c.title}</a></td>
                     <td><Notation inputs={r.fullInputs} size="sm" /></td>
-                    <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
+                    <td class="col-situation">{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
                     <td class="col-poster">
                       {c.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
                       {c.sourceType === 'shared' && <span class="poster-name">{c.ownerLabel}</span>}
@@ -204,34 +233,45 @@ for (const c of COMBOS) {
                     </td>
                     <td class="col-ender">
                       <span title={ender?.displayName}>{ender ? ender.displayName : '—'}</span>
-                      {okizemeList.length > 0 && (
-                        <button type="button" class="okizeme-toggle" data-okizeme-toggle={r.leaf.id}
-                          title={`起き攻め ${okizemeList.length}件を展開`}>
-                          起き攻め{okizemeList.length}件
-                        </button>
+                    </td>
+                    <td class="col-frame">
+                      {ender?.frameAdvantage && (
+                        okizemeList.length > 0 ? (
+                          <button type="button" class="frame-adv-badge frame-adv-toggle" data-okizeme-toggle={r.leaf.id}
+                            title={`起き攻め ${okizemeList.length}件を展開`}>
+                            {ender.frameAdvantage}
+                          </button>
+                        ) : (
+                          <span class="frame-adv-badge">{ender.frameAdvantage}</span>
+                        )
                       )}
                     </td>
                     <td class="col-num"><span class="dmg">{(r.leaf.damage ?? 0).toLocaleString()}</span></td>
                     <td class="col-actions">
-                      {broken > 0 && <span class="tag tag-warn">⚠ 不可{broken}</span>}
-                      {c.visibility !== 'public' && (
-                        <button type="button" class="btn-upload" data-combo-id={c.id}>アップロード</button>
-                      )}
+                      {broken > 0 && <span class="tag tag-warn broken-flag">⚠{broken}</span>}
+                      <div class="row-actions">
+                        <button type="button" class="btn-edit" data-edit-combo-id={c.id} title="編集" aria-label="編集">✎</button>
+                        {c.visibility !== 'public' && (
+                          <button type="button" class="btn-upload" data-combo-id={c.id} title="アップロード" aria-label="アップロード">⤴</button>
+                        )}
+                        <button type="button" class="btn-delete" data-delete-combo-id={c.id} title="このコンボを削除" aria-label="削除">🗑</button>
+                      </div>
                     </td>
                   </tr>
                   {okizemeList.length > 0 && (
                     <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} style="display:none;">
-                      <td colspan="8" class="okizeme-panel-cell">
+                      <td colspan="9" class="okizeme-panel-cell">
                         <div class="okizeme-panel">
                           <div class="okizeme-panel-hd">
-                            <span class="okizeme-panel-count">起き攻め {okizemeList.length}件</span>
-                            {ender && <span class="okizeme-panel-ender">{ender.displayName}{ender.frameAdvantage ? ` / ${ender.frameAdvantage}` : ''}</span>}
+                            <span class="okizeme-panel-count">起き攻め {okizemeList.length}件 ・ {ender!.frameAdvantage}</span>
+                            {ender && <span class="okizeme-panel-ender">{ender.displayName}</span>}
                           </div>
                           <div class="okizeme-cards">
                             {okizemeList.map(o => (
                               <div class="okizeme-card">
                                 <div class="okizeme-card-hd">
                                   <span class="okizeme-card-title">{o.title}</span>
+                                  <span class="okizeme-card-ender">{getEnderClassById(o.enderClassId)?.displayName}</span>
                                   <span class="okizeme-card-flags">
                                     {o.flags.mid && <span class="okizeme-flag">中段</span>}
                                     {o.flags.low && <span class="okizeme-flag">下段</span>}
@@ -282,11 +322,16 @@ for (const c of COMBOS) {
                   </td>
                   <td></td>
                   <td></td>
+                  <td></td>
                   <td class="col-actions">
-                    {broken > 0 && <span class="tag tag-warn">⚠ 不可{broken}</span>}
-                    {c.visibility !== 'public' && (
-                      <button type="button" class="btn-upload" data-combo-id={c.id}>アップロード</button>
-                    )}
+                    {broken > 0 && <span class="tag tag-warn broken-flag">⚠{broken}</span>}
+                    <div class="row-actions">
+                      <button type="button" class="btn-edit" data-edit-combo-id={c.id} title="編集" aria-label="編集">✎</button>
+                      {c.visibility !== 'public' && (
+                        <button type="button" class="btn-upload" data-combo-id={c.id} title="アップロード" aria-label="アップロード">⤴</button>
+                      )}
+                      <button type="button" class="btn-delete" data-delete-combo-id={c.id} title="このコンボを削除" aria-label="削除">🗑</button>
+                    </div>
                   </td>
                 </tr>
                 {routes.map((r, ri) => {
@@ -294,7 +339,7 @@ for (const c of COMBOS) {
                   const tailInputs = r.pathSegments[r.pathSegments.length - 1];
                   const ghostInputs = r.pathSegments.slice(0, -1).join(' > ');
                   const isLastRoute = ri === routes.length - 1;
-                  const okizemeList = r.leaf.enderClassId ? getOkizemeByEnderClass(r.leaf.enderClassId) : [];
+                  const okizemeList = ender?.frameAdvantage ? getOkizemeByFrameAdvantage(ender.frameAdvantage) : [];
                   return (
                     <>
                       <tr class="combo-child-row" data-branch-of={c.id} style="display:none;">
@@ -307,15 +352,21 @@ for (const c of COMBOS) {
                           </a>
                         </td>
                         <td><Notation inputs={tailInputs} ghostInputs={ghostInputs} branchElbow={isLastRoute ? '└─›' : '├─›'} size="sm" /></td>
-                        <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
+                        <td class="col-situation">{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
                         <td></td>
                         <td class="col-ender">
                           <span title={ender?.displayName}>{ender ? ender.displayName : '—'}</span>
-                          {okizemeList.length > 0 && (
-                            <button type="button" class="okizeme-toggle" data-okizeme-toggle={r.leaf.id}
-                              title={`起き攻め ${okizemeList.length}件を展開`}>
-                              <span class="okizeme-toggle-icon">◇</span>{okizemeList.length}
-                            </button>
+                        </td>
+                        <td class="col-frame">
+                          {ender?.frameAdvantage && (
+                            okizemeList.length > 0 ? (
+                              <button type="button" class="frame-adv-badge frame-adv-toggle" data-okizeme-toggle={r.leaf.id}
+                                title={`起き攻め ${okizemeList.length}件を展開`}>
+                                {ender.frameAdvantage}
+                              </button>
+                            ) : (
+                              <span class="frame-adv-badge">{ender.frameAdvantage}</span>
+                            )
                           )}
                         </td>
                         <td class="col-num"><span class="dmg">{(r.leaf.damage ?? 0).toLocaleString()}</span></td>
@@ -323,17 +374,18 @@ for (const c of COMBOS) {
                       </tr>
                       {okizemeList.length > 0 && (
                         <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} data-okizeme-branch-of={c.id} style="display:none;">
-                          <td colspan="8" class="okizeme-panel-cell">
+                          <td colspan="9" class="okizeme-panel-cell">
                             <div class="okizeme-panel">
                               <div class="okizeme-panel-hd">
-                                <span class="okizeme-panel-count">起き攻め {okizemeList.length}件</span>
-                                {ender && <span class="okizeme-panel-ender">{ender.displayName}{ender.frameAdvantage ? ` / ${ender.frameAdvantage}` : ''}</span>}
+                                <span class="okizeme-panel-count">起き攻め {okizemeList.length}件 ・ {ender!.frameAdvantage}</span>
+                                {ender && <span class="okizeme-panel-ender">{ender.displayName}</span>}
                               </div>
                               <div class="okizeme-cards">
                                 {okizemeList.map(o => (
                                   <div class="okizeme-card">
                                     <div class="okizeme-card-hd">
                                       <span class="okizeme-card-title">{o.title}</span>
+                                      <span class="okizeme-card-ender">{getEnderClassById(o.enderClassId)?.displayName}</span>
                                       <span class="okizeme-card-flags">
                                         {o.flags.mid && <span class="okizeme-flag">中段</span>}
                                         {o.flags.low && <span class="okizeme-flag">下段</span>}
@@ -370,16 +422,16 @@ for (const c of COMBOS) {
       <!-- インラインエディタ（初期は非表示、＋クリックで表示。tbodyとしてテーブル内を移動できる） -->
       <tbody id="inline-editor-host" class="inline-editor-tbody" style="display:none;">
         <tr class="editor-drag-chip-row">
-          <td colspan="8" style="padding:4px 8px;">
+          <td colspan="9" style="padding:4px 8px;">
             <div class="editor-drag-chip">
               <button type="button" id="editor-drag-handle" class="editor-drag-btn" title="ドラッグして挿入位置を変更">≡</button>
-              <strong>新規コンボを追加</strong>
+              <strong id="editor-mode-label">新規コンボを追加</strong>
               <span id="insert-pos-label"></span>
             </div>
           </td>
         </tr>
         <tr class="editor-card-row">
-          <td colspan="8" style="padding:0;">
+          <td colspan="9" style="padding:0;">
             <div class="card card-emph" style="padding:14px 16px; margin:8px 0; background:var(--surface);">
               <ComboEditor mode="inline" />
             </div>
@@ -390,10 +442,11 @@ for (const c of COMBOS) {
       <!-- 末尾の挿入ポイント（最後のコンボの後に挿入するための領域） -->
       <tbody class="combo-tail">
         <tr class="insert-here-row">
-          <td colspan="8"><button type="button" class="insert-here-btn" data-insert-pos="end">＋ ここに挿入</button></td>
+          <td colspan="9"><button type="button" class="insert-here-btn" data-insert-pos="end">＋ ここに挿入</button></td>
         </tr>
       </tbody>
     </table>
+    </div>
   </section>
 
   <section style="margin-bottom:32px;">
@@ -462,30 +515,72 @@ for (const c of COMBOS) {
       color: #3b6fd4;
     }
 
-    /* ── アップロードボタン ── */
-    .col-actions {
-      white-space: nowrap;
+    /* ── テーブルの横スクロール（ボタンが多い行でも画面外に切れないように） ── */
+    .combo-table-scroll {
+      overflow-x: auto;
     }
-    .btn-upload {
+
+    /* ── アクション列: 右寄せ・アイコン。行ホバーでフェード表示 ── */
+    .col-actions {
+      text-align: right;
+      white-space: nowrap;
+      padding-right: 10px !important;
+    }
+    /* 不可バッジは常時表示（重要情報のため隠さない） */
+    .col-actions .broken-flag {
+      font-size: 0.62rem;
+      padding: 0 4px;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+    .row-actions {
       display: inline-flex;
       align-items: center;
+      gap: 4px;
+      vertical-align: middle;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.12s ease;
+    }
+    .combo-group:hover .row-actions,
+    .row-actions:focus-within {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* アイコンボタン共通 */
+    .btn-edit,
+    .btn-upload,
+    .btn-delete {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
       background: transparent;
       border: 1px solid var(--border-strong);
-      border-radius: 3px;
-      padding: 1px 6px;
-      font-size: 0.68rem;
-      font-weight: 600;
+      border-radius: 4px;
+      padding: 0;
+      font-size: 0.82rem;
       font-family: inherit;
       color: var(--muted-strong);
       cursor: pointer;
-      white-space: nowrap;
+      line-height: 1;
       transition: background 0.1s, color 0.1s, border-color 0.1s;
-      line-height: 1.6;
+    }
+    .btn-edit:hover {
+      background: var(--accent-soft);
+      color: var(--text);
+      border-color: #111;
     }
     .btn-upload:hover {
       background: var(--good-bg);
       color: var(--good-fg);
       border-color: var(--good-fg);
+    }
+    .btn-delete:hover {
+      background: var(--warn-bg);
+      color: var(--warn-fg);
+      border-color: var(--warn-fg);
     }
 
     /* ── 列名行（各大分類の直下） ── */
@@ -570,8 +665,8 @@ for (const c of COMBOS) {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 16px 14px 14px;
-      margin-top: 20px;
+      padding: 8px 14px 8px 12px;
+      margin-top: 12px;
       border-left: 4px solid #f59e0b;
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
@@ -591,6 +686,38 @@ for (const c of COMBOS) {
       letter-spacing: 0.04em;
     }
 
+    /* ── 折りたたみトグル（大分類・小分類 共通） ── */
+    .combo-major-toggle,
+    .combo-minor-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px;
+      margin-right: 2px;
+      flex-shrink: 0;
+      color: var(--muted-strong);
+      border-radius: 3px;
+      transition: background 0.1s, color 0.1s;
+    }
+    .combo-major-toggle:hover,
+    .combo-minor-toggle:hover {
+      background: var(--surface3);
+      color: var(--text);
+    }
+    .combo-toggle-icon {
+      font-size: 0.6rem;
+      line-height: 1;
+      display: inline-block;
+      transition: transform 0.15s;
+    }
+    .combo-major-toggle[aria-expanded="false"] .combo-toggle-icon,
+    .combo-minor-toggle[aria-expanded="false"] .combo-toggle-icon {
+      transform: rotate(-90deg);
+    }
+
     /* ── 小分類サブヘッダー（バンド型・配下のコンボが明確に） ── */
     .combo-minor-cell {
       padding: 0 !important;
@@ -602,23 +729,12 @@ for (const c of COMBOS) {
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding: 7px 16px 7px 22px;
-      margin-top: 6px;
+      padding: 4px 14px 4px 10px;
+      margin-top: 3px;
       background: var(--surface2);
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border-strong);
       position: relative;
-    }
-    .combo-minor-inner::before {
-      content: '';
-      position: absolute;
-      left: 14px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 3px;
-      height: 14px;
-      background: var(--muted);
-      border-radius: 2px;
     }
     .combo-minor-title {
       font-size: 0.84rem;
@@ -643,6 +759,11 @@ for (const c of COMBOS) {
       border-left-color: var(--border-strong);
     }
 
+    /* ── テーブル: 全体的に行の縦幅をコンパクトに ── */
+    .data-table th,
+    .data-table td { padding-top: 5px; padding-bottom: 5px; }
+    .data-table td { font-size: 0.82rem; }
+
     /* ── テーブル: 列幅を固定してコマンド欄を最大化 ── */
     #combo-table { table-layout: fixed; }
     #combo-table th,
@@ -655,7 +776,15 @@ for (const c of COMBOS) {
       font-weight: 600;
       line-height: 1.35;
       display: block;
-      word-break: break-word;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* ── 状況タグ列: 1行に収める ── */
+    .col-situation {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     /* ── 投稿者列: 統一スタイル ── */
@@ -676,6 +805,55 @@ for (const c of COMBOS) {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    /* ── 列の表示/非表示コントロール ── */
+    .col-vis-wrap { position: relative; flex-shrink: 0; }
+    .col-vis-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      right: 0;
+      background: #fff;
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      z-index: 50;
+      min-width: 140px;
+    }
+    .col-vis-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.8rem;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .col-vis-item:hover { background: var(--surface2); }
+    .col-vis-item input { cursor: pointer; }
+
+    /* ── 有利フレーム列（〆分類とは独立した列） ── */
+    .col-frame {
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .combo-col-head th.col-frame { text-align: left; }
+    .frame-adv-badge {
+      display: inline-flex;
+      align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #b45309;
+      background: #fef3c7;
+      border: 1px solid #f5d78e;
+      border-radius: 3px;
+      padding: 0 4px;
+      vertical-align: middle;
     }
 
     /* ── ダメージ列: コンパクト ── */
@@ -849,28 +1027,19 @@ for (const c of COMBOS) {
 
     /* ── 起き攻めトグルボタン ── */
     .col-ender { white-space: normal; }
-    .okizeme-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      background: transparent;
-      border: 1px solid var(--border-strong);
-      border-radius: 3px;
-      padding: 0 5px;
+    /* ── 有利フレームバッジ = 起き攻め展開トグル ── */
+    .frame-adv-toggle {
       cursor: pointer;
-      font-size: 0.65rem;
-      color: var(--muted);
-      font-family: inherit;
-      line-height: 1.6;
-      margin-left: 4px;
-      transition: background 0.1s, color 0.1s, border-color 0.1s;
-      vertical-align: middle;
+      transition: background 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s;
     }
-    .okizeme-toggle:hover { background: var(--surface3); color: var(--text); border-color: var(--muted); }
-    .okizeme-toggle.is-open {
-      background: var(--accent-soft);
-      color: var(--text);
-      border-color: #f59e0b;
+    .frame-adv-toggle:hover {
+      background: #fde9b0;
+      border-color: #e0b74d;
+    }
+    .frame-adv-toggle.is-open {
+      background: #f59e0b;
+      color: #fff;
+      border-color: #d98207;
     }
 
 
@@ -925,7 +1094,15 @@ for (const c of COMBOS) {
       font-weight: 700;
       color: var(--text);
     }
-    .okizeme-card-flags { display: flex; gap: 3px; flex-wrap: wrap; }
+    .okizeme-card-ender {
+      font-size: 0.66rem;
+      color: var(--muted);
+      background: var(--surface3);
+      padding: 1px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .okizeme-card-flags { display: flex; gap: 3px; flex-wrap: wrap; margin-left: auto; }
     .okizeme-flag {
       font-size: 0.62rem;
       padding: 1px 5px;
@@ -959,8 +1136,8 @@ for (const c of COMBOS) {
       gap: 6px;
       margin-left: auto;
     }
-    .btn-minor-rename,
-    .btn-add-combo-minor {
+    .btn-add-combo-minor,
+    .btn-minor-delete {
       display: inline-flex;
       align-items: center;
       gap: 3px;
@@ -976,14 +1153,42 @@ for (const c of COMBOS) {
       transition: background 0.1s, color 0.1s, border-color 0.1s;
       line-height: 1.5;
     }
-    .btn-minor-rename:hover { background: var(--surface3); color: var(--text); border-color: var(--muted); }
+
+    /* ── 分類名変更（鉛筆アイコン、タイトル直後に配置） ── */
+    .btn-major-rename,
+    .btn-minor-rename {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 2px 3px;
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      color: var(--muted);
+      border-radius: 3px;
+      transition: background 0.1s, color 0.1s;
+    }
+    .btn-major-rename:hover,
+    .btn-minor-rename:hover {
+      background: var(--surface3);
+      color: var(--text);
+    }
     .btn-add-combo-minor {
       border-color: #f59e0b;
       color: #b45309;
     }
     .btn-add-combo-minor:hover { background: #fef3c7; color: #92400e; border-color: #d97706; }
+    .btn-minor-delete:hover { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-fg); }
 
-    /* ── 大分類ヘッダーの小分類追加ボタン ── */
+    /* ── 大分類ヘッダーのアクション群 ── */
+    .combo-major-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
     .btn-add-minor {
       display: inline-flex;
       align-items: center;
@@ -1005,6 +1210,27 @@ for (const c of COMBOS) {
       border-color: #f59e0b;
       color: #111;
       box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
+    }
+    .btn-major-delete {
+      display: inline-flex;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 3px 12px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: var(--muted-strong);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+      line-height: 1.55;
+    }
+    .btn-major-delete:hover {
+      background: var(--warn-bg);
+      border-color: var(--warn-fg);
+      color: var(--warn-fg);
     }
 
     /* ── 空小分類のドロップゾーン ── */
@@ -1037,6 +1263,8 @@ for (const c of COMBOS) {
 
   <script>
     import Sortable from 'sortablejs';
+    import { COMBOS } from '../../../mock-data/rashid';
+    import type { Combo } from '../../../mock-data/rashid';
 
     // ── 分岐ツリー 折り畳みトグル ──
     document.querySelectorAll<HTMLButtonElement>('.branch-toggle').forEach(btn => {
@@ -1061,7 +1289,7 @@ for (const c of COMBOS) {
     });
 
     // ── 起き攻め展開トグル ──
-    document.querySelectorAll<HTMLButtonElement>('.okizeme-toggle').forEach(btn => {
+    document.querySelectorAll<HTMLButtonElement>('.frame-adv-toggle').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const leafId = btn.dataset.okizemeToggle;
@@ -1073,32 +1301,75 @@ for (const c of COMBOS) {
 
     // ── 自身作成のみ / 大分類 / 小分類 フィルタ ──
     const filters = { selfOnly: false, major: '', minor: '' };
+    // ── 折りたたみ状態（大分類・小分類） ──
+    const collapsedMajors = new Set<string>();
+    const collapsedMinors = new Set<string>(); // key: `${major}:${minor}`
+    const minorKey = (major: string, minor: string) => `${major}:${minor}`;
+
     function applyFilters() {
+      // 各コンボ行: フィルタ一致判定（折りたたみとは独立に保持。ヘッダー表示判定に使う）
       document.querySelectorAll<HTMLElement>('tbody.combo-group').forEach(grp => {
         const src = grp.dataset.source ?? '';
+        const major = grp.dataset.major ?? '';
+        const minor = grp.dataset.minor ?? '';
         const okSource = !filters.selfOnly || src === 'personal' || src === 'shared';
-        const okMajor = !filters.major || grp.dataset.major === filters.major;
-        const okMinor = !filters.minor || grp.dataset.minor === filters.minor;
-        grp.style.display = (okSource && okMajor && okMinor) ? '' : 'none';
+        const okMajor = !filters.major || major === filters.major;
+        const okMinor = !filters.minor || minor === filters.minor;
+        const filterMatch = okSource && okMajor && okMinor;
+        grp.dataset.filterMatch = filterMatch ? '1' : '0';
+        const collapsed = collapsedMajors.has(major) || collapsedMinors.has(minorKey(major, minor));
+        grp.style.display = (filterMatch && !collapsed) ? '' : 'none';
       });
-      // 小分類サブヘッダ: 配下に表示中のコンボが1件以上あれば表示
+      // 小分類サブヘッダ: 配下にフィルタ一致するコンボが1件以上、かつ親の大分類が折りたたまれていなければ表示
       document.querySelectorAll<HTMLElement>('tbody.combo-section-head').forEach(head => {
         const hMajor = head.dataset.headMajor ?? '';
         const hMinor = head.dataset.headMinor ?? '';
-        const hasVisible = Array.from(
+        const hasMatch = Array.from(
           document.querySelectorAll<HTMLElement>('tbody.combo-group')
-        ).some(grp => grp.style.display !== 'none' && grp.dataset.major === hMajor && grp.dataset.minor === hMinor);
-        head.style.display = hasVisible ? '' : 'none';
+        ).some(grp => grp.dataset.filterMatch === '1' && grp.dataset.major === hMajor && grp.dataset.minor === hMinor);
+        head.style.display = (hasMatch && !collapsedMajors.has(hMajor)) ? '' : 'none';
       });
-      // 大分類ヘッダ: 配下に表示中のコンボが1件以上あれば表示
+      // 列名ヘッダ: 大分類が折りたたまれていなければ、配下に一致があるときのみ表示
+      document.querySelectorAll<HTMLElement>('tbody.combo-col-head').forEach(head => {
+        const hMajor = head.dataset.headMajor ?? '';
+        const hasMatch = Array.from(
+          document.querySelectorAll<HTMLElement>('tbody.combo-group')
+        ).some(grp => grp.dataset.filterMatch === '1' && grp.dataset.major === hMajor);
+        head.style.display = (hasMatch && !collapsedMajors.has(hMajor)) ? '' : 'none';
+      });
+      // 大分類ヘッダ: 配下にフィルタ一致するコンボが1件以上あれば表示（折りたたみ中でも再展開できるよう常に表示）
       document.querySelectorAll<HTMLElement>('tbody.combo-major-head').forEach(head => {
         const hMajor = head.dataset.headMajor ?? '';
-        const hasVisible = Array.from(
+        const hasMatch = Array.from(
           document.querySelectorAll<HTMLElement>('tbody.combo-group')
-        ).some(grp => grp.style.display !== 'none' && grp.dataset.major === hMajor);
-        head.style.display = hasVisible ? '' : 'none';
+        ).some(grp => grp.dataset.filterMatch === '1' && grp.dataset.major === hMajor);
+        head.style.display = hasMatch ? '' : 'none';
       });
     }
+
+    // ── 大分類 折りたたみトグル ──
+    document.querySelectorAll<HTMLButtonElement>('.combo-major-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const major = btn.dataset.majorToggle ?? '';
+        const nowCollapsed = !collapsedMajors.has(major);
+        if (nowCollapsed) collapsedMajors.add(major); else collapsedMajors.delete(major);
+        btn.setAttribute('aria-expanded', String(!nowCollapsed));
+        applyFilters();
+      });
+    });
+
+    // ── 小分類 折りたたみトグル ──
+    document.querySelectorAll<HTMLButtonElement>('.combo-minor-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const major = btn.dataset.major ?? '';
+        const minor = btn.dataset.minor ?? '';
+        const key = minorKey(major, minor);
+        const nowCollapsed = !collapsedMinors.has(key);
+        if (nowCollapsed) collapsedMinors.add(key); else collapsedMinors.delete(key);
+        btn.setAttribute('aria-expanded', String(!nowCollapsed));
+        applyFilters();
+      });
+    });
 
     const selfOnlyBtn = document.getElementById('filter-self-only') as HTMLButtonElement | null;
     selfOnlyBtn?.addEventListener('click', () => {
@@ -1130,6 +1401,43 @@ for (const c of COMBOS) {
       });
     }
 
+    // ── 列の表示/非表示 ──
+    const COL_VIS_KEY = 'sf6-combo-col-vis';
+    function loadColVis(): Record<string, boolean> {
+      try { return JSON.parse(localStorage.getItem(COL_VIS_KEY) ?? '{}'); }
+      catch { return {}; }
+    }
+    function applyColVis(colKey: string, visible: boolean) {
+      const col = document.querySelector<HTMLTableColElement>(`#combo-table col[data-col="${colKey}"]`);
+      if (col) col.style.visibility = visible ? '' : 'collapse';
+    }
+    const colVisState = loadColVis();
+    document.querySelectorAll<HTMLInputElement>('[data-col-vis]').forEach(cb => {
+      const key = cb.dataset.colVis ?? '';
+      if (key in colVisState) {
+        cb.checked = colVisState[key];
+      }
+      applyColVis(key, cb.checked);
+      cb.addEventListener('change', () => {
+        applyColVis(key, cb.checked);
+        colVisState[key] = cb.checked;
+        localStorage.setItem(COL_VIS_KEY, JSON.stringify(colVisState));
+      });
+    });
+    const colVisToggle = document.getElementById('col-vis-toggle');
+    const colVisMenu = document.getElementById('col-vis-menu');
+    colVisToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!colVisMenu) return;
+      colVisMenu.style.display = colVisMenu.style.display === 'none' ? 'flex' : 'none';
+    });
+    document.addEventListener('click', (e) => {
+      if (!colVisMenu || colVisMenu.style.display === 'none') return;
+      const target = e.target as HTMLElement;
+      if (colVisMenu.contains(target) || target === colVisToggle) return;
+      colVisMenu.style.display = 'none';
+    });
+
     // ── インラインエディタ展開（エディタ自体がテーブル内を移動する） ──
     const editorHost = document.getElementById('inline-editor-host') as HTMLTableSectionElement;
     const comboTableEl = document.getElementById('combo-table')!;
@@ -1150,10 +1458,22 @@ for (const c of COMBOS) {
       document.getElementById('insert-pos-label')!.textContent = label;
     }
 
+    const editorModeLabel = document.getElementById('editor-mode-label');
+    // deno-lint-ignore no-explicit-any
+    const editorAPI = () => (window as any).comboEditorAPI as
+      | { loadCombo: (c: unknown) => void; reset: () => void; comboId: string | null }
+      | undefined;
+
+    function setEditorNewMode() {
+      if (editorModeLabel) editorModeLabel.textContent = '新規コンボを追加';
+      editorAPI()?.reset();
+    }
+
     function openEditorAt(btn: HTMLElement) {
       activeBtn?.classList.remove('is-active');
       activeBtn = btn;
       btn.classList.add('is-active');
+      setEditorNewMode();
 
       const pos = btn.dataset.insertPos;
       if (pos === 'end') {
@@ -1310,14 +1630,18 @@ for (const c of COMBOS) {
       tbody.dataset.headMinor = minor;
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" class="combo-minor-cell">
+          <td colspan="9" class="combo-minor-cell">
             <div class="combo-minor-inner">
+              <button type="button" class="combo-minor-toggle" data-major="${major}" data-minor="${minor}" aria-expanded="true" title="折りたたむ/開く">
+                <span class="combo-toggle-icon">▼</span>
+              </button>
               <span class="combo-minor-title">${minor || '未分類'}</span>
+              <button type="button" class="btn-minor-rename" data-major="${major}" data-minor="${minor}" title="小分類名を変更">✎</button>
               <span class="combo-minor-rule"></span>
               <span class="combo-minor-count">0件</span>
               <div class="combo-minor-actions">
-                <button type="button" class="btn-minor-rename" data-major="${major}" data-minor="${minor}" title="小分類名を変更">✎ 名前変更</button>
                 <button type="button" class="btn-add-combo-minor" data-major="${major}" data-minor="${minor}">＋ コンボ追加</button>
+                <button type="button" class="btn-minor-delete" data-major="${major}" data-minor="${minor}" title="この小分類を削除（空の場合のみ）">削除</button>
               </div>
             </div>
           </td>
@@ -1332,7 +1656,7 @@ for (const c of COMBOS) {
       tbody.dataset.minor = minor;
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" class="drop-zone-cell">
+          <td colspan="9" class="drop-zone-cell">
             <span class="drop-zone-hint">コンボをここにドラッグして追加</span>
           </td>
         </tr>`;
@@ -1340,13 +1664,98 @@ for (const c of COMBOS) {
     }
 
     function attachMinorActionHandlers(container: HTMLElement) {
+      container.querySelectorAll<HTMLButtonElement>('.combo-minor-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const major = btn.dataset.major ?? '';
+          const minor = btn.dataset.minor ?? '';
+          const key = minorKey(major, minor);
+          const nowCollapsed = !collapsedMinors.has(key);
+          if (nowCollapsed) collapsedMinors.add(key); else collapsedMinors.delete(key);
+          btn.setAttribute('aria-expanded', String(!nowCollapsed));
+          applyFilters();
+        });
+      });
       container.querySelectorAll<HTMLButtonElement>('.btn-minor-rename').forEach(btn => {
         btn.addEventListener('click', () => handleMinorRename(btn));
       });
       container.querySelectorAll<HTMLButtonElement>('.btn-add-combo-minor').forEach(btn => {
         btn.addEventListener('click', () => handleAddComboToMinor(btn));
       });
+      container.querySelectorAll<HTMLButtonElement>('.btn-minor-delete').forEach(btn => {
+        btn.addEventListener('click', () => handleMinorDelete(btn));
+      });
     }
+
+    // ── 小分類削除（配下にコンボが残っている場合は保護） ──
+    function handleMinorDelete(btn: HTMLButtonElement) {
+      const major = btn.dataset.major ?? '';
+      const minor = btn.dataset.minor ?? '';
+      const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
+        `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
+      ));
+      if (realCombos.length > 0) {
+        alert(`「${minor || '未分類'}」にはコンボが${realCombos.length}件残っているため削除できません。`);
+        return;
+      }
+      if (!confirm(`小分類「${minor || '未分類'}」を削除しますか？`)) return;
+
+      document.querySelector<HTMLElement>(
+        `tbody.combo-section-head[data-head-major="${CSS.escape(major)}"][data-head-minor="${CSS.escape(minor)}"]`
+      )?.remove();
+      document.querySelector<HTMLElement>(
+        `tbody.combo-drop-zone[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
+      )?.remove();
+    }
+
+    // ── 大分類削除（配下にコンボが残っている場合は保護） ──
+    function handleMajorDelete(btn: HTMLButtonElement) {
+      const major = btn.dataset.major ?? '';
+      const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
+        `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"]`
+      ));
+      if (realCombos.length > 0) {
+        alert(`「${major || '未分類'}」にはコンボが${realCombos.length}件残っているため削除できません。`);
+        return;
+      }
+      if (!confirm(`大分類「${major || '未分類'}」を削除しますか？（配下の小分類もすべて削除されます）`)) return;
+
+      document.querySelectorAll<HTMLElement>(`[data-head-major="${CSS.escape(major)}"]`).forEach(el => el.remove());
+      document.querySelectorAll<HTMLElement>(`tbody.combo-drop-zone[data-major="${CSS.escape(major)}"]`).forEach(el => el.remove());
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.btn-major-delete').forEach(btn => {
+      btn.addEventListener('click', () => handleMajorDelete(btn));
+    });
+
+    // ── 大分類名変更 ──
+    function handleMajorRename(btn: HTMLButtonElement) {
+      const oldMajor = btn.dataset.major ?? '';
+      const newName = window.prompt('新しい大分類名を入力してください：', oldMajor);
+      if (!newName || newName === oldMajor) return;
+
+      document.querySelectorAll<HTMLElement>(`tbody.combo-major-head[data-head-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
+        el.dataset.headMajor = newName;
+        const titleEl = el.querySelector('.combo-major-title');
+        if (titleEl) titleEl.textContent = newName;
+        el.querySelectorAll<HTMLButtonElement>('[data-major]').forEach(b => { b.dataset.major = newName; });
+        const toggleBtn = el.querySelector<HTMLButtonElement>('.combo-major-toggle');
+        if (toggleBtn) toggleBtn.dataset.majorToggle = newName;
+      });
+      document.querySelectorAll<HTMLElement>(`tbody.combo-col-head[data-head-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
+        el.dataset.headMajor = newName;
+      });
+      document.querySelectorAll<HTMLElement>(`tbody.combo-section-head[data-head-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
+        el.dataset.headMajor = newName;
+        el.querySelectorAll<HTMLButtonElement>('[data-major]').forEach(b => { b.dataset.major = newName; });
+      });
+      document.querySelectorAll<HTMLElement>(`tbody.combo-group[data-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
+        el.dataset.major = newName;
+      });
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.btn-major-rename').forEach(btn => {
+      btn.addEventListener('click', () => handleMajorRename(btn));
+    });
 
     // ── 小分類名変更 ──
     function handleMinorRename(btn: HTMLButtonElement) {
@@ -1369,6 +1778,7 @@ for (const c of COMBOS) {
 
     // ── 小分類内にコンボ追加（エディタを末尾に配置） ──
     function handleAddComboToMinor(btn: HTMLButtonElement) {
+      setEditorNewMode();
       const major = btn.dataset.major ?? '';
       const minor = btn.dataset.minor ?? '';
       const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
@@ -1432,24 +1842,174 @@ for (const c of COMBOS) {
     attachMinorActionHandlers(document.body);
 
     // ── アップロードボタン（visibility を public に切替） ──
-    document.querySelectorAll<HTMLButtonElement>('.btn-upload').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const comboId = btn.dataset.comboId;
-        const tbody = comboId
-          ? document.querySelector<HTMLElement>(`tbody.combo-group[data-combo-id="${CSS.escape(comboId)}"]`)
-          : btn.closest<HTMLElement>('tbody.combo-group');
-        if (!tbody) return;
+    function handleUploadClick(btn: HTMLButtonElement) {
+      const comboId = btn.dataset.comboId;
+      const tbody = comboId
+        ? document.querySelector<HTMLElement>(`tbody.combo-group[data-combo-id="${CSS.escape(comboId)}"]`)
+        : btn.closest<HTMLElement>('tbody.combo-group');
+      if (!tbody) return;
 
-        const posterCell = tbody.querySelector<HTMLElement>('.col-poster');
-        if (posterCell) {
-          posterCell.querySelector<HTMLElement>('.tag-private, .tag-unlisted')?.remove();
-          const badge = document.createElement('span');
-          badge.className = 'tag tag-public';
-          badge.textContent = '🌐 公開';
-          posterCell.appendChild(badge);
-        }
-        btn.remove();
-      });
+      const posterCell = tbody.querySelector<HTMLElement>('.col-poster');
+      if (posterCell) {
+        posterCell.querySelector<HTMLElement>('.tag-private, .tag-unlisted')?.remove();
+        const badge = document.createElement('span');
+        badge.className = 'tag tag-public';
+        badge.textContent = '🌐 公開';
+        posterCell.appendChild(badge);
+      }
+      btn.remove();
+    }
+    document.querySelectorAll<HTMLButtonElement>('.btn-upload').forEach(btn => {
+      btn.addEventListener('click', () => handleUploadClick(btn));
     });
+
+    // ── コンボ編集（既存コンボをエディタへ読み込む） ──
+    function openEditorForCombo(comboId: string, anchorGroup: HTMLElement | null) {
+      const combo = COMBOS.find(c => c.id === comboId);
+      if (!combo) return;
+
+      activeBtn?.classList.remove('is-active');
+      activeBtn = null;
+
+      // 対象コンボの直前にエディタを配置
+      if (anchorGroup) anchorGroup.before(editorHost);
+      editorHost.style.display = '';
+      editorOpen = true;
+      if (editorModeLabel) editorModeLabel.textContent = 'コンボを編集';
+      editorAPI()?.loadCombo(combo);
+      updatePosLabel();
+      editorHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function handleEditClick(btn: HTMLButtonElement) {
+      const comboId = btn.dataset.editComboId;
+      if (!comboId) return;
+      const group = btn.closest<HTMLElement>('tbody.combo-group');
+      openEditorForCombo(comboId, group);
+    }
+    document.querySelectorAll<HTMLButtonElement>('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', () => handleEditClick(btn));
+    });
+
+    // ── コンボ単位の削除（モック挙動: DOM から除去） ──
+    function handleDeleteClick(btn: HTMLButtonElement) {
+      const comboId = btn.dataset.deleteComboId;
+      if (!comboId) return;
+      const tbody = document.querySelector<HTMLElement>(`tbody.combo-group[data-combo-id="${CSS.escape(comboId)}"]`);
+      if (!tbody) return;
+      const titleEl = tbody.querySelector<HTMLElement>('.col-title');
+      const label = titleEl?.textContent?.trim() ?? 'このコンボ';
+      if (!confirm(`「${label}」を削除しますか？`)) return;
+
+      // 削除対象がエディタで開かれていた場合は編集状態をリセットして閉じる
+      if (editorOpen && editorAPI()?.comboId === comboId) {
+        closeEditor();
+      }
+      tbody.remove();
+      updateDropZones();
+      applyFilters();
+    }
+    document.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', () => handleDeleteClick(btn));
+    });
+
+    // 動的に挿入された行のボタンにハンドラを付け直す
+    function bindRowActions(tbody: HTMLElement) {
+      tbody.querySelectorAll<HTMLButtonElement>('.insert-here-btn').forEach(btn => {
+        btn.addEventListener('click', () => openEditorAt(btn));
+      });
+      tbody.querySelectorAll<HTMLButtonElement>('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', () => handleEditClick(btn));
+      });
+      tbody.querySelectorAll<HTMLButtonElement>('.btn-upload').forEach(btn => {
+        btn.addEventListener('click', () => handleUploadClick(btn));
+      });
+      tbody.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', () => handleDeleteClick(btn));
+      });
+    }
+
+    // ── 新規コンボ「自分のメモとして保存」→ 一覧に行を挿入（モック挙動） ──
+    function escapeHtml(s: string): string {
+      return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+    }
+
+    interface ComboSaveDetail {
+      id: string;
+      title: string;
+      categoryMajor: string;
+      categoryMinor: string;
+      starterType: string;
+      root: Combo['root'];
+      fullInputsDisplay: string;
+      damage: number;
+      enderDisplayName: string | null;
+      situationTags: string[];
+      routeCount: number;
+    }
+
+    function buildNewComboRow(combo: Combo, view: ComboSaveDetail): HTMLElement {
+      const tbody = document.createElement('tbody');
+      tbody.className = 'combo-group';
+      tbody.dataset.comboId = combo.id;
+      tbody.dataset.source = combo.sourceType;
+      tbody.dataset.major = combo.categoryMajor ?? '';
+      tbody.dataset.minor = combo.categoryMinor ?? '';
+      const tagsHtml = view.situationTags.map(t => `<span class="tag" style="margin-right:3px;">${escapeHtml(t)}</span>`).join('');
+      tbody.innerHTML = `
+        <tr class="insert-here-row">
+          <td colspan="9"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
+        </tr>
+        <tr>
+          <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
+          <td><span class="row-link col-title">${escapeHtml(combo.title)}</span></td>
+          <td><span class="mono" style="font-size:0.82rem;">${escapeHtml(view.fullInputsDisplay)}</span></td>
+          <td class="col-situation">${tagsHtml}</td>
+          <td class="col-poster"><span class="tag tag-personal">自分のメモ</span><span class="tag tag-private">🔒</span></td>
+          <td class="col-ender"><span>${view.enderDisplayName ? escapeHtml(view.enderDisplayName) : '—'}</span></td>
+          <td class="col-frame"></td>
+          <td class="col-num"><span class="dmg">${view.damage.toLocaleString()}</span></td>
+          <td class="col-actions">
+            <div class="row-actions">
+              <button type="button" class="btn-edit" data-edit-combo-id="${combo.id}" title="編集" aria-label="編集">✎</button>
+              <button type="button" class="btn-upload" data-combo-id="${combo.id}" title="アップロード" aria-label="アップロード">⤴</button>
+              <button type="button" class="btn-delete" data-delete-combo-id="${combo.id}" title="このコンボを削除" aria-label="削除">🗑</button>
+            </div>
+          </td>
+        </tr>`;
+      return tbody;
+    }
+
+    editorHost.addEventListener('combo-editor:save', ((e: CustomEvent<ComboSaveDetail>) => {
+      const detail = e.detail;
+      const combo: Combo = {
+        id: detail.id,
+        title: detail.title,
+        categoryMajor: detail.categoryMajor || undefined,
+        categoryMinor: detail.categoryMinor || undefined,
+        starterType: detail.starterType,
+        sourceType: 'personal',
+        visibility: 'private',
+        patchVersion: COMBOS[0]?.patchVersion ?? '1.25',
+        root: detail.root,
+      };
+      COMBOS.push(combo);
+
+      const row = buildNewComboRow(combo, detail);
+      editorHost.before(row);
+      bindRowActions(row);
+      closeEditor();
+      updateDropZones();
+      applyFilters();
+    }) as EventListener);
+
+    // ── 詳細ページの「編集」導線（?edit=<id> で対象を開く） ──
+    const editParam = new URLSearchParams(location.search).get('edit');
+    if (editParam) {
+      const group = document.querySelector<HTMLElement>(
+        `tbody.combo-group[data-combo-id="${CSS.escape(editParam)}"]`
+      );
+      openEditorForCombo(editParam, group);
+    }
   </script>
 </Layout>

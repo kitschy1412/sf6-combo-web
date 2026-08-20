@@ -3,14 +3,9 @@ import Layout from '../../../layouts/Layout.astro';
 import ComboTree from '../../../components/ComboTree.astro';
 import Notation from '../../../components/Notation.astro';
 import {
-  getComboById, getEnderClassById, getOkizemeByEnderClass,
+  getComboById, getEnderClassById, getOkizemeByFrameAdvantage,
   getComboRoutes, hasBranches, getComboMaxDamage, getComboBrokenCount,
-  COMBOS,
 } from '../../../mock-data/rashid';
-
-export function getStaticPaths() {
-  return COMBOS.map(c => ({ params: { id: c.id } }));
-}
 
 const { id } = Astro.params;
 const combo = getComboById(id!);
@@ -23,8 +18,20 @@ const minDamage = Math.min(...routes.map(r => r.leaf.damage ?? 0));
 const totalBroken = getComboBrokenCount(combo);
 const isShared = combo.sourceType === 'shared';
 
-// 表示する起き攻めは「全葉の〆分類」全部
-const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId).filter(Boolean))) as string[];
+// YouTube 埋め込み（docs/DATA.md の埋め込みURL仕様に合わせる）
+const embedUrl = combo.youtubeId
+  ? `https://www.youtube.com/embed/${combo.youtubeId}?start=${combo.startSec ?? 0}`
+  : null;
+const youtubeUrl = combo.youtubeId
+  ? `https://www.youtube.com/watch?v=${combo.youtubeId}&t=${combo.startSec ?? 0}s`
+  : null;
+
+// 表示する起き攻めは「全葉の有利フレーム」全部（〆技が違っても有利フレームが同じなら同じ択が使える）
+const frameAdvantagesUsed = Array.from(new Set(
+  routes
+    .map(r => r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId)?.frameAdvantage : undefined)
+    .filter((f): f is string => Boolean(f))
+));
 ---
 
 <Layout title={`${combo.title} — モック`}>
@@ -66,13 +73,34 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
     <ComboTree node={combo.root} />
   </div>
 
+  {embedUrl && (
+    <div style="max-width:640px; margin-bottom:18px;">
+      <div style="position:relative; width:100%; padding-bottom:56.25%; border-radius:10px; overflow:hidden; background:#000;">
+        <iframe
+          style="position:absolute; inset:0; width:100%; height:100%;"
+          src={embedUrl}
+          title={combo.title}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        />
+      </div>
+    </div>
+  )}
+
   <div style="display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap;">
     {combo.sourceType === 'shared' && <button class="btn btn-primary">自分用にコピー（fork）</button>}
-    {combo.sourceType !== 'shared' && <button class="btn">編集</button>}
+    {combo.sourceType !== 'shared' && <a href={`/mock/character/rashid?edit=${combo.id}`} class="btn">編集</a>}
     {combo.sourceType === 'personal' && <button class="btn btn-primary">アップロード（公開）</button>}
     <button class="btn">編集提案</button>
+    {combo.sourceType !== 'shared' && (
+      <button type="button" class="btn btn-warn" id="btn-delete-combo" data-combo-title={combo.title}>削除</button>
+    )}
     <span style="flex:1;"></span>
-    {combo.youtubeId && <a href="#" class="btn">▶ YouTube ({combo.startSec}s〜)</a>}
+    {youtubeUrl && (
+      <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" class="btn">
+        ▶ YouTube ({combo.startSec}s〜)
+      </a>
+    )}
   </div>
 
   <!-- 各ルートの詳細 -->
@@ -110,7 +138,14 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
                 <tr>
                   <td><span class="dmg">{r.leaf.gauge ?? 0}</span></td>
                   <td><span class="dmg">{r.leaf.driveGauge ?? 0}</span></td>
-                  <td>{ender ? <span class="tag" style="background:#111; color:#fff;">{ender.displayName}</span> : '—'}</td>
+                  <td>
+                    {ender ? <span class="tag" style="background:#111; color:#fff;">{ender.displayName}</span> : '—'}
+                    {ender?.frameAdvantage && (
+                      <span class="tag" style="background:#fef3c7; color:#b45309; border:1px solid #f5d78e; font-family:'JetBrains Mono',monospace; margin-left:4px;">
+                        {ender.frameAdvantage}
+                      </span>
+                    )}
+                  </td>
                   <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
                 </tr>
               </tbody>
@@ -140,23 +175,22 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
     </div>
   </section>
 
-  <!-- 紐づく起き攻め (全〆分類の合算) -->
-  {enderClassesUsed.length > 0 && (
+  <!-- 紐づく起き攻め (有利フレーム単位の合算) -->
+  {frameAdvantagesUsed.length > 0 && (
     <section style="margin-bottom:20px;">
       <div class="section-head">
         <h2>このコンボから繋がる起き攻め</h2>
         <a href="/mock/okizeme/new" class="btn btn-sm">＋ 追加</a>
       </div>
       <div style="font-size:0.8rem; color:var(--muted); margin-bottom:10px;">
-        各ルートの〆分類経由で紐づくセットプレイ全てを表示
+        各ルートの有利フレーム（＋◯F）経由で紐づくセットプレイ全てを表示。〆技が違っても有利フレームが同じなら同じ択が使えます。
       </div>
-      {enderClassesUsed.map(ecId => {
-        const ec = getEnderClassById(ecId);
-        const okiList = getOkizemeByEnderClass(ecId);
+      {frameAdvantagesUsed.map(fa => {
+        const okiList = getOkizemeByFrameAdvantage(fa);
         return (
           <div style="margin-bottom:14px;">
             <div style="font-size:0.85rem; font-weight:700; margin-bottom:6px; color:var(--muted-strong);">
-              ▲ {ec?.displayName} <span style="font-weight:400; color:var(--muted);">({okiList.length}件)</span>
+              ▲ <span class="dmg" style="font-size:0.9rem;">{fa}</span> <span style="font-weight:400; color:var(--muted);">({okiList.length}件)</span>
             </div>
             {okiList.length === 0 ? (
               <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; font-size:0.85rem;">
@@ -171,6 +205,9 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
                         {o.sourceType === 'personal' && <span class="tag tag-personal">自分</span>}
                         {o.sourceType === 'shared' && <span class="tag tag-shared">{o.ownerLabel}</span>}
                         <strong>{o.title}</strong>
+                        <span style="font-size:0.7rem; color:var(--muted); background:var(--surface3); padding:1px 6px; border-radius:3px;">
+                          {getEnderClassById(o.enderClassId)?.displayName}
+                        </span>
                       </div>
                       <div style="display:flex; gap:4px;">
                         {o.flags.mid && <span class="tag tag-warn">中段</span>}
@@ -189,4 +226,15 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
       })}
     </section>
   )}
+
+  <script>
+    // 削除は一覧側の DOM 操作が正だが、詳細ページ単体では対象行を持たないため
+    // confirm 後に一覧へ戻る（モック挙動）。
+    document.getElementById('btn-delete-combo')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget as HTMLElement;
+      const title = btn.dataset.comboTitle ?? 'このコンボ';
+      if (!confirm(`「${title}」を削除しますか？`)) return;
+      location.href = '/mock/character/rashid';
+    });
+  </script>
 </Layout>

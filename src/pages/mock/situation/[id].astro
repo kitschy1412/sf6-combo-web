@@ -1,11 +1,7 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import Notation from '../../../components/Notation.astro';
-import { getSituationById, getEnderClassById, getOkizemeByEnderClass, KNOCKDOWN_SITUATIONS } from '../../../mock-data/rashid';
-
-export function getStaticPaths() {
-  return KNOCKDOWN_SITUATIONS.map(s => ({ params: { id: s.id } }));
-}
+import { getSituationById, getEnderClassById, getOkizemeByEnderClass } from '../../../mock-data/rashid';
 
 const { id } = Astro.params;
 const sit = getSituationById(id!);
