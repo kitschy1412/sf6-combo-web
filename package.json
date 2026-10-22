@@ -10,7 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test:scenarios": "node tests/scenarios.mjs"
+    "test:scenarios": "node tests/scenarios.mjs",
+    "import:archiver": "node scripts/import-archiver.ts"
   },
   "dependencies": {
     "@astrojs/vercel": "^10.0.2",

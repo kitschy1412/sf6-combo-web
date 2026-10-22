@@ -28,7 +28,7 @@ description: docs/backlog.md の未完了タスク（[ ]）を上から順に全
 
 3. **実装**（スキップしなかった場合）
    - メモに書かれた対象ファイル・受け入れ条件に従う
-   - CLAUDE.md のルール（TypeScript strict、Tailwind のみ、データ取得は src/lib/ 集約等）を遵守
+   - AGENTS.md のルール（TypeScript strict、Tailwind のみ、データ取得は src/lib/ 集約等）を遵守
    - 必要なら関連 docs（@docs/UI.md, @docs/DATA.md, @docs/VOTING.md）を on-demand で参照
    - 既存パターンの流用を最優先（新規抽象化を勝手に作らない）
    - 1タスクが大規模化しすぎたら、その時点で一旦停止してユーザーに相談

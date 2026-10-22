@@ -16,6 +16,15 @@
 
 <!-- 完了タスクをここから追記していく -->
 
+## 2026-10-23
+
+- archiver の Rashid データを JSON 経由でモックに取り込む変換スクリプトを作る
+  - `npm run import:archiver`（scripts/import-archiver.ts）→ src/mock-data/rashid-archiver.ts を生成し、rashid.ts の COMBOS / OKIZEME_SETUPS の末尾に展開。コンボ20・セットプレイ10、重複0
+  - 対応表 docs/rashid-terms.md を列位置で読む。択（OR/か）は ` or `、複数技の択は括弧。中大TC は「中大TC」表記のまま（ユーザー指定）
+  - 〆分類が推定できない11件（ミキサー〆、SA3〆など）は空のまま。patchVersion / starterType も空。一覧ページ下に「推定できなかった項目」表
+  - 既知の制約: Notation は `>` で分割するので、括弧つきの択（セットプレイ #5, #10）はチップをまたいで表示される
+
+
 ## 2026-08-20
 
 - シナリオテストの導入と、そこで見つかった不整合の修正

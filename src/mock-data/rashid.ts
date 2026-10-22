@@ -1,6 +1,8 @@
 // モック用ハードコードデータ（Rashid）
 // Phase 1: 入力UIの設計確認用。バックエンド未接続。
 
+import { ARCHIVER_COMBOS, ARCHIVER_OKIZEME_SETUPS } from './rashid-archiver';
+
 export type SourceType = 'personal' | 'shared' | 'forked';
 export type Visibility = 'private' | 'unlisted' | 'public';
 
@@ -71,6 +73,7 @@ export type OkizemeSetup = {
     delayedWakeup?: string;
   };
   flags: { mid?: boolean; low?: boolean; throw?: boolean; safeJump?: boolean };
+  notes?: string;                  // archiver 取り込み分の解説字幕など
   youtubeId?: string;
   startSec?: number;
   sourceType: SourceType;
@@ -79,6 +82,16 @@ export type OkizemeSetup = {
 };
 
 // ─── コマンド入力パレット ───
+// archiver 取り込みで、対応表で変換できなかった語がある or 〆技から enderClassId を推定できなかったもの
+export type ArchiverUnresolved = {
+  id: string;
+  kind: 'combo' | 'okizeme';
+  title: string;
+  recipeJa: string;                // 取り込み元の日本語レシピ
+  unresolvedTerms: string[];       // 日本語のまま残った語
+  enderUnknown: boolean;
+};
+
 export type PaletteMove = {
   token: string;   // コマンド表記: "214LK"
   name?: string;   // 日本語名: "イーグルスパイク 弱" (なければ token を表示)
@@ -1005,6 +1018,8 @@ export const COMBOS: Combo[] = [
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
+  // archiver 取り込み（scripts/import-archiver.ts が生成）
+  ...ARCHIVER_COMBOS,
 ];
 
 export const KNOCKDOWN_SITUATIONS: KnockdownSituation[] = [
@@ -1072,6 +1087,7 @@ export const OKIZEME_SETUPS: OkizemeSetup[] = [
     ownerLabel: 'cobra_player',
     votes: { good: 24, bad: 1, brokenInCurrentVer: 0 },
   },
+  ...ARCHIVER_OKIZEME_SETUPS,
 ];
 
 export function getComboById(id: string): Combo | undefined {

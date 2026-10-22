@@ -17,7 +17,7 @@ Astro 6 + TypeScript (strict) / @supabase/supabase-js / TailwindCSS v4 / Vercel 
 - `docs/UI.md` — UI/Tailwind 規約（色・レイアウト・キャラバッジ等）
 - `docs/DATA.md` — Supabase スキーマ、YouTube埋め込みURL生成（Phase 2 設計案は `docs/DATA_PHASE2.md`）
 - `docs/VOTING.md` — 投票システム（Wilson Score + IP制限）
-- `docs/backlog.md` — やりたいことリスト（`/next-task` で先頭から実装）。完了時は項目を削除し `docs/done.md` の先頭に移す
+- `docs/backlog.md` — やりたいことリスト（`/sy-next-task` で先頭から実装）。完了時は項目を削除し `docs/done.md` の先頭に移す
 - `docs/done.md` — 完了タスクの履歴
 
 ## 接続先

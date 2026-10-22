@@ -8,6 +8,7 @@ import {
   getEnderClassById, getComboRoutes, hasBranches, getComboBrokenCount,
   getOkizemeByFrameAdvantage,
 } from '../../../mock-data/rashid';
+import { ARCHIVER_UNRESOLVED } from '../../../mock-data/rashid-archiver';
 
 const { name } = Astro.params;
 // モックデータは Rashid のみ。未知のキャラ名は他のモックページと同様 /mock/ へ戻す
@@ -448,6 +449,37 @@ for (const c of COMBOS) {
     </table>
     </div>
   </section>
+
+  {ARCHIVER_UNRESOLVED.length > 0 && (
+    <section style="margin-bottom:32px;">
+      <div class="section-head">
+        <h2>archiver取り込み: 推定できなかった項目</h2>
+        <span style="font-size:0.76rem; color:var(--muted);">{ARCHIVER_UNRESOLVED.length}件 ／ npm run import:archiver で再生成</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>種別</th>
+            <th>タイトル</th>
+            <th>元レシピ</th>
+            <th>未変換の語</th>
+            <th>〆分類</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ARCHIVER_UNRESOLVED.map(u => (
+            <tr>
+              <td><span class="tag">{u.kind === 'combo' ? 'コンボ' : 'セットプレイ'}</span></td>
+              <td>{u.kind === 'combo' ? <a href={`/mock/combo/${u.id}`} class="row-link">{u.title}</a> : u.title}</td>
+              <td>{u.recipeJa}</td>
+              <td>{u.unresolvedTerms.length > 0 ? u.unresolvedTerms.map(t => <span class="tag tag-warn" style="margin-right:3px;">{t}</span>) : '—'}</td>
+              <td>{u.enderUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )}
 
   <section style="margin-bottom:32px;">
     <div class="section-head">

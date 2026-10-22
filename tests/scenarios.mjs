@@ -94,7 +94,9 @@ scenario('S2 Wiki型キャラページ: 一覧・分類・フィルタ・編集U
   const edits = count(h, /class="btn-edit"/g);
   const dels = count(h, /class="btn-delete"/g);
   const ups = count(h, /class="btn-upload"/g);
-  check(`モックデータ38件のコンボが全部描画される (combo-group=${groups})`, groups === 38, `combo-group=${groups}`);
+  check(`モックデータ58件（手書き38 + archiver取り込み20）のコンボが全部描画される (combo-group=${groups})`, groups === 58, `combo-group=${groups}`);
+  check('archiver取り込みの大分類と、推定できなかった項目の一覧が出る',
+    majors.has('archiver取り込み') && h.includes('archiver取り込み: 推定できなかった項目'), `majors=${[...majors].join(',')}`);
   check(`各コンボ行に編集/削除ボタンが1組ずつ (edit=${edits}, delete=${dels})`,
     edits === groups && dels === groups, `groups=${groups} edit=${edits} delete=${dels}`);
   check(`アップロードボタンは共有済みを除いた行に出る (upload=${ups})`,

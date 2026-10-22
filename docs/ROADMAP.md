@@ -1,7 +1,7 @@
 # Roadmap
 
 このサイトの目的・現状・今後の方針をまとめた長期視点のドキュメント。
-細かい実装タスクは [backlog.md](./backlog.md) を参照（`/next-task` はそちらだけを読む）。
+細かい実装タスクは [backlog.md](./backlog.md) を参照（`/sy-next-task` はそちらだけを読む）。
 
 ---
 
@@ -58,6 +58,20 @@ Astro + Supabase 直結のシンプル版。`sf6-combo-archiver` の出力をそ
 ## これから
 
 各 Phase は前の Phase に依存する。Phase 内のタスクは [backlog.md](./backlog.md) に切り出す。
+
+### 当面の方針（2026-10-21）: Rashid に絞って深掘りする
+全キャラ展開（Phase 5）は凍結し、Rashid 1キャラで「扱いやすさ」と「中身」を充実させる。
+
+- **進め方**: Supabase 接続より先に、**モック（`src/mock-data/rashid.ts`）上で使い勝手を詰める**。
+  使い勝手が固まってからスキーマを確定する方が作り直しが少ないため。
+- **扱いやすさ**: 次の3場面すべてを対象にする
+  1. 探す・見る（一覧の絞り込み・検索、詳細ページの見やすさ）
+  2. 入力・編集（ComboEditor、パレット、分岐ツリー作成）
+  3. 練習で使う（ノート、動画タイムスタンプ確認、起き攻めとの紐付け）
+- **中身**: 手入力ではなく **`sf6-combo-archiver` で取り込む**。
+  主な収集源は Rashid 専門の doskonnbu チャンネル（`UC5jD0tCP5IIfP4oBVU1kB-Q`）。
+  取り込み層は `npm run import:archiver`（scripts/import-archiver.ts、2026-10-23 作成）。archiver の JSON を
+  docs/rashid-terms.md で変換し、src/mock-data/rashid-archiver.ts に生成する。Supabase が使えない間は JSON ファイル経由で受け渡す。
 
 ### Phase 2 — 仕様確定とスキーマ設計（進行中: 仕様詰め）
 モックで詰めた論点を「採用 / 不採用 / 保留」で確定し、Supabase スキーマに落とす。
