@@ -14,7 +14,7 @@ Astro 6 + TypeScript (strict) / @supabase/supabase-js / TailwindCSS v4 / Vercel 
 ## 参考ドキュメント（on-demand）
 作業領域に応じて必要な時だけ読む：
 - `docs/ROADMAP.md` — プロジェクト全体の目的・現状・Phase 計画
-- `docs/UI.md` — UI/Tailwind 規約（色・レイアウト・キャラバッジ等）
+- `docs/UI.md` — UI/Tailwind 規約（色・レイアウト・キャラバッジ等）、画面のスクショ確認手順
 - `docs/DATA.md` — Supabase スキーマ、YouTube埋め込みURL生成（Phase 2 設計案は `docs/DATA_PHASE2.md`）
 - `docs/VOTING.md` — 投票システム（Wilson Score + IP制限）
 - `docs/backlog.md` — やりたいことリスト（`/sy-next-task` で先頭から実装）。完了時は項目を削除し `docs/done.md` の先頭に移す

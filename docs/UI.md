@@ -295,3 +295,17 @@ SA ゲージ消費・D ゲージ消費など、入力値から自動算出する
 - テキストは `var(--text-soft)`（通常テキストより薄め）
 - 値は JS で動的に更新。計算ロジックは `src/lib/gauges.ts` の `calcGaugesFromSegs` を使用
 - ラベルと「自動」バッジは横並び（`display:flex; align-items:center; gap:7px;`）
+
+---
+
+## 見た目の確認（スクリーンショット）
+
+UI を変えたら、ヘッドレス Edge で撮って目で確かめる（2026-10-23 の UI 見直しで使用）。
+
+1. `npm run dev`（4321 が使用中だと 4322 などにずれる。起動ログの Local の URL を使う）
+2. スクラッチパッドに shots.json を書き、`node scripts/screenshot.mjs shots.json <出力フォルダ>` を実行
+3. 出力された PNG を Read で見る
+
+- 使い方の詳細はスクリプト冒頭のコメント。初回は Edge のプロファイル作成で十数秒かかる
+- 撮影後は 9333 番の Edge が残るので、終わったら止める（`msedge.exe` のうち `--remote-debugging-port=9333` のもの）
+- シナリオテストをずれたポートに向けるときは `BASE=http://localhost:4322 npm run test:scenarios`
