@@ -321,4 +321,5 @@ UI を変えたら、ヘッドレス Edge で撮って目で確かめる（2026-
 - シナリオテストをずれたポートに向けるときは `BASE=http://localhost:4322 npm run test:scenarios`
 - 撮影用 Edge のプロファイルは使い回されるので、localStorage（表記設定 `sf6-dir` / `sf6-name` など）が前回の撮影から残る（2026-10-24）。表記に関わる撮影は actions で値を入れてから撮り、終わったら消す
 - shots.json は Write で書く。Bash のヒアドキュメントで書くと、actions / evals の JS 式のバックスラッシュ（正規表現の `\s` など）が1つ減って JSON が壊れることがある
+- `npm run dev` 直後の最初の撮影は、Vite の依存の再最適化（ログに「optimized dependencies changed. reloading」）でページが読み直され、actions が効かないことがある（2026-10-24。「＋ コンボ」を押したのにエディタが開いていなかった）。evals の結果が空や想定外なら、もう一度撮る
 - キャラハブのインラインエディタを撮るとき（2026-10-24）: startSelector を `#inline-editor-host` にすると Layout の sticky ヘッダーがエディタの上端に重なるので、actions の先頭で `document.querySelector('header').style.position = 'static'` にする。開く操作は `#btn-add-combo-top`（新規）・`button.btn-edit[data-edit-combo-id="c_001"]`（編集）・`#combo-editor-cancel`（キャンセル）の click。入力欄の値は evals で JSON にまとめて出すと、画像を見なくても確かめられる

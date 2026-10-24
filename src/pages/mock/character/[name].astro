@@ -1224,7 +1224,8 @@ for (const c of COMBOS) {
         const filterMatch = okSource && okMajor && okMinor;
         grp.dataset.filterMatch = filterMatch ? '1' : '0';
         const collapsed = collapsedMajors.has(major) || collapsedMinors.has(minorKey(major, minor));
-        grp.style.display = (filterMatch && !collapsed) ? '' : 'none';
+        const editing = grp.dataset.editing === '1';
+        grp.style.display = (filterMatch && !collapsed && !editing) ? '' : 'none';
       });
       // 小分類サブヘッダ: 配下にフィルタ一致するコンボが1件以上、かつ親の大分類が折りたたまれていなければ表示
       document.querySelectorAll<HTMLElement>('tbody.combo-section-head').forEach(head => {
@@ -1349,10 +1350,26 @@ for (const c of COMBOS) {
     const comboTableEl = document.getElementById('combo-table')!;
     let activeBtn: HTMLElement | null = null;
     let editorOpen = false;
+    // 既存コンボを編集中のときの元の行（編集中だけ隠し、閉じたら戻す）
+    let editingGroup: HTMLElement | null = null;
+    let editingTitle = '';
+
+    function setEditingGroup(group: HTMLElement | null) {
+      if (editingGroup) delete editingGroup.dataset.editing;
+      editingGroup = group;
+      if (group) group.dataset.editing = '1';
+      applyFilters();
+    }
 
     function updatePosLabel() {
       if (!editorOpen) return;
-      const realGroups = Array.from(document.querySelectorAll<HTMLElement>('tbody.combo-group'));
+      const labelEl = document.getElementById('insert-pos-label')!;
+      if (editingGroup) {
+        labelEl.textContent = `「${editingTitle}」を編集中`;
+        return;
+      }
+      // 空の小分類用ドロップゾーンは数えない（実際のコンボだけ）
+      const realGroups = Array.from(document.querySelectorAll<HTMLElement>('tbody.combo-group:not(.combo-drop-zone)'));
       const beforeCount = realGroups.filter(g => {
         const pos = editorHost.compareDocumentPosition(g);
         return (pos & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
@@ -1361,7 +1378,7 @@ for (const c of COMBOS) {
       if (beforeCount === 0) label = '先頭に挿入';
       else if (beforeCount === realGroups.length) label = '末尾に挿入';
       else label = `${beforeCount} 番目の後に挿入`;
-      document.getElementById('insert-pos-label')!.textContent = label;
+      labelEl.textContent = label;
     }
 
     const editorModeLabel = document.getElementById('editor-mode-label');
@@ -1379,6 +1396,7 @@ for (const c of COMBOS) {
       activeBtn?.classList.remove('is-active');
       activeBtn = btn;
       btn.classList.add('is-active');
+      setEditingGroup(null);
       setEditorNewMode();
 
       const pos = btn.dataset.insertPos;
@@ -1401,6 +1419,7 @@ for (const c of COMBOS) {
       editorOpen = false;
       activeBtn?.classList.remove('is-active');
       activeBtn = null;
+      setEditingGroup(null);
     }
 
     document.querySelectorAll<HTMLButtonElement>('.insert-here-btn').forEach(btn => {
@@ -1777,8 +1796,10 @@ for (const c of COMBOS) {
       activeBtn?.classList.remove('is-active');
       activeBtn = null;
 
-      // 対象コンボの直前にエディタを配置
+      // 対象コンボの直前にエディタを配置し、元の行は編集中だけ隠す
       if (anchorGroup) anchorGroup.before(editorHost);
+      editingTitle = combo.title || '(無題コンボ)';
+      setEditingGroup(anchorGroup);
       editorHost.style.display = '';
       editorOpen = true;
       if (editorModeLabel) editorModeLabel.textContent = 'コンボを編集';
