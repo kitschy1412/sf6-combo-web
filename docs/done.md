@@ -18,6 +18,11 @@
 
 ## 2026-10-24
 
+- 新規コンボのエディタを空の状態で開く
+  - ComboEditor.astro: 見本のツリー（`makeDefaultTree`）を空のルート1本（`makeEmptyTree`）に替え、タイトル・大分類・始動技種別の初期値をなくした（始動技種別は「（未選択）」を追加）。YouTube URL・開始秒の欄に id を付けた
+  - 入力欄を空に戻す `resetFields()`（タイトル・分類・始動技種別・YouTube URL・開始秒・保存先＝自分のメモ）を作り、`reset()` と `loadCombo()` の両方で使う。新規入力の値が ✎ で開いたコンボにも残らない。`loadCombo()` は動画のあるコンボで YouTube URL・開始秒も埋める
+  - tests/scenarios.mjs: S2 に「エディタの入力欄に初期値が入っていない」を追加（reset の動きは JS なので、ヘッドレス Edge で ✎ → キャンセル → ＋ コンボ の手順を確認）
+
 - 表記設定（数字/矢印・コマンド/技名）を全ページで反映する
   - 反映処理を NotationToggle から Layout.astro のスクリプトに移し、トグルの無いページ（コンボ詳細・ノート詳細・ダウン状況など）も保存済みの表記で出す。技名は Layout の `character`（`<body data-character>`）で表を引くので、コマンドを出すページは Layout に `character` を渡す。変換と設定の読み込みは src/lib/notation.ts（`readNotationPrefs` / `formatToken`）
   - トグル（NotationToggle・エディタ内）は保存して `notation:change` を流すだけにし、ページのチップ・両トグル・エディタが追従する（別タブも storage イベントで追従）。コンボ詳細のパンくずの下にトグルを追加。ノート詳細のコマンドをチップ表示に

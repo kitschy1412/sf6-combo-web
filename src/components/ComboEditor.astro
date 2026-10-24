@@ -36,7 +36,7 @@ const CATEGORY_DATA = COMBOS
       <div>
         <label class="field-label">大分類</label>
         <input type="text" class="input" id="cat-major" list="major-cat-list"
-          value="ヒット時コンボ" placeholder="例: ヒット時コンボ" autocomplete="off" />
+          placeholder="例: ヒット時コンボ" autocomplete="off" />
         <datalist id="major-cat-list"></datalist>
       </div>
       <div>
@@ -55,12 +55,13 @@ const CATEGORY_DATA = COMBOS
     <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
       <div>
         <label class="field-label">タイトル</label>
-        <input type="text" class="input" id="combo-title" value="2MK始動 〆分岐コンボ群" />
+        <input type="text" class="input" id="combo-title" placeholder="例: 基本コンボ" />
       </div>
       <div>
         <label class="field-label">始動技種別</label>
         <select class="select" id="combo-starter">
-          <option>通常技</option><option selected>下段</option><option>中段</option>
+          <option value="">（未選択）</option>
+          <option>通常技</option><option>下段</option><option>中段</option>
           <option>投げ</option><option>カウンター</option><option>確定反撃</option><option>CA/SA</option>
         </select>
       </div>
@@ -103,8 +104,8 @@ const CATEGORY_DATA = COMBOS
     <div>
       <label class="field-label">YouTube URL（任意・ツリー全体に紐づく）</label>
       <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
-        <input type="text" class="input" placeholder="https://youtu.be/..." />
-        <input type="number" class="input" placeholder="開始秒" />
+        <input type="text" class="input" id="combo-youtube-url" placeholder="https://youtu.be/..." />
+        <input type="number" class="input" id="combo-start-sec" placeholder="開始秒" />
       </div>
     </div>
 
@@ -425,16 +426,9 @@ const CATEGORY_DATA = COMBOS
   function applyDirMode(seg) {
     return dirMode === 'arrows' ? numpadToArrows(seg) : seg;
   }
-  function makeDefaultTree() {
-    return {
-      id: uid(),
-      segment: '2MK > 236LP > 214LK',
-      damage: 2200,
-      saGauge: 0,
-      dGauge: 1,
-      enderClassId: 'ec_weak_eagle',
-      situationTags: ['画面中央'],
-    };
+  // 新規コンボは空のルート1本から始める（見本は入れない）
+  function makeEmptyTree() {
+    return { id: uid(), segment: '', situationTags: [] };
   }
 
   // データモデルの ComboNode をエディタ用ツリー形状へ正規化
@@ -452,7 +446,7 @@ const CATEGORY_DATA = COMBOS
     return out;
   }
 
-  let tree = INITIAL_TREE ? normalizeDataNode(INITIAL_TREE) : makeDefaultTree();
+  let tree = INITIAL_TREE ? normalizeDataNode(INITIAL_TREE) : makeEmptyTree();
   let comboId = COMBO_ID ?? null;
   let focusedId = tree.id;
 
@@ -1014,8 +1008,8 @@ const CATEGORY_DATA = COMBOS
   }
 
   updateMajorDatalist();
-  updateMinorDatalist('ヒット時コンボ');
-  renderCustomMinorChips('ヒット時コンボ');
+  updateMinorDatalist('');
+  renderCustomMinorChips('');
 
   document.getElementById('cat-major').addEventListener('input', e => {
     updateMinorDatalist(e.target.value);
@@ -1046,6 +1040,15 @@ const CATEGORY_DATA = COMBOS
     const el = document.getElementById(id);
     if (el) el.value = val ?? '';
   }
+  // ツリー以外の入力欄を空に戻す（前に開いたコンボの値を次に持ち越さない）。入力欄を足したらここにも足す
+  function resetFields() {
+    ['cat-major', 'cat-minor', 'combo-title', 'combo-starter', 'combo-youtube-url', 'combo-start-sec']
+      .forEach(id => setFieldValue(id, ''));
+    const personal = document.getElementById('dest-personal');
+    if (personal) personal.checked = true;
+    updateMinorDatalist('');
+    renderCustomMinorChips('');
+  }
   window.comboEditorAPI = {
     // 既存コンボを読み込んで編集モードにする
     loadCombo(combo) {
@@ -1053,20 +1056,26 @@ const CATEGORY_DATA = COMBOS
       tree = normalizeDataNode(combo.root);
       comboId = combo.id ?? null;
       focusedId = tree.id;
+      resetFields();
       const major = combo.categoryMajor ?? '';
       setFieldValue('cat-major', major);
       setFieldValue('cat-minor', combo.categoryMinor ?? '');
       setFieldValue('combo-title', combo.title ?? '');
       setFieldValue('combo-starter', combo.starterType ?? '');
+      if (combo.youtubeId) {
+        setFieldValue('combo-youtube-url', `https://youtu.be/${combo.youtubeId}`);
+        setFieldValue('combo-start-sec', combo.startSec);
+      }
       updateMinorDatalist(major);
       renderCustomMinorChips(major);
       render();
     },
-    // 新規コンボ入力用に初期状態へ戻す
+    // 新規コンボ入力用に、すべての入力欄を空にする
     reset() {
-      tree = makeDefaultTree();
+      tree = makeEmptyTree();
       comboId = null;
       focusedId = tree.id;
+      resetFields();
       render();
     },
     get comboId() { return comboId; },

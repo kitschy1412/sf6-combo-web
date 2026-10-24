@@ -115,6 +115,13 @@ scenario('S2 Wiki型キャラページ: 一覧・分類・フィルタ・編集U
   check('保存先の選択肢が2つある（自分のメモ / アップロード）',
     h.includes('id="dest-personal"') && h.includes('id="dest-upload"'));
   check('重複確認モーダルがある', h.includes('id="dup-modal"'));
+  // 新規は空で開く（見本の値を入れない）。編集のあとに新規を開いたときの初期化（comboEditorAPI.reset）は
+  // JS なのでここでは見られない（docs/UI.md の手順でヘッドレス Edge で確かめる）
+  const editorForm = h.slice(h.indexOf('id="combo-form"'), h.indexOf('id="dup-modal"'));
+  const prefilled = editorForm.match(/<input\b[^>]*\svalue="[^"]+"|<option\b[^>]*\sselected/g) ?? [];
+  check('インラインエディタの入力欄に初期値が入っていない（新規は空で開く）',
+    editorForm.includes('id="combo-title"') && prefilled.length === 0,
+    prefilled.join(' / ') || 'エディタのフォームが見つかりません');
   check('ツリー編集操作（分岐追加・ノート削除）がある',
     h.includes('id="btn-add-sibling"') && h.includes('id="btn-delete-node"'));
   check('全コンボ行がリンク付きで詳細へ遷移できる',
