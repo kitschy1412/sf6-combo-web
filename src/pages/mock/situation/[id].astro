@@ -1,13 +1,18 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import Notation from '../../../components/Notation.astro';
-import { getSituationById, getEnderClassById, getOkizemeByEnderClass } from '../../../mock-data/rashid';
+import { getSituationById, getEnderClassById, getOkizemeLinks } from '../../../mock-data/rashid';
 
 const { id } = Astro.params;
 const sit = getSituationById(id!);
 if (!sit) return Astro.redirect('/mock/');
 const enderClass = getEnderClassById(sit.enderClassId);
-const okizeme = getOkizemeByEnderClass(sit.enderClassId);
+// 〆分類が同じ起き攻めを主に、〆は違うが有利フレームが同じものを参考として薄く出す
+const okizeme = getOkizemeLinks(sit.enderClassId);
+const groups = [
+  { rel: 'main', items: okizeme.main },
+  { rel: 'ref', items: okizeme.reference },
+].filter(g => g.items.length > 0);
 ---
 
 <Layout title={`${sit.label} — モック`}>
@@ -32,52 +37,66 @@ const okizeme = getOkizemeByEnderClass(sit.enderClassId);
     </div>
   </div>
 
-  <section style="margin-top:22px;">
+  <section id="situation-okizeme" style="margin-top:22px;">
     <div class="section-head">
       <h2>この状況で使える起き攻め</h2>
       <a href="/mock/okizeme/new" class="btn btn-sm">＋ 起き攻めを追加</a>
     </div>
 
-    {okizeme.length === 0 ? (
+    {okizeme.main.length === 0 && (
       <div class="card" style="text-align:center; color:var(--muted); border-style:dashed;">
         まだ起き攻めが登録されていません
       </div>
-    ) : (
-      <div style="display:grid; gap:10px;">
-        {okizeme.map(o => (
-          <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
-              <div style="display:flex; gap:6px; align-items:center;">
-                {o.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
-                {o.sourceType === 'shared' && <span class="tag tag-shared">共有 / {o.ownerLabel}</span>}
-                <strong>{o.title}</strong>
-              </div>
-              <div style="display:flex; gap:4px;">
-                {o.flags.mid && <span class="tag tag-warn">中段</span>}
-                {o.flags.low && <span class="tag tag-personal">下段</span>}
-                {o.flags.throw && <span class="tag tag-shared">投げ</span>}
-                {o.flags.safeJump && <span class="tag">詐欺重ね</span>}
-              </div>
-            </div>
-            <Notation inputs={o.inputs} size="sm" />
-            <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:6px; font-size:0.82rem;">
-              {o.vsWakeup.guard && <div><span style="color:var(--muted); font-weight:600;">ガード:</span> {o.vsWakeup.guard}</div>}
-              {o.vsWakeup.mash && <div><span style="color:var(--muted); font-weight:600;">暴れ:</span> {o.vsWakeup.mash}</div>}
-              {o.vsWakeup.invincible && <div><span style="color:var(--muted); font-weight:600;">無敵:</span> {o.vsWakeup.invincible}</div>}
-              {o.vsWakeup.delayedWakeup && <div><span style="color:var(--muted); font-weight:600;">受身ずらし:</span> {o.vsWakeup.delayedWakeup}</div>}
-            </div>
-            {o.sourceType === 'shared' && (
-              <div class="vote-bar" style="margin-top:12px; padding:8px 10px;">
-                <button class="btn btn-sm">👍 Good {o.votes.good}</button>
-                <button class="btn btn-sm">👎 Bad {o.votes.bad}</button>
-                <button class="btn btn-sm btn-warn">⚠ 現ver不可 {o.votes.brokenInCurrentVer}</button>
-                <span style="flex:1;"></span>
-                <button class="btn btn-sm">自分用にコピー</button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
     )}
+    {groups.map(g => (
+      <div style={g.rel === 'ref' ? 'margin-top:16px;' : undefined}>
+        {g.rel === 'ref' && (
+          <div style="font-size:0.8rem; font-weight:700; color:var(--muted); margin-bottom:8px;">
+            参考（同じ {okizeme.frameAdvantage}）
+            <span style="font-weight:400; margin-left:6px;">〆が違うため、距離が合わないことがあります</span>
+          </div>
+        )}
+        <div style={`display:grid; gap:10px;${g.rel === 'ref' ? ' opacity:0.55;' : ''}`}>
+          {g.items.map(o => (
+            <div class="card" data-okizeme-id={o.id} data-okizeme-rel={g.rel}>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+                <div style="display:flex; gap:6px; align-items:center;">
+                  {o.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
+                  {o.sourceType === 'shared' && <span class="tag tag-shared">共有 / {o.ownerLabel}</span>}
+                  <strong>{o.title}</strong>
+                  {g.rel === 'ref' && (
+                    <span style="font-size:0.7rem; color:var(--muted); background:var(--surface3); padding:1px 6px; border-radius:3px;">
+                      {getEnderClassById(o.enderClassId)?.displayName}
+                    </span>
+                  )}
+                </div>
+                <div style="display:flex; gap:4px;">
+                  {o.flags.mid && <span class="tag tag-warn">中段</span>}
+                  {o.flags.low && <span class="tag tag-personal">下段</span>}
+                  {o.flags.throw && <span class="tag tag-shared">投げ</span>}
+                  {o.flags.safeJump && <span class="tag">詐欺重ね</span>}
+                </div>
+              </div>
+              <Notation inputs={o.inputs} size="sm" />
+              <div style="margin-top:10px; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:6px; font-size:0.82rem;">
+                {o.vsWakeup.guard && <div><span style="color:var(--muted); font-weight:600;">ガード:</span> {o.vsWakeup.guard}</div>}
+                {o.vsWakeup.mash && <div><span style="color:var(--muted); font-weight:600;">暴れ:</span> {o.vsWakeup.mash}</div>}
+                {o.vsWakeup.invincible && <div><span style="color:var(--muted); font-weight:600;">無敵:</span> {o.vsWakeup.invincible}</div>}
+                {o.vsWakeup.delayedWakeup && <div><span style="color:var(--muted); font-weight:600;">受身ずらし:</span> {o.vsWakeup.delayedWakeup}</div>}
+              </div>
+              {o.sourceType === 'shared' && (
+                <div class="vote-bar" style="margin-top:12px; padding:8px 10px;">
+                  <button class="btn btn-sm">👍 Good {o.votes.good}</button>
+                  <button class="btn btn-sm">👎 Bad {o.votes.bad}</button>
+                  <button class="btn btn-sm btn-warn">⚠ 現ver不可 {o.votes.brokenInCurrentVer}</button>
+                  <span style="flex:1;"></span>
+                  <button class="btn btn-sm">自分用にコピー</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    ))}
   </section>
 </Layout>

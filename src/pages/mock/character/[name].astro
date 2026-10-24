@@ -3,10 +3,11 @@ import Layout from '../../../layouts/Layout.astro';
 import Notation from '../../../components/Notation.astro';
 import NotationToggle from '../../../components/NotationToggle.astro';
 import ComboEditor from '../../../components/ComboEditor.astro';
+import OkizemePanel from '../../../components/OkizemePanel.astro';
 import {
   COMBOS, ENDER_CLASSES, KNOCKDOWN_SITUATIONS,
   getEnderClassById, getComboRoutes, hasBranches, getComboBrokenCount,
-  getOkizemeByFrameAdvantage,
+  getOkizemeLinks, getEnderClassCounts,
 } from '../../../mock-data/rashid';
 import { ARCHIVER_UNRESOLVED } from '../../../mock-data/rashid-archiver';
 
@@ -217,7 +218,8 @@ for (const c of COMBOS) {
             {!branched && (() => {
               const r = routes[0];
               const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
-              const okizemeList = ender?.frameAdvantage ? getOkizemeByFrameAdvantage(ender.frameAdvantage) : [];
+              const okizeme = getOkizemeLinks(r.leaf.enderClassId);
+              const okizemeTotal = okizeme.main.length + okizeme.reference.length;
               return (
                 <>
                   <tr>
@@ -237,9 +239,9 @@ for (const c of COMBOS) {
                     </td>
                     <td class="col-frame">
                       {ender?.frameAdvantage && (
-                        okizemeList.length > 0 ? (
+                        okizemeTotal > 0 ? (
                           <button type="button" class="frame-adv-badge frame-adv-toggle" data-okizeme-toggle={r.leaf.id}
-                            title={`起き攻め ${okizemeList.length}件を展開`}>
+                            title={`起き攻め ${okizeme.main.length}件${okizeme.reference.length > 0 ? `（参考 ${okizeme.reference.length}件）` : ''}を展開`}>
                             {ender.frameAdvantage}
                           </button>
                         ) : (
@@ -259,37 +261,10 @@ for (const c of COMBOS) {
                       </div>
                     </td>
                   </tr>
-                  {okizemeList.length > 0 && (
+                  {okizemeTotal > 0 && (
                     <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} style="display:none;">
                       <td colspan="9" class="okizeme-panel-cell">
-                        <div class="okizeme-panel">
-                          <div class="okizeme-panel-hd">
-                            <span class="okizeme-panel-count">起き攻め {okizemeList.length}件 ・ {ender!.frameAdvantage}</span>
-                            {ender && <span class="okizeme-panel-ender">{ender.displayName}</span>}
-                          </div>
-                          <div class="okizeme-cards">
-                            {okizemeList.map(o => (
-                              <div class="okizeme-card">
-                                <div class="okizeme-card-hd">
-                                  <span class="okizeme-card-title">{o.title}</span>
-                                  <span class="okizeme-card-ender">{getEnderClassById(o.enderClassId)?.displayName}</span>
-                                  <span class="okizeme-card-flags">
-                                    {o.flags.mid && <span class="okizeme-flag">中段</span>}
-                                    {o.flags.low && <span class="okizeme-flag">下段</span>}
-                                    {o.flags.throw && <span class="okizeme-flag">投げ</span>}
-                                    {o.flags.safeJump && <span class="okizeme-flag okizeme-flag-safe">詐欺</span>}
-                                  </span>
-                                </div>
-                                <div class="okizeme-card-inputs"><Notation inputs={o.inputs} size="sm" /></div>
-                                <div class="okizeme-card-wk">
-                                  {o.vsWakeup.guard && <div><span class="wk-label">GD</span>{' '}{o.vsWakeup.guard}</div>}
-                                  {o.vsWakeup.mash && <div><span class="wk-label">暴れ</span>{' '}{o.vsWakeup.mash}</div>}
-                                  {o.vsWakeup.invincible && <div><span class="wk-label">無敵</span>{' '}{o.vsWakeup.invincible}</div>}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                        <OkizemePanel links={okizeme} ender={ender} />
                       </td>
                     </tr>
                   )}
@@ -340,7 +315,8 @@ for (const c of COMBOS) {
                   const tailInputs = r.pathSegments[r.pathSegments.length - 1];
                   const ghostInputs = r.pathSegments.slice(0, -1).join(' > ');
                   const isLastRoute = ri === routes.length - 1;
-                  const okizemeList = ender?.frameAdvantage ? getOkizemeByFrameAdvantage(ender.frameAdvantage) : [];
+                  const okizeme = getOkizemeLinks(r.leaf.enderClassId);
+                  const okizemeTotal = okizeme.main.length + okizeme.reference.length;
                   return (
                     <>
                       <tr class="combo-child-row" data-branch-of={c.id} style="display:none;">
@@ -360,9 +336,9 @@ for (const c of COMBOS) {
                         </td>
                         <td class="col-frame">
                           {ender?.frameAdvantage && (
-                            okizemeList.length > 0 ? (
+                            okizemeTotal > 0 ? (
                               <button type="button" class="frame-adv-badge frame-adv-toggle" data-okizeme-toggle={r.leaf.id}
-                                title={`起き攻め ${okizemeList.length}件を展開`}>
+                                title={`起き攻め ${okizeme.main.length}件${okizeme.reference.length > 0 ? `（参考 ${okizeme.reference.length}件）` : ''}を展開`}>
                                 {ender.frameAdvantage}
                               </button>
                             ) : (
@@ -373,37 +349,10 @@ for (const c of COMBOS) {
                         <td class="col-num"><span class="dmg">{(r.leaf.damage ?? 0).toLocaleString()}</span></td>
                         <td>{(r.leaf.votes?.brokenInCurrentVer ?? 0) > 0 && <span class="tag tag-warn">⚠ {r.leaf.votes!.brokenInCurrentVer}</span>}</td>
                       </tr>
-                      {okizemeList.length > 0 && (
+                      {okizemeTotal > 0 && (
                         <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} data-okizeme-branch-of={c.id} style="display:none;">
                           <td colspan="9" class="okizeme-panel-cell">
-                            <div class="okizeme-panel">
-                              <div class="okizeme-panel-hd">
-                                <span class="okizeme-panel-count">起き攻め {okizemeList.length}件 ・ {ender!.frameAdvantage}</span>
-                                {ender && <span class="okizeme-panel-ender">{ender.displayName}</span>}
-                              </div>
-                              <div class="okizeme-cards">
-                                {okizemeList.map(o => (
-                                  <div class="okizeme-card">
-                                    <div class="okizeme-card-hd">
-                                      <span class="okizeme-card-title">{o.title}</span>
-                                      <span class="okizeme-card-ender">{getEnderClassById(o.enderClassId)?.displayName}</span>
-                                      <span class="okizeme-card-flags">
-                                        {o.flags.mid && <span class="okizeme-flag">中段</span>}
-                                        {o.flags.low && <span class="okizeme-flag">下段</span>}
-                                        {o.flags.throw && <span class="okizeme-flag">投げ</span>}
-                                        {o.flags.safeJump && <span class="okizeme-flag okizeme-flag-safe">詐欺</span>}
-                                      </span>
-                                    </div>
-                                    <div class="okizeme-card-inputs"><Notation inputs={o.inputs} size="sm" /></div>
-                                    <div class="okizeme-card-wk">
-                                      {o.vsWakeup.guard && <div><span class="wk-label">GD</span>{' '}{o.vsWakeup.guard}</div>}
-                                      {o.vsWakeup.mash && <div><span class="wk-label">暴れ</span>{' '}{o.vsWakeup.mash}</div>}
-                                      {o.vsWakeup.invincible && <div><span class="wk-label">無敵</span>{' '}{o.vsWakeup.invincible}</div>}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
+                            <OkizemePanel links={okizeme} ender={ender} />
                           </td>
                         </tr>
                       )}
@@ -487,16 +436,19 @@ for (const c of COMBOS) {
       <a href="/mock/ender-class/list" class="btn btn-sm">分類を管理</a>
     </div>
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px;">
-      {ENDER_CLASSES.map(ec => (
-        <div class="card">
-          <div style="font-weight:700; margin-bottom:4px;">{ec.displayName}</div>
-          <div style="font-size:0.78rem; color:var(--muted);">
-            <span class="dmg" style="color:var(--text); font-size:0.85rem;">{ec.frameAdvantage}</span>
-            <span style="margin:0 6px; color:var(--border-strong);">|</span>
-            コンボ {ec.comboCount} ・ 起き攻め {ec.okizemeCount}
+      {ENDER_CLASSES.map(ec => {
+        const n = getEnderClassCounts(ec.id);
+        return (
+          <div class="card">
+            <div style="font-weight:700; margin-bottom:4px;">{ec.displayName}</div>
+            <div style="font-size:0.78rem; color:var(--muted);">
+              <span class="dmg" style="color:var(--text); font-size:0.85rem;">{ec.frameAdvantage}</span>
+              <span style="margin:0 6px; color:var(--border-strong);">|</span>
+              コンボ {n.combos} ・ 起き攻め {n.okizeme}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </section>
 
@@ -1075,90 +1027,12 @@ for (const c of COMBOS) {
     }
 
 
-    /* ── 起き攻めパネル ── */
+    /* ── 起き攻めパネルの行（中身のスタイルは OkizemePanel.astro） ── */
     .okizeme-panel-cell {
       padding: 0 !important;
       background: var(--surface2) !important;
       border-top: none !important;
       border-bottom: 1px solid var(--border) !important;
-    }
-    .okizeme-panel {
-      padding: 10px 16px 12px 24px;
-    }
-    .okizeme-panel-hd {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-    .okizeme-panel-count {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--muted-strong);
-      letter-spacing: 0.04em;
-    }
-    .okizeme-panel-ender {
-      font-size: 0.7rem;
-      color: var(--muted);
-      background: var(--surface3);
-      padding: 1px 7px;
-      border-radius: 3px;
-    }
-    .okizeme-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .okizeme-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 10px;
-    }
-    .okizeme-card-hd {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-      margin-bottom: 4px;
-    }
-    .okizeme-card-title {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .okizeme-card-ender {
-      font-size: 0.66rem;
-      color: var(--muted);
-      background: var(--surface3);
-      padding: 1px 6px;
-      border-radius: 3px;
-      white-space: nowrap;
-    }
-    .okizeme-card-flags { display: flex; gap: 3px; flex-wrap: wrap; margin-left: auto; }
-    .okizeme-flag {
-      font-size: 0.62rem;
-      padding: 1px 5px;
-      border-radius: 3px;
-      background: var(--surface3);
-      color: var(--muted-strong);
-      font-weight: 600;
-    }
-    .okizeme-flag-safe { background: #d97706/20; color: #f59e0b; }
-    .okizeme-card-inputs { margin-bottom: 4px; }
-    .okizeme-card-wk {
-      font-size: 0.7rem;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-    .wk-label {
-      display: inline-block;
-      font-size: 0.62rem;
-      font-weight: 700;
-      color: var(--muted-strong);
-      background: var(--surface3);
-      padding: 0 4px;
-      border-radius: 2px;
-      margin-right: 4px;
     }
 
     /* ── 小分類アクションボタン群 ── */

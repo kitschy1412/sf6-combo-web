@@ -3,8 +3,9 @@ import Layout from '../../../layouts/Layout.astro';
 import ComboTree from '../../../components/ComboTree.astro';
 import Notation from '../../../components/Notation.astro';
 import {
-  getComboById, getEnderClassById, getOkizemeByFrameAdvantage,
+  getComboById, getEnderClassById, getOkizemeLinks,
   getComboRoutes, hasBranches, getComboMaxDamage, getComboBrokenCount,
+  type EnderClass,
 } from '../../../mock-data/rashid';
 
 const { id } = Astro.params;
@@ -26,12 +27,10 @@ const youtubeUrl = combo.youtubeId
   ? `https://www.youtube.com/watch?v=${combo.youtubeId}&t=${combo.startSec ?? 0}s`
   : null;
 
-// 表示する起き攻めは「全葉の有利フレーム」全部（〆技が違っても有利フレームが同じなら同じ択が使える）
-const frameAdvantagesUsed = Array.from(new Set(
-  routes
-    .map(r => r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId)?.frameAdvantage : undefined)
-    .filter((f): f is string => Boolean(f))
-));
+// 起き攻めは各ルートの〆分類で紐付ける（同じ有利フレームの別〆は参考。getOkizemeLinks）
+const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)))
+  .map(id => (id ? getEnderClassById(id) : undefined))
+  .filter((e): e is EnderClass => Boolean(e));
 ---
 
 <Layout title={`${combo.title} — モック`}>
@@ -175,52 +174,69 @@ const frameAdvantagesUsed = Array.from(new Set(
     </div>
   </section>
 
-  <!-- 紐づく起き攻め (有利フレーム単位の合算) -->
-  {frameAdvantagesUsed.length > 0 && (
-    <section style="margin-bottom:20px;">
+  <!-- 紐づく起き攻め（ルートの〆分類ごと。同じ有利フレームの別〆は参考として薄く） -->
+  {enderClassesUsed.length > 0 && (
+    <section id="combo-okizeme" style="margin-bottom:20px;">
       <div class="section-head">
         <h2>このコンボから繋がる起き攻め</h2>
         <a href="/mock/okizeme/new" class="btn btn-sm">＋ 追加</a>
       </div>
       <div style="font-size:0.8rem; color:var(--muted); margin-bottom:10px;">
-        各ルートの有利フレーム（＋◯F）経由で紐づくセットプレイ全てを表示。〆技が違っても有利フレームが同じなら同じ択が使えます。
+        各ルートの〆分類に紐づく起き攻めを表示。〆が違っても有利フレームが同じものは「参考」として薄く出します（距離が合わないことがあります）。
       </div>
-      {frameAdvantagesUsed.map(fa => {
-        const okiList = getOkizemeByFrameAdvantage(fa);
+      {enderClassesUsed.map(ender => {
+        const oki = getOkizemeLinks(ender.id);
+        const groups = [
+          { rel: 'main', items: oki.main },
+          { rel: 'ref', items: oki.reference },
+        ].filter(g => g.items.length > 0);
         return (
           <div style="margin-bottom:14px;">
             <div style="font-size:0.85rem; font-weight:700; margin-bottom:6px; color:var(--muted-strong);">
-              ▲ <span class="dmg" style="font-size:0.9rem;">{fa}</span> <span style="font-weight:400; color:var(--muted);">({okiList.length}件)</span>
+              ▲ {ender.displayName}
+              {ender.frameAdvantage && <span class="dmg" style="font-size:0.9rem; margin-left:4px;">{ender.frameAdvantage}</span>}
+              {' '}<span style="font-weight:400; color:var(--muted);">({oki.main.length}件)</span>
             </div>
-            {okiList.length === 0 ? (
+            {oki.main.length === 0 && (
               <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; font-size:0.85rem;">
                 登録なし
               </div>
-            ) : (
-              <div style="display:grid; gap:8px;">
-                {okiList.map(o => (
-                  <div class="card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
-                      <div style="display:flex; gap:6px; align-items:center;">
-                        {o.sourceType === 'personal' && <span class="tag tag-personal">自分</span>}
-                        {o.sourceType === 'shared' && <span class="tag tag-shared">{o.ownerLabel}</span>}
-                        <strong>{o.title}</strong>
-                        <span style="font-size:0.7rem; color:var(--muted); background:var(--surface3); padding:1px 6px; border-radius:3px;">
-                          {getEnderClassById(o.enderClassId)?.displayName}
-                        </span>
-                      </div>
-                      <div style="display:flex; gap:4px;">
-                        {o.flags.mid && <span class="tag tag-warn">中段</span>}
-                        {o.flags.low && <span class="tag tag-personal">下段</span>}
-                        {o.flags.throw && <span class="tag tag-shared">投げ</span>}
-                        {o.flags.safeJump && <span class="tag">詐欺</span>}
-                      </div>
-                    </div>
-                    <Notation inputs={o.inputs} size="sm" />
-                  </div>
-                ))}
-              </div>
             )}
+            {groups.map(g => (
+              <div style={g.rel === 'ref' ? 'margin-top:10px;' : undefined}>
+                {g.rel === 'ref' && (
+                  <div style="font-size:0.76rem; font-weight:700; color:var(--muted); margin-bottom:6px;">
+                    参考（同じ {oki.frameAdvantage}）
+                    <span style="font-weight:400; margin-left:6px;">〆が違うため、距離が合わないことがあります</span>
+                  </div>
+                )}
+                <div style={`display:grid; gap:8px;${g.rel === 'ref' ? ' opacity:0.55;' : ''}`}>
+                  {g.items.map(o => (
+                    <div class="card" data-okizeme-id={o.id} data-okizeme-rel={g.rel}>
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                          {o.sourceType === 'personal' && <span class="tag tag-personal">自分</span>}
+                          {o.sourceType === 'shared' && <span class="tag tag-shared">{o.ownerLabel}</span>}
+                          <strong>{o.title}</strong>
+                          {g.rel === 'ref' && (
+                            <span style="font-size:0.7rem; color:var(--muted); background:var(--surface3); padding:1px 6px; border-radius:3px;">
+                              {getEnderClassById(o.enderClassId)?.displayName}
+                            </span>
+                          )}
+                        </div>
+                        <div style="display:flex; gap:4px;">
+                          {o.flags.mid && <span class="tag tag-warn">中段</span>}
+                          {o.flags.low && <span class="tag tag-personal">下段</span>}
+                          {o.flags.throw && <span class="tag tag-shared">投げ</span>}
+                          {o.flags.safeJump && <span class="tag">詐欺</span>}
+                        </div>
+                      </div>
+                      <Notation inputs={o.inputs} size="sm" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         );
       })}

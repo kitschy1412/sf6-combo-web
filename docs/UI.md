@@ -308,4 +308,5 @@ UI を変えたら、ヘッドレス Edge で撮って目で確かめる（2026-
 
 - 使い方の詳細はスクリプト冒頭のコメント。初回は Edge のプロファイル作成で十数秒かかる
 - 撮影後は 9333 番の Edge が残るので、終わったら止める（`msedge.exe` のうち `--remote-debugging-port=9333` のもの）
+- `npm run dev` をバックグラウンドで起動して止めると、npm だけが終わって `node …astro.mjs dev` が 4321 に残ることがある（2026-10-24）。そのプロセスも止める（残ると次の `npm run dev` が 4322 にずれる）
 - シナリオテストをずれたポートに向けるときは `BASE=http://localhost:4322 npm run test:scenarios`

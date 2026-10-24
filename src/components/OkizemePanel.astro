@@ -1,0 +1,139 @@
+---
+// 一覧（キャラハブ・公開一覧）の行で開く起き攻めパネル
+// 〆分類が同じ起き攻めを主に、〆は違うが有利フレームが同じものを「参考」として薄く出す（getOkizemeLinks）
+import Notation from './Notation.astro';
+import { getEnderClassById, type EnderClass, type OkizemeLinks } from '../mock-data/rashid';
+
+interface Props {
+  links: OkizemeLinks;
+  /** そのルートの〆分類（見出しに出す） */
+  ender?: EnderClass | null;
+}
+const { links, ender } = Astro.props;
+const groups = [
+  { rel: 'main', items: links.main },
+  { rel: 'ref', items: links.reference },
+].filter(g => g.items.length > 0);
+---
+
+<div class="okizeme-panel">
+  <div class="okizeme-panel-hd">
+    <span class="okizeme-panel-count">
+      {links.main.length > 0 ? `起き攻め ${links.main.length}件` : 'この〆の起き攻めは未登録'}
+    </span>
+    {ender && <span class="okizeme-panel-ender">{ender.displayName}{ender.frameAdvantage ? ` / ${ender.frameAdvantage}` : ''}</span>}
+  </div>
+  {groups.map(g => (
+    <div class={g.rel === 'ref' ? 'okizeme-ref' : undefined}>
+      {g.rel === 'ref' && (
+        <div class="okizeme-ref-hd">
+          参考（同じ {links.frameAdvantage}）
+          <span class="okizeme-ref-note">〆が違うため、距離が合わないことがあります</span>
+        </div>
+      )}
+      <div class="okizeme-cards">
+        {g.items.map(o => (
+          <div class="okizeme-card" data-okizeme-id={o.id} data-okizeme-rel={g.rel}>
+            <div class="okizeme-card-hd">
+              <span class="okizeme-card-title">{o.title}</span>
+              {g.rel === 'ref' && <span class="okizeme-card-ender">{getEnderClassById(o.enderClassId)?.displayName}</span>}
+              <span class="okizeme-card-flags">
+                {o.flags.mid && <span class="okizeme-flag">中段</span>}
+                {o.flags.low && <span class="okizeme-flag">下段</span>}
+                {o.flags.throw && <span class="okizeme-flag">投げ</span>}
+                {o.flags.safeJump && <span class="okizeme-flag okizeme-flag-safe">詐欺</span>}
+              </span>
+            </div>
+            <div class="okizeme-card-inputs"><Notation inputs={o.inputs} size="sm" /></div>
+            <div class="okizeme-card-wk">
+              {o.vsWakeup.guard && <div><span class="wk-label">GD</span>{' '}{o.vsWakeup.guard}</div>}
+              {o.vsWakeup.mash && <div><span class="wk-label">暴れ</span>{' '}{o.vsWakeup.mash}</div>}
+              {o.vsWakeup.invincible && <div><span class="wk-label">無敵</span>{' '}{o.vsWakeup.invincible}</div>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+</div>
+
+<style is:global>
+  .okizeme-panel { padding: 10px 16px 12px 24px; }
+  .okizeme-panel-hd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .okizeme-panel-count {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--muted-strong);
+    letter-spacing: 0.04em;
+  }
+  .okizeme-panel-ender {
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: var(--surface3);
+    padding: 1px 7px;
+    border-radius: 3px;
+  }
+  .okizeme-cards { display: flex; flex-direction: column; gap: 6px; }
+  .okizeme-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .okizeme-card-hd {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+  .okizeme-card-title { font-size: 0.8rem; font-weight: 700; color: var(--text); }
+  .okizeme-card-ender {
+    font-size: 0.66rem;
+    color: var(--muted);
+    background: var(--surface3);
+    padding: 1px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .okizeme-card-flags { display: flex; gap: 3px; flex-wrap: wrap; margin-left: auto; }
+  .okizeme-flag {
+    font-size: 0.62rem;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--surface3);
+    color: var(--muted-strong);
+    font-weight: 600;
+  }
+  .okizeme-flag-safe { background: #fef3c7; color: #b45309; }
+  .okizeme-card-inputs { margin-bottom: 4px; }
+  .okizeme-card-wk { font-size: 0.7rem; color: var(--muted); line-height: 1.6; }
+  .wk-label {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: var(--muted-strong);
+    background: var(--surface3);
+    padding: 0 4px;
+    border-radius: 2px;
+    margin-right: 4px;
+  }
+
+  /* ── 参考（〆は違うが有利フレームが同じ）: 薄く出し、マウスを乗せたカードだけ濃くする ── */
+  .okizeme-ref { margin-top: 10px; }
+  .okizeme-panel-hd + .okizeme-ref { margin-top: 0; }
+  .okizeme-ref-hd {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+  .okizeme-ref-note { font-weight: 400; margin-left: 6px; }
+  .okizeme-ref .okizeme-card { opacity: 0.55; transition: opacity 0.12s; }
+  .okizeme-ref .okizeme-card:hover { opacity: 1; }
+</style>

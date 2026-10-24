@@ -36,13 +36,6 @@
 当面は Rashid 限定（ROADMAP「当面の方針（2026-10-21）」参照）。
 2026-10-23 の UI 見直しで決めた方針（始動技の1段でまとめる・行はコマンドが主役・分岐はルートを1本ずつ書く・詳細は動画の横でルートを選ぶ・起き攻めは〆分類基準）は、ROADMAP「決まったこと（2026-10-23）」を参照。
 
-- [ ] 起き攻めの紐付けを〆分類基準にそろえる（同じ有利フレームの別〆は参考として出す）
-  - 対象: src/mock-data/rashid.ts（getOkizemeByEnderClass / getOkizemeByFrameAdvantage）、src/pages/mock/character/[name].astro、src/pages/mock/combo/[id].astro、src/pages/mock/explore/[character].astro、src/pages/mock/situation/[id].astro
-  - 現状: キャラハブとコンボ詳細は「有利フレーム一致」、公開一覧とダウン状況は「〆分類一致」で、同じコンボでも出る起き攻めが画面ごとに違う
-  - 取得関数を1つにまとめ、〆分類が同じものを主に、〆は違うが有利フレームが同じものを「参考（同じ +34F）」として分けて返す。参考は薄く表示する
-  - ENDER_CLASSES の comboCount / okizemeCount は手書きの値なので、実データから数える（キャラハブの〆分類カード、〆分類管理）
-  - 受け入れ: 4画面で同じコンボ（例: c_001）に同じ起き攻めが出る。`npm run test:scenarios` が通る
-
 - [ ] 表記設定（数字/矢印・コマンド/技名）を全ページで反映する
   - 対象: src/components/NotationToggle.astro、src/components/Notation.astro、src/pages/mock/combo/[id].astro、src/pages/mock/me/notes/combos/[id].astro
   - 現状: 設定は localStorage（sf6-dir / sf6-name）に保存されるが、表示に反映する処理が NotationToggle の中にしかない。トグルの無いコンボ詳細などでは、キャラハブで「技名」にしても反映されない
@@ -104,7 +97,7 @@
 - [ ] 分岐コンボの親行に要約を出し、起き攻めの展開を小さくする
   - 対象: src/pages/mock/character/[name].astro、src/pages/mock/explore/[character].astro
   - 分岐の親行: 今は「共通部分 …の後に分岐」だけで、ダメージ・〆・有利F が空欄。ルート数・ダメージの幅（例: 2,580〜4,280）・〆の一覧を出す。▶ でルートを開く動きは残す
-  - 起き攻めの展開: 今は全幅のカード（6件で約600px）が開き、表が押し下げられる。1件1行（タイトル・コマンド・中段/下段/投げ/詐欺）の小さなリストにして、詳しくはコンボ詳細へリンクする。出す起き攻めは〆分類基準（このセクション先頭のタスク）に従う
+  - 起き攻めの展開: 今は全幅のカード（6件で約600px）が開き、表が押し下げられる。1件1行（タイトル・コマンド・中段/下段/投げ/詐欺）の小さなリストにして、詳しくはコンボ詳細へリンクする。出す起き攻めは〆分類基準（getOkizemeLinks。パネルは src/components/OkizemePanel.astro に切り出し済みで、参考は薄く出す）に従う
   - 受け入れ: 分岐コンボを開かなくても、ダメージと〆がおおよそ分かる。起き攻めを開いても周りの行が大きく動かない
 
 - [ ] 位置・ヒット状態・ゲージの絞り込みチップを動かす

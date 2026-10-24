@@ -16,6 +16,14 @@
 
 <!-- 完了タスクをここから追記していく -->
 
+## 2026-10-24
+
+- 起き攻めの紐付けを〆分類基準にそろえる（同じ有利フレームの別〆は参考として出す）
+  - rashid.ts: `getOkizemeByEnderClass` / `getOkizemeByFrameAdvantage` を `getOkizemeLinks()`（main=同じ〆分類 / reference=〆違い・同じ有利F）に一本化。有利Fが「—」の SA〆どうしは同じ扱いにしない。今のデータで参考が出るのは中イーグル〆 ↔ 投げ後（+30F）だけ
+  - `comboCount` / `okizemeCount` を型とデータから外し、`getEnderClassCounts()` で数える（コンボは「その〆で終わるルートを持つコンボ」数。公開一覧のカードは公開分だけ）
+  - 一覧の起き攻めパネルを src/components/OkizemePanel.astro に切り出し、キャラハブ・公開一覧の4か所で共用。コンボ詳細とダウン状況はページ固有のカードのまま、参考を薄く足した
+  - tests/scenarios.mjs に S9 を追加（c_002 を4画面、c_001 を3画面で突き合わせ。c_001 は非公開なので公開一覧には出ない）
+
 ## 2026-10-23
 
 - archiver の Rashid データを JSON 経由でモックに取り込む変換スクリプトを作る

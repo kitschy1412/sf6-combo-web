@@ -1,6 +1,6 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import { ENDER_CLASSES } from '../../../mock-data/rashid';
+import { ENDER_CLASSES, getEnderClassCounts } from '../../../mock-data/rashid';
 ---
 
 <Layout title="〆分類管理 — モック">
@@ -32,20 +32,23 @@ import { ENDER_CLASSES } from '../../../mock-data/rashid';
       </tr>
     </thead>
     <tbody>
-      {ENDER_CLASSES.map(ec => (
-        <tr>
-          <td>
-            <div class="col-title">{ec.displayName}</div>
-            <code style="font-size:0.72rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">{ec.key}</code>
-          </td>
-          <td><span class="dmg">{ec.frameAdvantage}</span></td>
-          <td class="col-num">{ec.comboCount}</td>
-          <td class="col-num">{ec.okizemeCount}</td>
-          <td style="text-align:right;">
-            <button type="button" class="btn btn-sm">編集</button>
-          </td>
-        </tr>
-      ))}
+      {ENDER_CLASSES.map(ec => {
+        const n = getEnderClassCounts(ec.id);
+        return (
+          <tr data-ender-class={ec.id}>
+            <td>
+              <div class="col-title">{ec.displayName}</div>
+              <code style="font-size:0.72rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">{ec.key}</code>
+            </td>
+            <td><span class="dmg">{ec.frameAdvantage}</span></td>
+            <td class="col-num" data-count="combos">{n.combos}</td>
+            <td class="col-num" data-count="okizeme">{n.okizeme}</td>
+            <td style="text-align:right;">
+              <button type="button" class="btn btn-sm">編集</button>
+            </td>
+          </tr>
+        );
+      })}
     </tbody>
   </table>
 
@@ -53,5 +56,7 @@ import { ENDER_CLASSES } from '../../../mock-data/rashid';
     <strong style="color:var(--text);">設計メモ:</strong>
     分類を作っておくと、コンボ追加時に「〆分類」セレクトで選択でき、その分類に属する起き攻めが自動で紐づきます。
     例: 「弱イーグルスパイク〆」分類に重ねを4種類登録 → 「2MK始動」「DR始動」など弱イーグルで〆る全コンボから同じ起き攻め4種が引ける。
+    〆が違っても有利フレームが同じ分類（例: 中イーグル〆と投げ後の +30F）の起き攻めは、距離が合わないことがあるので「参考」として薄く出す。
+    件数は登録済みのコンボ・起き攻めから数える（分岐コンボは、その〆で終わるルートがあれば1件）。
   </div>
 </Layout>

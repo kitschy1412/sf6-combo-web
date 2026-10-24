@@ -298,6 +298,79 @@ scenario('S8 ロジック: Wilson Score / ゲージ計算 / 表記変換');
 }
 
 // ────────────────────────────────────────────────────────────
+// S9. 起き攻めの紐付け（〆分類基準。同じ有利フレームの別〆は参考）
+// ────────────────────────────────────────────────────────────
+scenario('S9 起き攻めの紐付け: 同じコンボにはどの画面でも同じ起き攻めが出る');
+{
+  // 起き攻め1件ごとに data-okizeme-id と data-okizeme-rel（main=〆分類が同じ / ref=参考）を出している。
+  // 一覧のパネル行（data-okizeme-panel）・詳細の #combo-okizeme・ダウン状況の #situation-okizeme で画面を突き合わせるので、
+  // 起き攻めの見た目を作り直すときもこれらの属性は残す
+  const okizemeIn = (html) => [...new Set([...(html ?? '').matchAll(/<[^>]*\bdata-okizeme-id="([^"]+)"[^>]*>/g)]
+    .map(m => `${/data-okizeme-rel="(\w+)"/.exec(m[0])?.[1]}:${m[1]}`))].sort().join(' ');
+  const panelOf = (html, leafId) => { // 一覧の行で開く起き攻めパネル（tr 1行）
+    const i = html.indexOf(`data-okizeme-panel="${leafId}"`);
+    return i < 0 ? null : html.slice(i, html.indexOf('</tr>', i));
+  };
+  const sectionOf = (html, id) => {
+    const i = html.indexOf(`id="${id}"`);
+    return i < 0 ? null : html.slice(i, html.indexOf('</section>', i));
+  };
+  const hub = (await get('/mock/character/rashid')).body;
+  const explore = (await get('/mock/explore/rashid')).body;
+  const detail = async (id) => okizemeIn(sectionOf((await get(`/mock/combo/${id}`)).body, 'combo-okizeme'));
+  const situation = async (id) => okizemeIn(sectionOf((await get(`/mock/situation/${id}`)).body, 'situation-okizeme'));
+
+  // c_002（公開・1本道）はダウン状況 s_002 の由来コンボなので、4画面すべてに出る
+  const c002 = okizemeIn(panelOf(hub, 'n_c002_r'));
+  const c002Others = [okizemeIn(panelOf(explore, 'n_c002_r')), await detail('c_002'), await situation('s_002')];
+  check('c_002: キャラハブ・公開一覧・コンボ詳細・ダウン状況で同じ起き攻め',
+    c002 !== '' && c002Others.every(s => s === c002), `hub=${c002} / others=${c002Others.join(' | ')}`);
+  // c_001 は非公開なので公開一覧には出ない
+  const c001 = okizemeIn(panelOf(hub, 'n_c001_r'));
+  const c001Others = [await detail('c_001'), await situation('s_001')];
+  check('c_001: キャラハブ・コンボ詳細・ダウン状況で同じ起き攻め（非公開なので公開一覧には出ない）',
+    c001 !== '' && c001Others.every(s => s === c001) && panelOf(explore, 'n_c001_r') === null,
+    `hub=${c001} / others=${c001Others.join(' | ')}`);
+
+  const exploreLeaves = [...explore.matchAll(/data-okizeme-panel="([^"]+)"/g)].map(m => m[1]);
+  const differs = exploreLeaves.filter(l => okizemeIn(panelOf(hub, l)) !== okizemeIn(panelOf(explore, l)));
+  check(`公開一覧の全ルート (${exploreLeaves.length}件) でキャラハブと同じ起き攻め`,
+    exploreLeaves.length > 0 && differs.length === 0, `違うルート: ${differs.join(', ')}`);
+
+  // 中イーグル〆（c_012）と投げ後（s_003）は同じ +30F なので、互いの起き攻めが参考に出る
+  const c012 = okizemeIn(panelOf(hub, 'n_c012_r'));
+  const s003 = await situation('s_003');
+  const rel = (s, r) => s.split(' ').filter(x => x.startsWith(`${r}:`)).map(x => x.slice(r.length + 1)).join(' ');
+  check('同じ有利フレームの別〆は「参考」として分けて出る（中イーグル〆 ↔ 投げ後）',
+    rel(c012, 'ref') !== '' && rel(c012, 'ref') === rel(s003, 'main') && rel(c012, 'main') === rel(s003, 'ref'),
+    `c_012=${c012} / s_003=${s003}`);
+  check('c_012: コンボ詳細もキャラハブと同じ（参考を含む）', (await detail('c_012')) === c012);
+  check('公開一覧にも参考付きのルートがある', exploreLeaves.some(l => okizemeIn(panelOf(explore, l)).includes('ref:')));
+
+  // 〆分類管理の件数は手書きではなく実データから数える（キャラハブのコンボ行・ダウン状況と突き合わせる）。
+  // コンボ行の〆は〆分類列の title 属性で拾っているので、行を作り直したらここも合わせる
+  const list = (await get('/mock/ender-class/list')).body;
+  const groups = hub.split('<tbody class="combo-group"').slice(1).map(s => s.slice(0, s.indexOf('</tbody>')));
+  const rows = [...list.matchAll(/<tr[^>]*data-ender-class="([^"]+)"[^>]*>([\s\S]*?)<\/tr>/g)].map(m => ({
+    id: m[1],
+    name: /class="col-title"[^>]*>([^<]+)</.exec(m[2])?.[1],
+    combos: Number(/data-count="combos"[^>]*>(\d+)</.exec(m[2])?.[1]),
+    okizeme: Number(/data-count="okizeme"[^>]*>(\d+)</.exec(m[2])?.[1]),
+  }));
+  const wrongCombos = rows.filter(r => r.combos !== groups.filter(g => g.includes(`title="${r.name}"`)).length);
+  check(`〆分類管理のコンボ数がキャラハブのコンボ行と一致 (${rows.length}分類)`,
+    rows.length > 0 && wrongCombos.length === 0, `ずれ: ${wrongCombos.map(r => `${r.name}=${r.combos}`).join(', ')}`);
+  const sitOf = { ec_weak_eagle: 's_001', ec_strong_eagle: 's_002', ec_throw: 's_003', ec_arabian: 's_004' };
+  const wrongOki = [];
+  for (const [ec, sid] of Object.entries(sitOf)) {
+    const shown = rel(await situation(sid), 'main').split(' ').filter(Boolean).length;
+    const row = rows.find(r => r.id === ec);
+    if (row?.okizeme !== shown) wrongOki.push(`${ec}: 一覧=${row?.okizeme} 状況=${shown}`);
+  }
+  check('〆分類管理の起き攻め数がダウン状況に出る件数と一致', wrongOki.length === 0, wrongOki.join(', '));
+}
+
+// ────────────────────────────────────────────────────────────
 console.log(`\n${'─'.repeat(60)}`);
 console.log(`\x1b[1m結果: ${pass} pass / ${fail} fail / ${skip} skip\x1b[0m`);
 if (failures.length) {

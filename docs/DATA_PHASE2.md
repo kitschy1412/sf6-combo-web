@@ -118,9 +118,8 @@ type EnderClass = {
   key: string;         // "weak_eagle_spike_ender"
   displayName: string; // "弱イーグルスパイク〆"
   frameAdvantage?: string; // "+34F"
-  comboCount: number;
-  okizemeCount: number;
 };
+// コンボ数・起き攻め数は持たず、getEnderClassCounts() で実データから数える
 
 // ComboNode（葉）側
 enderClassId?: string | null;  // EnderClass.id を参照
@@ -128,6 +127,7 @@ enderClassId?: string | null;  // EnderClass.id を参照
 
 `ENDER_CLASSES` に 6種（弱/強イーグル, ODミキサー, ODウィップ, 投げ後, アラビアンサイクロン）を定義し、
 `OkizemeSetup` が `enderClassId` でリンクしている。つまり **〆分類 → 起き攻め** の紐付けがマスタ経由で成立している。
+紐付けは `getOkizemeLinks()` に一本化していて、〆分類が同じ起き攻めを主に、〆は違うが有利フレームが同じものを「参考」として返す（2026-10-24）。
 
 ### 方式A — 自由文字列
 

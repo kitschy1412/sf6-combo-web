@@ -6,13 +6,12 @@ import { ARCHIVER_COMBOS, ARCHIVER_OKIZEME_SETUPS } from './rashid-archiver';
 export type SourceType = 'personal' | 'shared' | 'forked';
 export type Visibility = 'private' | 'unlisted' | 'public';
 
+// コンボ数・起き攻め数は持たない（getEnderClassCounts で実データから数える）
 export type EnderClass = {
   id: string;
   key: string;
   displayName: string;
   frameAdvantage?: string;
-  comboCount: number;
-  okizemeCount: number;
 };
 
 // ─── パレット表示: コマンド ↔ 技名 変換マップ ───
@@ -145,15 +144,15 @@ export const RASHID_PALETTE: PaletteGroup[] = [
 ];
 
 export const ENDER_CLASSES: EnderClass[] = [
-  { id: 'ec_weak_eagle', key: 'weak_eagle_spike_ender', displayName: '弱イーグルスパイク〆', frameAdvantage: '+34F', comboCount: 4, okizemeCount: 3 },
-  { id: 'ec_strong_eagle', key: 'strong_eagle_spike_ender', displayName: '強イーグルスパイク〆', frameAdvantage: '+28F', comboCount: 2, okizemeCount: 2 },
-  { id: 'ec_od_mixer', key: 'od_mixer_ender', displayName: 'ODスピニングミキサー〆', frameAdvantage: '+22F', comboCount: 3, okizemeCount: 1 },
-  { id: 'ec_od_whip', key: 'od_whip_ender', displayName: 'ODウィップオブザワインド〆', frameAdvantage: '+24F', comboCount: 1, okizemeCount: 1 },
-  { id: 'ec_throw', key: 'throw_after', displayName: '投げ後', frameAdvantage: '+30F', comboCount: 0, okizemeCount: 4 },
-  { id: 'ec_arabian', key: 'arabian_cyclone_ender', displayName: 'アラビアンサイクロン〆', frameAdvantage: '+40F', comboCount: 1, okizemeCount: 1 },
-  { id: 'ec_mid_eagle', key: 'mid_eagle_spike_ender', displayName: '中イーグルスパイク〆', frameAdvantage: '+30F', comboCount: 0, okizemeCount: 0 },
-  { id: 'ec_sa3_iusal', key: 'sa3_iusal_ender', displayName: 'SA3 イウサール〆', frameAdvantage: '—', comboCount: 0, okizemeCount: 0 },
-  { id: 'ec_sa1', key: 'sa1_ender', displayName: 'SA1〆', frameAdvantage: '—', comboCount: 0, okizemeCount: 0 },
+  { id: 'ec_weak_eagle', key: 'weak_eagle_spike_ender', displayName: '弱イーグルスパイク〆', frameAdvantage: '+34F' },
+  { id: 'ec_strong_eagle', key: 'strong_eagle_spike_ender', displayName: '強イーグルスパイク〆', frameAdvantage: '+28F' },
+  { id: 'ec_od_mixer', key: 'od_mixer_ender', displayName: 'ODスピニングミキサー〆', frameAdvantage: '+22F' },
+  { id: 'ec_od_whip', key: 'od_whip_ender', displayName: 'ODウィップオブザワインド〆', frameAdvantage: '+24F' },
+  { id: 'ec_throw', key: 'throw_after', displayName: '投げ後', frameAdvantage: '+30F' },
+  { id: 'ec_arabian', key: 'arabian_cyclone_ender', displayName: 'アラビアンサイクロン〆', frameAdvantage: '+40F' },
+  { id: 'ec_mid_eagle', key: 'mid_eagle_spike_ender', displayName: '中イーグルスパイク〆', frameAdvantage: '+30F' },
+  { id: 'ec_sa3_iusal', key: 'sa3_iusal_ender', displayName: 'SA3 イウサール〆', frameAdvantage: '—' },
+  { id: 'ec_sa1', key: 'sa1_ender', displayName: 'SA1〆', frameAdvantage: '—' },
 ];
 
 export const COMBOS: Combo[] = [
@@ -1098,21 +1097,42 @@ export function getSituationById(id: string): KnockdownSituation | undefined {
   return KNOCKDOWN_SITUATIONS.find(s => s.id === id);
 }
 
-export function getOkizemeByEnderClass(enderClassId: string): OkizemeSetup[] {
-  return OKIZEME_SETUPS.filter(o => o.enderClassId === enderClassId);
-}
-
-// 有利フレーム（例: "+34F"）単位での起き攻め分類。
-// 〆技が違っても有利フレームが同じなら同じ択が使えるため、〆分類名ではなくフレーム値でグルーピングする。
-export function getOkizemeByFrameAdvantage(frameAdvantage: string): OkizemeSetup[] {
-  const enderIds = new Set(
-    ENDER_CLASSES.filter(e => e.frameAdvantage === frameAdvantage).map(e => e.id)
-  );
-  return OKIZEME_SETUPS.filter(o => enderIds.has(o.enderClassId));
-}
-
 export function getEnderClassById(id: string): EnderClass | undefined {
   return ENDER_CLASSES.find(e => e.id === id);
+}
+
+// ─── 起き攻めの紐付け ───
+// 〆分類が同じ起き攻めを主に出し、〆は違うが有利フレームが同じものは「参考」として分けて返す。
+// 有利フレームだけで紐付けると、距離の違う〆の択まで混ざるため（ROADMAP「決まったこと（2026-10-23）」）。
+export type OkizemeLinks = {
+  main: OkizemeSetup[];
+  reference: OkizemeSetup[];
+  frameAdvantage?: string;         // 参考を選んだ基準（"+30F" など）。有利フレームが数値で分からない〆は undefined
+};
+
+export function getOkizemeLinks(enderClassId: string | null | undefined): OkizemeLinks {
+  if (!enderClassId) return { main: [], reference: [] };
+  const fa = getEnderClassById(enderClassId)?.frameAdvantage;
+  // SA〆などの「—」どうしは同じ有利フレームとみなさない
+  const frameAdvantage = fa && /\d/.test(fa) ? fa : undefined;
+  const sameFrameIds = new Set(
+    ENDER_CLASSES
+      .filter(e => frameAdvantage && e.id !== enderClassId && e.frameAdvantage === frameAdvantage)
+      .map(e => e.id)
+  );
+  return {
+    main: OKIZEME_SETUPS.filter(o => o.enderClassId === enderClassId),
+    reference: OKIZEME_SETUPS.filter(o => sameFrameIds.has(o.enderClassId)),
+    frameAdvantage,
+  };
+}
+
+// 〆分類の件数。コンボはその〆で終わるルートを1本以上持つものを数える（分岐コンボも1件）
+export function getEnderClassCounts(enderClassId: string, combos: Combo[] = COMBOS) {
+  return {
+    combos: combos.filter(c => getComboRoutes(c).some(r => r.leaf.enderClassId === enderClassId)).length,
+    okizeme: OKIZEME_SETUPS.filter(o => o.enderClassId === enderClassId).length,
+  };
 }
 
 // ─── ツリー走査ヘルパ ───

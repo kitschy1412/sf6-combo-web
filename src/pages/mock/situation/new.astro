@@ -1,6 +1,8 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import { ENDER_CLASSES, getOkizemeByEnderClass } from '../../../mock-data/rashid';
+import { ENDER_CLASSES, getEnderClassById, getOkizemeLinks } from '../../../mock-data/rashid';
+
+const okizeme = getOkizemeLinks('ec_throw');
 ---
 
 <Layout title="ダウン状況入力 — モック">
@@ -43,7 +45,10 @@ import { ENDER_CLASSES, getOkizemeByEnderClass } from '../../../mock-data/rashid
       <div style="font-size:0.82rem;">
         <strong>この分類に紐づく起き攻め（自動表示されます）:</strong>
         <ul style="margin:6px 0 0; padding-left:20px; color:var(--muted-strong);">
-          {getOkizemeByEnderClass('ec_throw').map(o => <li>{o.title}</li>)}
+          {okizeme.main.map(o => <li>{o.title}</li>)}
+          {okizeme.reference.map(o => (
+            <li style="opacity:0.55;">参考（同じ {okizeme.frameAdvantage}・{getEnderClassById(o.enderClassId)?.displayName}）: {o.title}</li>
+          ))}
         </ul>
       </div>
     </div>
