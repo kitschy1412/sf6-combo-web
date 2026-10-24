@@ -4,9 +4,11 @@ import '../styles/global.css';
 interface Props {
   title: string;
   description?: string;
+  /** このページで表示するコマンドのキャラ。技名表記の変換テーブルに使う（コマンドを出すページで指定） */
+  character?: string;
 }
 
-const { title, description = 'SF6コンボをタイムスタンプ付きで検索・閲覧できるサイト' } = Astro.props;
+const { title, description = 'SF6コンボをタイムスタンプ付きで検索・閲覧できるサイト', character } = Astro.props;
 ---
 
 <html lang="ja">
@@ -20,7 +22,7 @@ const { title, description = 'SF6コンボをタイムスタンプ付きで検�
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body>
+  <body data-character={character}>
     <header style="background:#111; color:#fff; position:sticky; top:0; z-index:100;">
       <div style="max-width:1200px; margin:0 auto; padding:0 24px; height:52px; display:flex; align-items:center; gap:16px;">
         <a href="/" style="display:flex; align-items:center; gap:10px; flex:1; text-decoration:none; color:#fff;">
@@ -38,5 +40,41 @@ const { title, description = 'SF6コンボをタイムスタンプ付きで検�
     <footer style="border-top:1px solid var(--border); padding:20px 24px; text-align:center; color:var(--muted); font-size:0.78rem;">
       SF6 Combo Archive — コミュニティによる動作確認型コンボデータベース
     </footer>
+
+    <script>
+      import { getMoveTable } from '../lib/movenames';
+      import { formatToken, readNotationPrefs, NOTATION_CHANGE_EVENT, NOTATION_STORAGE_KEYS } from '../lib/notation';
+
+      // 表記設定（数字/矢印・コマンド/技名）を、このページのコマンド表示すべてに反映する。
+      // トグル（NotationToggle / ComboEditor）は設定を保存して NOTATION_CHANGE_EVENT を流すだけ
+      const moveTable = getMoveTable(document.body.dataset.character ?? '');
+
+      function applyNotation(): void {
+        const prefs = readNotationPrefs(localStorage);
+
+        // (旧) .notation[data-original]: Phase 0 ページ。テキストとして一括変換
+        document.querySelectorAll<HTMLElement>('.notation[data-original]').forEach((el) => {
+          el.textContent = (el.dataset.original ?? '')
+            .split(' > ')
+            .map((seg) => formatToken(seg, prefs, moveTable))
+            .join(' > ');
+        });
+
+        // (新) .cmd-chip[data-token]: Notation.astro のチップ単位で置換
+        document.querySelectorAll<HTMLElement>('.cmd-chip[data-token]').forEach((el) => {
+          el.textContent = formatToken(el.dataset.token ?? '', prefs, moveTable);
+        });
+      }
+
+      applyNotation();
+      document.addEventListener(NOTATION_CHANGE_EVENT, applyNotation);
+
+      // 別のタブで切り替えたときも、このタブのチップ・トグルを合わせる
+      window.addEventListener('storage', (e) => {
+        if (e.key === NOTATION_STORAGE_KEYS.dir || e.key === NOTATION_STORAGE_KEYS.name) {
+          document.dispatchEvent(new CustomEvent(NOTATION_CHANGE_EVENT));
+        }
+      });
+    </script>
   </body>
 </html>

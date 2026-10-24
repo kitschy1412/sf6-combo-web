@@ -1,87 +1,50 @@
 ---
-interface Props {
-  character: string;
-}
-const { character } = Astro.props;
+// 表記の切り替えボタン。設定は localStorage に保存し、ページへの反映は Layout.astro が行う
+// （技名の変換テーブルは Layout の character で決まる）
 ---
 
-<!-- トグルバー: data-character でキャラ名をクライアント側に渡す -->
-<div id="notation-toggle-bar" data-character={character} style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:10px 0; margin-bottom:16px;">
+<div id="notation-toggle-bar" style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:10px 0; margin-bottom:16px;">
 
   <!-- 方向入力トグル -->
   <div style="display:flex; align-items:center; gap:6px;">
     <span class="ntoggle-label">方向</span>
-    <button class="ntoggle-btn" data-group="direction" data-value="numpad">数字</button>
-    <button class="ntoggle-btn" data-group="direction" data-value="arrows">矢印</button>
+    <button class="ntoggle-btn" data-group="dir" data-value="numpad">数字</button>
+    <button class="ntoggle-btn" data-group="dir" data-value="arrows">矢印</button>
   </div>
 
   <!-- 必殺技名トグル -->
   <div style="display:flex; align-items:center; gap:6px;">
     <span class="ntoggle-label">必殺技</span>
-    <button class="ntoggle-btn" data-group="movename" data-value="command">コマンド</button>
-    <button class="ntoggle-btn" data-group="movename" data-value="name">技名</button>
+    <button class="ntoggle-btn" data-group="name" data-value="command">コマンド</button>
+    <button class="ntoggle-btn" data-group="name" data-value="name">技名</button>
   </div>
 
 </div>
 
 <script>
-  import { numpadToArrows } from '../lib/notation';
-  import { getMoveTable } from '../lib/movenames';
+  import { readNotationPrefs, NOTATION_CHANGE_EVENT, NOTATION_STORAGE_KEYS } from '../lib/notation';
 
-  const bar = document.getElementById('notation-toggle-bar');
-  const character = bar?.dataset.character ?? '';
-  const moveTable = getMoveTable(character);
+  // data-group を持つボタンだけが対象（ComboEditor 内の同じ見た目のトグルは data-editor-toggle で別扱い）
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn[data-group]');
 
-  // ── 変換ロジック ───────────────────────────────────────────
-  function convertSegment(seg: string, dirMode: string, nameMode: string): string {
-    // 技名モード: テーブルにあれば技名を返す（方向変換は不要）
-    if (nameMode === 'name' && moveTable[seg]) {
-      return moveTable[seg];
-    }
-    // 方向変換モード
-    if (dirMode === 'arrows') {
-      return numpadToArrows(seg);
-    }
-    return seg;
-  }
-
-  function applyToPage(): void {
-    const dirMode  = localStorage.getItem('sf6-dir')  ?? 'numpad';
-    const nameMode = localStorage.getItem('sf6-name') ?? 'command';
-
-    // (旧) .notation[data-original]: テキストとして一括変換するパターン
-    document.querySelectorAll<HTMLElement>('.notation[data-original]').forEach((el) => {
-      const original = el.dataset.original ?? '';
-      el.textContent = original
-        .split(' > ')
-        .map((seg) => convertSegment(seg, dirMode, nameMode))
-        .join(' > ');
-    });
-
-    // (新) .cmd-chip[data-token]: チップ単位で表示テキストを置換
-    document.querySelectorAll<HTMLElement>('.cmd-chip[data-token]').forEach((el) => {
-      const tok = el.dataset.token ?? '';
-      el.textContent = convertSegment(tok, dirMode, nameMode);
-    });
-
-    // ボタンのアクティブ状態を更新
-    document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn[data-group="direction"]').forEach((btn) => {
-      btn.classList.toggle('ntoggle-active', btn.dataset.value === dirMode);
-    });
-    document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn[data-group="movename"]').forEach((btn) => {
-      btn.classList.toggle('ntoggle-active', btn.dataset.value === nameMode);
+  // ボタンの選択状態を保存済みの設定に合わせる
+  function syncButtons(): void {
+    const prefs = readNotationPrefs(localStorage);
+    buttons.forEach((btn) => {
+      const current = btn.dataset.group === 'dir' ? prefs.dir : prefs.name;
+      btn.classList.toggle('ntoggle-active', btn.dataset.value === current);
     });
   }
 
-  // ── トグルクリック ─────────────────────────────────────────
-  document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn').forEach((btn) => {
+  // ── トグルクリック: 保存して全体に知らせる ──────────────────
+  buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      const key = btn.dataset.group === 'direction' ? 'sf6-dir' : 'sf6-name';
+      const key = btn.dataset.group === 'dir' ? NOTATION_STORAGE_KEYS.dir : NOTATION_STORAGE_KEYS.name;
       localStorage.setItem(key, btn.dataset.value ?? '');
-      applyToPage();
+      document.dispatchEvent(new CustomEvent(NOTATION_CHANGE_EVENT));
     });
   });
 
-  // 初期適用
-  applyToPage();
+  document.addEventListener(NOTATION_CHANGE_EVENT, syncButtons);
+  syncButtons();
 </script>

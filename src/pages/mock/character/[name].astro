@@ -48,7 +48,7 @@ for (const c of COMBOS) {
 }
 ---
 
-<Layout title={`${charName} — モック`}>
+<Layout title={`${charName} — モック`} character={charName}>
   <nav class="breadcrumb">
     <a href="/mock/">モックトップ</a>
     <span class="sep">/</span>
@@ -112,7 +112,7 @@ for (const c of COMBOS) {
     </div>
 
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-      <NotationToggle character={charName} />
+      <NotationToggle />
       <div class="col-vis-wrap">
         <button type="button" id="col-vis-toggle" class="btn btn-sm">列表示 ▾</button>
         <div id="col-vis-menu" class="col-vis-menu" style="display:none;">

@@ -17,3 +17,32 @@ export function numpadToArrows(input: string): string {
     (digits) => [...digits].map((d) => NUMPAD_TO_ARROW[d] ?? d).join(''),
   );
 }
+
+// ── 表記設定（方向: 数字/矢印・必殺技: コマンド/技名） ─────────
+// localStorage に保存し、コマンドを出す全ページで同じ表記にする（ページへの反映は Layout.astro）
+export type DirMode = 'numpad' | 'arrows';
+export type NameMode = 'command' | 'name';
+export type NotationPrefs = { dir: DirMode; name: NameMode };
+
+export const NOTATION_STORAGE_KEYS = { dir: 'sf6-dir', name: 'sf6-name' } as const;
+
+/** 表記を切り替えたら document に流すイベント。ページのチップと各トグルの表示がこれで揃う */
+export const NOTATION_CHANGE_EVENT = 'notation:change';
+
+/** 保存済みの表記設定を読む（未設定・想定外の値は 数字 / コマンド） */
+export function readNotationPrefs(storage: Pick<Storage, 'getItem'>): NotationPrefs {
+  return {
+    dir: storage.getItem(NOTATION_STORAGE_KEYS.dir) === 'arrows' ? 'arrows' : 'numpad',
+    name: storage.getItem(NOTATION_STORAGE_KEYS.name) === 'name' ? 'name' : 'command',
+  };
+}
+
+/**
+ * コマンド1トークンを表記設定に合わせて変換する
+ * 技名モードで技名テーブルにあるトークンは技名に（方向の変換はしない）、それ以外は方向だけ変換する
+ */
+export function formatToken(token: string, prefs: NotationPrefs, moveTable: Record<string, string>): string {
+  const moveName = prefs.name === 'name' ? moveTable[token] : undefined;
+  if (moveName) return moveName;
+  return prefs.dir === 'arrows' ? numpadToArrows(token) : token;
+}

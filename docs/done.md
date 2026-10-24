@@ -18,6 +18,12 @@
 
 ## 2026-10-24
 
+- 表記設定（数字/矢印・コマンド/技名）を全ページで反映する
+  - 反映処理を NotationToggle から Layout.astro のスクリプトに移し、トグルの無いページ（コンボ詳細・ノート詳細・ダウン状況など）も保存済みの表記で出す。技名は Layout の `character`（`<body data-character>`）で表を引くので、コマンドを出すページは Layout に `character` を渡す。変換と設定の読み込みは src/lib/notation.ts（`readNotationPrefs` / `formatToken`）
+  - トグル（NotationToggle・エディタ内）は保存して `notation:change` を流すだけにし、ページのチップ・両トグル・エディタが追従する（別タブも storage イベントで追従）。コンボ詳細のパンくずの下にトグルを追加。ノート詳細のコマンドをチップ表示に
+  - 直した既存の不具合: NotationToggle のクリック処理がエディタ内のトグルにも付いていて、エディタで「矢印」を押すと sf6-name に "arrows" が入っていた。エディタの入力欄が矢印表記になり、編集・パレット追加で矢印のままコマンドに保存されていた（入力欄は数字のままにした）
+  - tests/scenarios.mjs: S8 に設定読み込み・変換のテスト、S10（チップを出す全ページにキャラ指定がある・コンボ詳細のトグル・ノート詳細のチップ）を追加
+
 - 起き攻めの紐付けを〆分類基準にそろえる（同じ有利フレームの別〆は参考として出す）
   - rashid.ts: `getOkizemeByEnderClass` / `getOkizemeByFrameAdvantage` を `getOkizemeLinks()`（main=同じ〆分類 / reference=〆違い・同じ有利F）に一本化。有利Fが「—」の SA〆どうしは同じ扱いにしない。今のデータで参考が出るのは中イーグル〆 ↔ 投げ後（+30F）だけ
   - `comboCount` / `okizemeCount` を型とデータから外し、`getEnderClassCounts()` で数える（コンボは「その〆で終わるルートを持つコンボ」数。公開一覧のカードは公開分だけ）

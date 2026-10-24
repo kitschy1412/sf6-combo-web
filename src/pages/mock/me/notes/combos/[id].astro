@@ -24,7 +24,7 @@ function visibilityStyle(v: Visibility): string {
 }
 ---
 
-<Layout title={`${note.title} — コンボノート — モック`}>
+<Layout title={`${note.title} — コンボノート — モック`} character="Rashid">
   <nav class="breadcrumb">
     <a href="/mock/">モックトップ</a>
     <span class="sep">/</span>
@@ -94,8 +94,9 @@ function visibilityStyle(v: Visibility): string {
               {branched && <span class="tag" style="background:#111; color:#fff;">{routes.length}ルート</span>}
             </div>
             <div style="font-weight:700; font-size:0.92rem; margin-bottom:4px;">{combo.title}</div>
-            <div style="font-size:0.8rem; color:var(--muted-strong); font-family:'JetBrains Mono',monospace;">
-              {combo.root.segment}
+            <div style="font-size:0.82rem;">
+              <Notation inputs={combo.root.segment} size="sm" />
+              {branched && <span style="margin-left:8px; color:var(--muted);">…の後に分岐</span>}
             </div>
             {enderIds.length > 0 && (
               <div style="display:flex; gap:4px; margin-top:5px; flex-wrap:wrap;">

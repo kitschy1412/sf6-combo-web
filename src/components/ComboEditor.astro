@@ -540,6 +540,10 @@ const CATEGORY_DATA = COMBOS
     const named = paletteMode === 'name' ? convertInput(seg, true) : seg;
     return applyDirMode(named);
   }
+  // 入力欄用: 技名は NAME_TO_TOKEN で戻せるが、矢印は戻せない（5 を省略する）ので出さない
+  function editableSegment(seg) {
+    return paletteMode === 'name' ? convertInput(seg, true) : seg;
+  }
   function pickLeafMeta(n) {
     const meta = {};
     if (n.routeLabel != null) meta.routeLabel = n.routeLabel;
@@ -748,7 +752,7 @@ const CATEGORY_DATA = COMBOS
       </div>
       <div class="hybrid-pad" style="margin-bottom:10px;">
         <input type="text" class="input mono" data-hybrid-target id="focus-segment-input"
-          value="${escapeHtml(displaySegment(node.segment))}" placeholder="例: 2MK > 236LP > 214LK" />
+          value="${escapeHtml(editableSegment(node.segment))}" placeholder="例: 2MK > 236LP > 214LK" />
         <div class="token-bar">
           <span class="token-bar-label">分岐したい所をクリック</span>
           <div class="token-chips">${buildTokenChipsHTML(node)}</div>
@@ -891,6 +895,8 @@ const CATEGORY_DATA = COMBOS
   }
 
   // ── 表記トグル（方向 + 必殺技、コンボ一覧と localStorage 共有） ──
+  // 切り替えたら notation:change（lib/notation.ts の NOTATION_CHANGE_EVENT）を流し、
+  // ページ側のチップ（Layout.astro）・一覧のトグル・このエディタを同じ設定に揃える
   function syncEditorToggleUI() {
     document.querySelectorAll('.ntoggle-btn[data-editor-toggle="dir"]').forEach(b => {
       b.classList.toggle('ntoggle-active', b.dataset.value === dirMode);
@@ -903,18 +909,16 @@ const CATEGORY_DATA = COMBOS
   syncEditorToggleUI();
   document.querySelectorAll('.ntoggle-btn[data-editor-toggle]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const group = btn.dataset.editorToggle;
-      const val = btn.dataset.value ?? '';
-      if (group === 'dir') {
-        dirMode = val;
-        localStorage.setItem('sf6-dir', val);
-      } else if (group === 'name') {
-        paletteMode = (val === 'name') ? 'name' : 'cmd';
-        localStorage.setItem('sf6-name', val);
-      }
-      syncEditorToggleUI();
-      render();
+      const key = btn.dataset.editorToggle === 'dir' ? 'sf6-dir' : 'sf6-name';
+      localStorage.setItem(key, btn.dataset.value ?? '');
+      document.dispatchEvent(new CustomEvent('notation:change'));
     });
+  });
+  document.addEventListener('notation:change', () => {
+    paletteMode = (localStorage.getItem('sf6-name') === 'name') ? 'name' : 'cmd';
+    dirMode = localStorage.getItem('sf6-dir') ?? 'numpad';
+    syncEditorToggleUI();
+    render();
   });
 
   document.getElementById('combo-form').addEventListener('submit', e => {

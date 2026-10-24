@@ -2,6 +2,7 @@
 import Layout from '../../../layouts/Layout.astro';
 import ComboTree from '../../../components/ComboTree.astro';
 import Notation from '../../../components/Notation.astro';
+import NotationToggle from '../../../components/NotationToggle.astro';
 import {
   getComboById, getEnderClassById, getOkizemeLinks,
   getComboRoutes, hasBranches, getComboMaxDamage, getComboBrokenCount,
@@ -33,7 +34,7 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
   .filter((e): e is EnderClass => Boolean(e));
 ---
 
-<Layout title={`${combo.title} — モック`}>
+<Layout title={`${combo.title} — モック`} character="Rashid">
   <nav class="breadcrumb">
     <a href="/mock/">モックトップ</a>
     <span class="sep">/</span>
@@ -41,6 +42,8 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
     <span class="sep">/</span>
     <span style="color:var(--text);">コンボ詳細</span>
   </nav>
+
+  <NotationToggle />
 
   <div class="page-head" style="border-radius:6px 6px 0 0; align-items:flex-start;">
     <div style="flex:1;">

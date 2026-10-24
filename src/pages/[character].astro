@@ -76,7 +76,7 @@ function getColor(name: string) {
 const charColor = getColor(character ?? '');
 ---
 
-<Layout title={`${character} コンボ一覧 | SF6 Combo Archive`}>
+<Layout title={`${character} コンボ一覧 | SF6 Combo Archive`} character={character ?? ''}>
   <!-- パンくず -->
   <div class="breadcrumb">
     <a href="/">← キャラクター一覧</a>
@@ -98,7 +98,7 @@ const charColor = getColor(character ?? '');
   </div>
 
   <!-- 表記トグル -->
-  <NotationToggle character={character ?? ''} />
+  <NotationToggle />
 
   <!-- 列表示トグル -->
   <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:10px 0 14px;">

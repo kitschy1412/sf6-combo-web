@@ -62,7 +62,7 @@ function getComboScoreLabel(c: (typeof publicCombos)[0]): string {
 }
 ---
 
-<Layout title={`${charName} — 公開コンボ一覧`}>
+<Layout title={`${charName} — 公開コンボ一覧`} character={charName}>
   <nav class="breadcrumb">
     <a href="/mock/">モックトップ</a>
     <span class="sep">/</span>
@@ -112,7 +112,7 @@ function getComboScoreLabel(c: (typeof publicCombos)[0]): string {
       <h2>コンボ</h2>
     </div>
 
-    <NotationToggle character={charName} />
+    <NotationToggle />
 
     <table class="data-table" id="combo-table">
       <colgroup>

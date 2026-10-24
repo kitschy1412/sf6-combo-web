@@ -38,7 +38,7 @@ const youtubeUrl = `https://www.youtube.com/watch?v=${combo.youtube_id}&t=${comb
 const confidenceColor = total === 0 ? '#6b6b7a' : score >= 0.8 ? '#34d399' : score >= 0.6 ? '#f59e0b' : '#f87171';
 ---
 
-<Layout title={`${combo.title} | SF6 Combo Archive`}>
+<Layout title={`${combo.title} | SF6 Combo Archive`} character={combo.character}>
   <!-- パンくず -->
   <div class="breadcrumb">
     <a href="/">一覧</a>
@@ -49,7 +49,7 @@ const confidenceColor = total === 0 ? '#6b6b7a' : score >= 0.8 ? '#34d399' : sco
   </div>
 
   <!-- 表記トグル -->
-  <NotationToggle character={combo.character} />
+  <NotationToggle />
 
   <!-- ① コンボサマリー行（選択コンボの概要） -->
   <div class="combo-summary-row">

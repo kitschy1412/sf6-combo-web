@@ -154,6 +154,15 @@
 | `.ntoggle-btn` | トグルボタン（非選択） |
 | `.ntoggle-btn.ntoggle-active` | 選択中（黒背景） |
 
+表記の設定（方向: 数字/矢印・必殺技: コマンド/技名）は全ページで共有する（2026-10-24）。
+
+- 設定は localStorage（`sf6-dir` / `sf6-name`）に保存。読み込みと1トークンの変換は `src/lib/notation.ts`（`readNotationPrefs` / `formatToken`）
+- ページへの反映は `Layout.astro` のスクリプトが行う（`.cmd-chip[data-token]` と Phase 0 の `.notation[data-original]`）。トグルの無いページでも保存済みの表記で出る
+- 技名は Layout の `character`（`<body data-character>`）のキャラの表（`src/lib/movenames.ts`）で引く。**コマンドを出すページでは Layout に `character` を渡す**（モックは `"Rashid"`）
+- トグル（`NotationToggle.astro` と ComboEditor 内のトグル）は、保存して `notation:change` を流すだけ。ページのチップ・各トグル・エディタがそれを受けて表示を合わせる（別タブでの切り替えも storage イベントで追従）
+- 一覧のトグルは `data-group`、エディタ内は `data-editor-toggle` で区別する（同じ `.ntoggle-btn` でも互いのハンドラを付けない）
+- 置き場所: キャラハブ・公開一覧は表の上、コンボ詳細はパンくずの下
+
 ### アニメーション
 
 | クラス | 概要 |
@@ -253,7 +262,7 @@ tr.combo-child-row           ← 各ルート行（初期:display:none、ツリ�
 - **テキスト入力（主）**: `"2MK > 236LP > 214LK"` 形式で直打ち。慣れたプレイヤーが速く入力できる
 - **パレット（補助）**: キャラ固有の技をグループ別ボタンで選択。入力欄末尾に追記される
 - **トークンチップ行**: 入力内容をリアルタイムで表示。チップクリックで「ここで分岐」UI が起動
-- **コマンド表示モード**: パレットを「コマンド表記」「技名表記」で切り替え可能（`NotationToggle.astro`）
+- **コマンド表示モード**: パレットを「コマンド表記」「技名表記」で切り替え可能（エディタ内のトグル。設定は一覧の `NotationToggle.astro` と共通）
 
 #### 捨てた案と理由
 
@@ -310,3 +319,5 @@ UI を変えたら、ヘッドレス Edge で撮って目で確かめる（2026-
 - 撮影後は 9333 番の Edge が残るので、終わったら止める（`msedge.exe` のうち `--remote-debugging-port=9333` のもの）
 - `npm run dev` をバックグラウンドで起動して止めると、npm だけが終わって `node …astro.mjs dev` が 4321 に残ることがある（2026-10-24）。そのプロセスも止める（残ると次の `npm run dev` が 4322 にずれる）
 - シナリオテストをずれたポートに向けるときは `BASE=http://localhost:4322 npm run test:scenarios`
+- 撮影用 Edge のプロファイルは使い回されるので、localStorage（表記設定 `sf6-dir` / `sf6-name` など）が前回の撮影から残る（2026-10-24）。表記に関わる撮影は actions で値を入れてから撮り、終わったら消す
+- shots.json は Write で書く。Bash のヒアドキュメントで書くと、actions / evals の JS 式のバックスラッシュ（正規表現の `\s` など）が1つ減って JSON が壊れることがある

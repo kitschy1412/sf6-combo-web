@@ -254,7 +254,8 @@ scenario('S8 ロジック: Wilson Score / ゲージ計算 / 表記変換');
   const lib = (f) => new URL(`../src/lib/${f}`, import.meta.url).href;
   const { wilsonScore, scoreLabel } = await import(lib('wilson.ts'));
   const { calcGaugesFromSegs, parseTokens } = await import(lib('gauges.ts'));
-  const { numpadToArrows } = await import(lib('notation.ts'));
+  const { numpadToArrows, readNotationPrefs, formatToken } = await import(lib('notation.ts'));
+  const { getMoveTable } = await import(lib('movenames.ts'));
 
   // Wilson
   check('投票0件はスコア0', wilsonScore(0, 0) === 0, `=${wilsonScore(0, 0)}`);
@@ -295,6 +296,25 @@ scenario('S8 ロジック: Wilson Score / ゲージ計算 / 表記変換');
   check('OD技(PP/KK)も変換対象', numpadToArrows('236PP') === '↓↘→PP', numpadToArrows('236PP'));
   check('ボタンを伴わない数字は変換しない', numpadToArrows('DR') === 'DR' && numpadToArrows('x3') === 'x3',
     `${numpadToArrows('DR')} / ${numpadToArrows('x3')}`);
+
+  // 表記設定（localStorage の sf6-dir / sf6-name）
+  const storage = (items) => ({ getItem: (k) => items[k] ?? null });
+  const prefsOf = (items) => JSON.stringify(readNotationPrefs(storage(items)));
+  check('表記設定の既定は 数字 / コマンド', prefsOf({}) === '{"dir":"numpad","name":"command"}', prefsOf({}));
+  check('保存済みの 矢印 / 技名 を読む',
+    prefsOf({ 'sf6-dir': 'arrows', 'sf6-name': 'name' }) === '{"dir":"arrows","name":"name"}',
+    prefsOf({ 'sf6-dir': 'arrows', 'sf6-name': 'name' }));
+  check('想定外の値はコマンド扱い（以前エディタの方向トグルで sf6-name に入った "arrows" など）',
+    readNotationPrefs(storage({ 'sf6-name': 'arrows' })).name === 'command', prefsOf({ 'sf6-name': 'arrows' }));
+  const rashid = getMoveTable('Rashid');
+  const arrowsName = { dir: 'arrows', name: 'name' };
+  check('技名モード: 技名テーブルにある技は技名で出す（236LP → 弱ミキサー）',
+    formatToken('236LP', arrowsName, rashid) === '弱ミキサー', formatToken('236LP', arrowsName, rashid));
+  check('技名モード: テーブルにない通常技は方向だけ変換する（2MK → ↓MK）',
+    formatToken('2MK', arrowsName, rashid) === '↓MK', formatToken('2MK', arrowsName, rashid));
+  check('コマンドモードでは技名にしない',
+    formatToken('236LP', { dir: 'numpad', name: 'command' }, rashid) === '236LP',
+    formatToken('236LP', { dir: 'numpad', name: 'command' }, rashid));
 }
 
 // ────────────────────────────────────────────────────────────
@@ -368,6 +388,51 @@ scenario('S9 起き攻めの紐付け: 同じコンボにはどの画面でも�
     if (row?.okizeme !== shown) wrongOki.push(`${ec}: 一覧=${row?.okizeme} 状況=${shown}`);
   }
   check('〆分類管理の起き攻め数がダウン状況に出る件数と一致', wrongOki.length === 0, wrongOki.join(', '));
+}
+
+// ────────────────────────────────────────────────────────────
+// S10. 表記設定（数字/矢印・コマンド/技名）を全ページで反映する
+// ────────────────────────────────────────────────────────────
+// 反映は Layout.astro のスクリプトが行い、技名は <body data-character> のキャラの表で引く。
+// ここでは JS を動かせないので、反映できる形になっているか（チップ + キャラ指定）を見る
+scenario('S10 表記設定: コマンドを出すページはどれも保存済みの表記で表示できる');
+{
+  const chipRe = /class="cmd-chip[^"]*" data-token="/g;
+  const pages = [
+    '/mock/character/rashid', '/mock/explore/rashid', '/mock/combo/c_001', '/mock/combo/c_006',
+    '/mock/me/notes/combos/note_c_001', '/mock/me/notes/okizeme/note_o_001',
+    '/mock/situation/s_001', '/mock/okizeme/new',
+  ];
+  const notReady = [];
+  for (const p of pages) {
+    const r = await get(p);
+    const chips = count(r.body, chipRe);
+    const hasCharacter = /<body[^>]*\sdata-character="Rashid"/.test(r.body);
+    if (r.status !== 200 || chips === 0 || !hasCharacter) {
+      notReady.push(`${p} (status=${r.status} chips=${chips} character=${hasCharacter})`);
+    }
+  }
+  check(`コマンドを出す ${pages.length} ページすべてがチップ表示で、技名に使うキャラが body に入っている`,
+    notReady.length === 0, notReady.join(', '));
+
+  const detail = await get('/mock/combo/c_006');
+  check('コンボ詳細に表記トグル（方向・必殺技）がある',
+    /data-group="dir"/.test(detail.body) && /data-group="name"/.test(detail.body), 'トグルが見つかりません');
+
+  // ノート詳細: c_002（DR > 5HP > 2MK > 214MK > 5HP > 214HK）がチップで並び、プレーンテキストで出ていない
+  const note = await get('/mock/me/notes/combos/note_c_001');
+  const noteTokens = [...note.body.matchAll(/class="cmd-chip[^"]*" data-token="([^"]+)"/g)].map(m => m[1]).join(' > ');
+  check('コンボノート詳細のコマンドがチップ表示になっている',
+    noteTokens.includes('DR > 5HP > 2MK > 214MK > 5HP > 214HK') && !/DR (&gt;|>) 5HP (&gt;|>) 2MK/.test(note.body),
+    `チップ: ${noteTokens}`);
+  check('ノートの分岐コンボ（c_005）は共通部分の後に「…の後に分岐」と出る', note.body.includes('…の後に分岐'));
+
+  // キャラハブ: 一覧のトグルはエディタ内のトグル（data-editor-toggle）と別扱い
+  const hub = await get('/mock/character/rashid');
+  const pageToggles = count(hub.body, /class="ntoggle-btn" data-group=/g);
+  const editorToggles = count(hub.body, /class="ntoggle-btn" data-editor-toggle=/g);
+  check('キャラハブの一覧トグルとエディタ内トグルが別の属性で区別されている',
+    pageToggles === 4 && editorToggles === 4, `一覧=${pageToggles} エディタ=${editorToggles}`);
 }
 
 // ────────────────────────────────────────────────────────────
