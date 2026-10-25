@@ -318,6 +318,7 @@ UI を変えたら、ヘッドレス Edge で撮って目で確かめる（2026-
 - 使い方の詳細はスクリプト冒頭のコメント。初回は Edge のプロファイル作成で十数秒かかる
 - 撮影後は 9333 番の Edge が残るので、終わったら止める（`msedge.exe` のうち `--remote-debugging-port=9333` のもの）
 - `npm run dev` をバックグラウンドで起動して止めると、npm だけが終わって `node …astro.mjs dev` が 4321 に残ることがある（2026-10-24）。そのプロセスも止める（残ると次の `npm run dev` が 4322 にずれる）
+- `npm run dev` の出力をファイルに流してバックグラウンドで起動すると、ログに Local の URL が出ないことがある（2026-10-24）。そのときは `curl -s -o /dev/null -w "%{http_code}" http://localhost:4322/mock/` のようにポートを順に叩いて確かめる。4321 にユーザーの dev サーバーが動いていることがあるので、止めるのは自分が起動したポートだけにする
 - シナリオテストをずれたポートに向けるときは `BASE=http://localhost:4322 npm run test:scenarios`
 - 撮影用 Edge のプロファイルは使い回されるので、localStorage（表記設定 `sf6-dir` / `sf6-name` など）が前回の撮影から残る（2026-10-24）。表記に関わる撮影は actions で値を入れてから撮り、終わったら消す
 - shots.json は Write で書く。Bash のヒアドキュメントで書くと、actions / evals の JS 式のバックスラッシュ（正規表現の `\s` など）が1つ減って JSON が壊れることがある
