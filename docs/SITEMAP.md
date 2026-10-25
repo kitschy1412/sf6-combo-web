@@ -94,7 +94,7 @@ visibility は `public` / `unlisted` / `private` の 3 値（コンボ・ノー�
 | `/mock/` | — （モック索引） |
 | `/mock/character/[name]` | `/[character]` |
 | `/mock/combo/[id]` | `/combo/[id]` |
-| `/mock/combo/new` | `/combo/new` |
+| `/mock/combo/new`（廃止。入力はキャラハブのインラインエディタ） | `/combo/new` |
 | `/mock/okizeme/new` | `/okizeme/new` |
 | `/mock/situation/[id]` | `/okizeme/[id]` （旧称 situation） |
 | `/mock/situation/new` | `/okizeme/new` |
