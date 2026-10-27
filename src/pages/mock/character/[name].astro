@@ -327,6 +327,7 @@ for (const c of COMBOS) {
                           <a href={`/mock/combo/${c.id}#${r.leaf.id}`} class="row-link" style="display:inline; color:var(--text);">
                             {r.leaf.routeLabel ?? '(無名ルート)'}
                           </a>
+                          {r.leaf.condition && <span class="tag" style="margin-left:6px;">{r.leaf.condition}</span>}
                         </td>
                         <td><Notation inputs={tailInputs} ghostInputs={ghostInputs} branchElbow={isLastRoute ? '└─›' : '├─›'} size="sm" /></td>
                         <td class="col-situation">{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
@@ -413,6 +414,8 @@ for (const c of COMBOS) {
             <th>元レシピ</th>
             <th>未変換の語</th>
             <th>〆分類</th>
+            <th>始動技</th>
+            <th>位置</th>
           </tr>
         </thead>
         <tbody>
@@ -423,6 +426,8 @@ for (const c of COMBOS) {
               <td>{u.recipeJa}</td>
               <td>{u.unresolvedTerms.length > 0 ? u.unresolvedTerms.map(t => <span class="tag tag-warn" style="margin-right:3px;">{t}</span>) : '—'}</td>
               <td>{u.enderUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
+              <td>{u.starterUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
+              <td>{u.positionUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
             </tr>
           ))}
         </tbody>
@@ -1169,7 +1174,7 @@ for (const c of COMBOS) {
 
   <script>
     import Sortable from 'sortablejs';
-    import { COMBOS } from '../../../mock-data/rashid';
+    import { COMBOS, inferStarter } from '../../../mock-data/rashid';
     import type { Combo } from '../../../mock-data/rashid';
 
     // ── 分岐ツリー 折り畳みトグル ──
@@ -1909,11 +1914,16 @@ for (const c of COMBOS) {
 
     editorHost.addEventListener('combo-editor:save', ((e: CustomEvent<ComboSaveDetail>) => {
       const detail = e.detail;
+      // 始動技・ヒット状態はコマンドの先頭から仮に決める（エディタの入力欄は次のタスクで置き換える）
+      const inferred = inferStarter(detail.root.segment);
       const combo: Combo = {
         id: detail.id,
         title: detail.title,
         categoryMajor: detail.categoryMajor || undefined,
         categoryMinor: detail.categoryMinor || undefined,
+        starter: inferred.starter ?? 'その他',
+        hitState: inferred.hitState,
+        position: 'どこでも',
         starterType: detail.starterType,
         sourceType: 'personal',
         visibility: 'private',

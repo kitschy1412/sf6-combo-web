@@ -9,6 +9,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #1",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "2MP",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -21,9 +24,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "2MP > 5LK > 214LK",
       "damage": 1780,
       "enderClassId": "ec_weak_eagle",
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 2中P>弱K>弱スパイク\nヒットバックが少なく、弱K>弱Pの暴れ潰しや弱Kから大サイクロン、2中P歩き2中Pなど連携の起点になる",
       "votes": {
         "good": 0,
@@ -37,6 +38,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #2",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "5LP",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -49,9 +53,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "5LP > 2LP > 5LP > 236LP or 236MP",
       "damage": 1170,
       "enderClassId": null,
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 弱P>2弱P>弱P>弱ミキサーか中ミキサー\nダメージは弱ミキサー〆。大サイクロン等で+1F取った後に使用。2段目は小足でも可（ジャスパ対策）。弱ミキサーをガードされたら弱サイクロン",
       "votes": {
         "good": 0,
@@ -65,6 +67,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #3",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "5MP",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -76,9 +81,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "id": "n_ax_eXUug9kjcVQ_03_r",
       "segment": "5MP > 5LP > 236MP",
       "enderClassId": null,
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 中P>弱P>中ミキサー\nガードバックを活かした固め。クラシックは基本2中P、モダンで頻繁に使うルート",
       "votes": {
         "good": 0,
@@ -92,6 +95,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #4",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "5LP",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -104,9 +110,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "5LP or 5LK > CR > 5LP > 5MK > 5MP > 214MK",
       "damage": 2310,
       "enderClassId": "ec_mid_eagle",
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 弱Por弱K>キャンセルラッシュ立弱P>立中K>中P>中スパイク\nダメージは弱P始動。ゲージがあれば伸ばすルート。運び量が大きい。5ゲージ以上あれば使ってよい",
       "votes": {
         "good": 0,
@@ -120,6 +124,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #5",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "2MK",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -132,9 +139,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "2MK > CR > 5MK > 5HP > 214MK",
       "damage": 2043,
       "enderClassId": "ec_mid_eagle",
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 中足>キャンセルラッシュ中K>大P>中スパイク\n中足ラッシュの定番。しゃがみ確認できれば中足>CR2中P>立中K>中P>中スパイクでダメージ増。確認が難しければCR弱P>立中K>中P>中スパイク",
       "votes": {
         "good": 0,
@@ -148,6 +153,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #6",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "DR",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -160,9 +168,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "DR > 5LP > 5MP > 214MK",
       "damage": 1690,
       "enderClassId": "ec_mid_eagle",
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: ラッシュ弱P>中P>中スパイク\nラシード黄金3段コンボその2。低燃費で運び量に優れる",
       "votes": {
         "good": 0,
@@ -176,6 +182,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #7",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "DR",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -188,9 +197,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "DR > 2LK > 2MK > 214LK",
       "damage": 1370,
       "enderClassId": "ec_weak_eagle",
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: ラッシュ小足>中足>弱スパイク\n下段から攻め込みたい時、後ろ歩きが多い相手に。咄嗟パリィにジャスパされやすい",
       "votes": {
         "good": 0,
@@ -204,6 +211,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #8",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "中央",
+    "starter": "その他",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -216,9 +226,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "始動技 > CR > 2HP > 5HP > 214LK > 236236P",
       "damage": 4549,
       "enderClassId": null,
-      "situationTags": [
-        "中央"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 始動技>キャンセルラッシュ2大P>大P>弱スパイク>SA3\n中足始動での値（SA3前 2549）。SA3でリーサルを狙う時。主な始動は中P・大P。SA1でリーサルなら大P>キャンセルSA1",
       "votes": {
         "good": 0,
@@ -232,6 +240,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #9",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "端",
+    "starter": "2LK",
+    "hitState": "通常",
+    "position": "端",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -244,9 +255,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "始動技 > 中大TC > 236LP > 6MP > 214LP>4K > j.HK",
       "damage": 1430,
       "enderClassId": null,
-      "situationTags": [
-        "端"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 始動技>中大TC>弱ミキサー>前中P>弱サイクロンストローク>J大K\n通称もにょもにょ。ダメージは小足始動、J大Kの前まで（J大Kは起き攻めとして800）。中スパイクを当てられる場面で端に届くなら中PからTCへ移行",
       "votes": {
         "good": 0,
@@ -260,6 +269,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #10",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "端",
+    "starter": "その他",
+    "hitState": "通常",
+    "position": "端",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -272,9 +284,7 @@ export const ARCHIVER_COMBOS: Combo[] = [
       "segment": "始動技 > 5MP > 214MP > 5LP > CR > 5LP > 5MK > 中大TC > 236K(微溜め) > 6MP > 236MP > 236236K",
       "damage": 2999,
       "enderClassId": "ec_sa1",
-      "situationTags": [
-        "端"
-      ],
+      "situationTags": [],
       "notes": "元レシピ: 始動技>中P>中サイクロン>弱P>キャンセルラッシュ立弱P>立中K>中大TC>微溜めワール>前中P>中ミキサー>SA1\nSA1込み（SA1前 2459）。通称コンビニコンボ。最後を前中P>弱スパイクにするとSA3リーサルも可。ワールが厳しければTC>弱ミキサー>前中P>中ミキサー>SA1",
       "votes": {
         "good": 0,
@@ -288,6 +298,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #11",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "インパクト",
+    "starter": "インパクト",
+    "hitState": "通常",
+    "position": "どこでも",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -316,6 +329,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #12",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "インパクト",
+    "starter": "インパクト",
+    "hitState": "通常",
+    "position": "どこでも",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -344,6 +360,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #13",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "インパクト",
+    "starter": "インパクト",
+    "hitState": "通常",
+    "position": "端",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -372,6 +391,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #14",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "インパクト",
+    "starter": "インパクト",
+    "hitState": "通常",
+    "position": "どこでも",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -400,6 +422,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #15",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "スタン",
+    "starter": "スタン",
+    "hitState": "通常",
+    "position": "どこでも",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -428,6 +453,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #16",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "スタン",
+    "starter": "スタン",
+    "hitState": "通常",
+    "position": "どこでも",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -456,6 +484,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #17",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "イウサール",
+    "starter": "イウサール",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -484,6 +515,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #18",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "イウサール",
+    "starter": "イウサール",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -512,6 +546,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #19",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "イウサール",
+    "starter": "イウサール",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -540,6 +577,9 @@ export const ARCHIVER_COMBOS: Combo[] = [
     "title": "コンボ20選 #20",
     "categoryMajor": "archiver取り込み",
     "categoryMinor": "イウサール",
+    "starter": "イウサール",
+    "hitState": "通常",
+    "position": "中央",
     "starterType": "",
     "youtubeId": "eXUug9kjcVQ",
     "sourceType": "shared",
@@ -770,7 +810,7 @@ export const ARCHIVER_OKIZEME_SETUPS: OkizemeSetup[] = [
   }
 ];
 
-// 対応表で変換できなかった語、または〆技から enderClassId を推定できなかったもの
+// 対応表で変換できなかった語、または〆技・始動技・位置を推定できなかったもの
 export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
   {
     "id": "ax_B7GqchUdv3Y_10",
@@ -786,7 +826,9 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #2",
     "recipeJa": "弱P>2弱P>弱P>弱ミキサーか中ミキサー",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
   },
   {
     "id": "ax_eXUug9kjcVQ_03",
@@ -794,7 +836,9 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #3",
     "recipeJa": "中P>弱P>中ミキサー",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
   },
   {
     "id": "ax_eXUug9kjcVQ_08",
@@ -802,7 +846,9 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #8",
     "recipeJa": "始動技>キャンセルラッシュ2大P>大P>弱スパイク>SA3",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": true,
+    "positionUnknown": false
   },
   {
     "id": "ax_eXUug9kjcVQ_09",
@@ -810,7 +856,39 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #9",
     "recipeJa": "始動技>中大TC>弱ミキサー>前中P>弱サイクロンストローク>J大K",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
+  },
+  {
+    "id": "ax_eXUug9kjcVQ_10",
+    "kind": "combo",
+    "title": "コンボ20選 #10",
+    "recipeJa": "始動技>中P>中サイクロン>弱P>キャンセルラッシュ立弱P>立中K>中大TC>微溜めワール>前中P>中ミキサー>SA1",
+    "unresolvedTerms": [],
+    "enderUnknown": false,
+    "starterUnknown": true,
+    "positionUnknown": false
+  },
+  {
+    "id": "ax_eXUug9kjcVQ_11",
+    "kind": "combo",
+    "title": "コンボ20選 #11",
+    "recipeJa": "垂直J8大K>大スパイク",
+    "unresolvedTerms": [],
+    "enderUnknown": false,
+    "starterUnknown": false,
+    "positionUnknown": true
+  },
+  {
+    "id": "ax_eXUug9kjcVQ_12",
+    "kind": "combo",
+    "title": "コンボ20選 #12",
+    "recipeJa": "垂直J大K>前中P>大スパイク",
+    "unresolvedTerms": [],
+    "enderUnknown": false,
+    "starterUnknown": false,
+    "positionUnknown": true
   },
   {
     "id": "ax_eXUug9kjcVQ_13",
@@ -818,7 +896,9 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #13",
     "recipeJa": "垂直J8大K>大K>J前中P>大スカイハイ>J2大P",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
   },
   {
     "id": "ax_eXUug9kjcVQ_14",
@@ -826,7 +906,9 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #14",
     "recipeJa": "前ステ2回>ODサイクロン>前中P>弱スパイク>前中P>弱サイクロンストローク",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
   },
   {
     "id": "ax_eXUug9kjcVQ_15",
@@ -834,7 +916,19 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #15",
     "recipeJa": "J大K>立中K>いつもの",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": true
+  },
+  {
+    "id": "ax_eXUug9kjcVQ_16",
+    "kind": "combo",
+    "title": "コンボ20選 #16",
+    "recipeJa": "最大溜めワール>ODミキサー>ODスカイハイ>中ミキサー>SA1",
+    "unresolvedTerms": [],
+    "enderUnknown": false,
+    "starterUnknown": false,
+    "positionUnknown": true
   },
   {
     "id": "ax_eXUug9kjcVQ_17",
@@ -842,7 +936,9 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #17",
     "recipeJa": "前ステ>2大P>前中P>弱スパイク>弱ミキサー>大ミキサー",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
   },
   {
     "id": "ax_eXUug9kjcVQ_18",
@@ -850,7 +946,9 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #18",
     "recipeJa": "中P>垂直J8大K>ODミキサー>ODスカイハイ>大ミキサー",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
   },
   {
     "id": "ax_eXUug9kjcVQ_19",
@@ -858,6 +956,8 @@ export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = [
     "title": "コンボ20選 #19",
     "recipeJa": "フリップ>大K>ODミキサー>前中P>弱サイクロンストローク",
     "unresolvedTerms": [],
-    "enderUnknown": true
+    "enderUnknown": true,
+    "starterUnknown": false,
+    "positionUnknown": false
   }
 ];

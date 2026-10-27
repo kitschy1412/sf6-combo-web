@@ -8,6 +8,7 @@ import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ArchiverUnresolved, Combo, OkizemeSetup } from '../src/mock-data/rashid.ts';
+import { inferStarter, type Position, type Starter } from '../src/mock-data/rashid-starters.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const INPUT_DIR = join(ROOT, '..', 'sf6-combo-archiver', 'data', 'rashid');
@@ -128,6 +129,28 @@ function inferEnder(converted: string): string | null {
   return ENDER_BY_COMMAND[last] ?? null;
 }
 
+// ── 始動技・位置の推定 ──
+// section から決まるもの。始動技が決まらない section はコマンドの先頭トークンから推定する
+const SECTION_RULES: Record<string, { starter?: Starter; position?: Position }> = {
+  '中央': { position: '中央' },
+  '端': { position: '端' },
+  'インパクト': { starter: 'インパクト' },
+  'スタン': { starter: 'スタン' },
+  'イウサール': { starter: 'イウサール' },
+};
+// section からは決まらないが、動画の補足（notes）から分かるもの。キーはコンボの id
+const OVERRIDES: Record<string, { starter?: Starter; position?: Position }> = {
+  'ax_eXUug9kjcVQ_09': { starter: '2LK' },      // 「ダメージは小足始動」
+  'ax_eXUug9kjcVQ_13': { position: '端' },      // 「端付近限定」
+  'ax_eXUug9kjcVQ_14': { position: 'どこでも' }, // 「画面どこからでも端へ運べる」
+  'ax_eXUug9kjcVQ_17': { position: '中央' },    // 「端が少し遠ければ」
+  'ax_eXUug9kjcVQ_18': { position: '中央' },
+  'ax_eXUug9kjcVQ_19': { position: '中央' },    // 「端が遠くても狙え」
+  'ax_eXUug9kjcVQ_20': { position: '中央' },    // 「端も遠い時」
+};
+// 位置の語は position で表すので situationTags には入れない
+const POSITION_SECTIONS = ['中央', '端'];
+
 // ── 重複検出（youtubeId + startSec ±3秒） ──
 // 比較対象は rashid.ts の手書きデータ。rashid.ts は生成ファイルを取り込んでいるので import せず文字列から拾う
 const seen: { youtubeId: string; startSec: number }[] = [
@@ -164,11 +187,17 @@ function main() {
       if (isDuplicate(data.youtube_id, c.start_sec)) { skipped.push(id); continue; }
       const { text, unresolved: terms_ } = convertRecipe(c.recipe_ja, terms);
       const enderClassId = inferEnder(text);
+      const inferred = inferStarter(text);
+      const rule = { ...SECTION_RULES[c.section], ...OVERRIDES[id] };
+      const starter = rule.starter ?? inferred.starter;
       combos.push({
         id,
         title: `${shortTitle(data.title)} #${c.no}`,
         categoryMajor: CATEGORY_MAJOR,
         categoryMinor: c.section,
+        starter: starter ?? 'その他',
+        hitState: inferred.hitState,
+        position: rule.position ?? 'どこでも',
         starterType: '',
         ...source,
         visibility: 'public',
@@ -179,13 +208,16 @@ function main() {
           segment: text,
           ...(c.damage !== null ? { damage: c.damage } : {}),
           enderClassId,
-          situationTags: [c.section],
+          situationTags: POSITION_SECTIONS.includes(c.section) ? [] : [c.section],
           notes: [`元レシピ: ${c.recipe_ja}`, c.notes].filter(Boolean).join('\n'),
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
       });
-      if (terms_.length || !enderClassId) {
-        unresolved.push({ id, kind: 'combo', title: combos.at(-1)!.title, recipeJa: c.recipe_ja, unresolvedTerms: terms_, enderUnknown: !enderClassId });
+      if (terms_.length || !enderClassId || !starter || !rule.position) {
+        unresolved.push({
+          id, kind: 'combo', title: combos.at(-1)!.title, recipeJa: c.recipe_ja, unresolvedTerms: terms_, enderUnknown: !enderClassId,
+          starterUnknown: !starter, positionUnknown: !rule.position,
+        });
       }
     }
 
@@ -223,7 +255,7 @@ function main() {
 
   if (preview) {
     console.log(JSON.stringify({ combos: combos.slice(0, 2), okizeme: okizeme.slice(0, 1), unresolved, skipped }, null, 2));
-    for (const c of combos) console.log(`${c.id}\t${c.root.enderClassId ?? '-'}\t${c.root.segment}`);
+    for (const c of combos) console.log(`${c.id}\t${c.starter}\t${c.hitState}\t${c.position}\t${c.root.enderClassId ?? '-'}\t${c.root.segment}`);
     for (const o of okizeme) console.log(`${o.id}\t${o.enderClassId || '-'}\t${o.inputs}\t${JSON.stringify(o.flags)}`);
     return;
   }
@@ -238,7 +270,7 @@ function main() {
     '',
     `export const ARCHIVER_OKIZEME_SETUPS: OkizemeSetup[] = ${JSON.stringify(okizeme, null, 2)};`,
     '',
-    '// 対応表で変換できなかった語、または〆技から enderClassId を推定できなかったもの',
+    '// 対応表で変換できなかった語、または〆技・始動技・位置を推定できなかったもの',
     `export const ARCHIVER_UNRESOLVED: ArchiverUnresolved[] = ${JSON.stringify(unresolved, null, 2)};`,
     '',
   ].join('\n');

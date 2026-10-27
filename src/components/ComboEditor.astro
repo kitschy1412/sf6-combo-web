@@ -437,6 +437,7 @@ const CATEGORY_DATA = COMBOS
   function normalizeDataNode(node) {
     const out = { id: node.id || uid(), segment: node.segment ?? '' };
     if (node.routeLabel != null) out.routeLabel = node.routeLabel;
+    if (node.condition != null) out.condition = node.condition;
     if (node.damage != null) out.damage = node.damage;
     if (node.enderClassId != null) out.enderClassId = node.enderClassId;
     out.situationTags = Array.isArray(node.situationTags) ? [...node.situationTags] : [];
@@ -541,6 +542,7 @@ const CATEGORY_DATA = COMBOS
   function pickLeafMeta(n) {
     const meta = {};
     if (n.routeLabel != null) meta.routeLabel = n.routeLabel;
+    if (n.condition != null) meta.condition = n.condition;
     if (n.damage != null) meta.damage = n.damage;
     if (n.saGauge != null) meta.saGauge = n.saGauge;
     if (n.dGauge != null) meta.dGauge = n.dGauge;
@@ -549,7 +551,7 @@ const CATEGORY_DATA = COMBOS
     return meta;
   }
   function clearLeafMeta(n) {
-    delete n.routeLabel; delete n.damage; delete n.saGauge;
+    delete n.routeLabel; delete n.condition; delete n.damage; delete n.saGauge;
     delete n.dGauge; delete n.enderClassId; delete n.situationTags;
   }
 

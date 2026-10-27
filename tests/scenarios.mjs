@@ -7,6 +7,8 @@
 // ユーザー動線ごとに実際のHTTPレスポンスと src/lib のロジックを検証する。
 // 破壊的操作はしない（/api/vote はバリデーション拒否パスのみ叩く）。
 
+import { readFileSync } from 'node:fs';
+
 const BASE = process.env.BASE ?? 'http://localhost:4321';
 
 let pass = 0, fail = 0, skip = 0;
@@ -294,6 +296,29 @@ scenario('S8 ロジック: Wilson Score / ゲージ計算 / 表記変換');
   check('分岐パス（複数セグメント）を合算する',
     calcGaugesFromSegs(['DR > 2MP', '236PP']).dGauge === 5,
     JSON.stringify(calcGaugesFromSegs(['DR > 2MP', '236PP'])));
+  const { gaugeClassFromSegs } = await import(lib('gauges.ts'));
+  check('ゲージ区分: 通常技のみ=ノーゲージ / DR=OD / SA込み=SA',
+    gaugeClassFromSegs(['2MK > 236LP']) === 'ノーゲージ' && gaugeClassFromSegs(['DR > 5HP']) === 'OD'
+      && gaugeClassFromSegs(['DR > 5HP', '214214K']) === 'SA',
+    ['2MK > 236LP', 'DR > 5HP', 'DR > 5HP > 214214K'].map(s => gaugeClassFromSegs([s])).join(' / '));
+
+  // 始動技・ヒット状態・位置（手書きは rashid.ts を文字列で、取り込みは生成物を読む）
+  const data = (f) => new URL(`../src/mock-data/${f}`, import.meta.url);
+  const { STARTERS, HIT_STATES, POSITIONS, inferStarter } = await import(data('rashid-starters.ts').href);
+  const { ARCHIVER_COMBOS } = await import(data('rashid-archiver.ts').href);
+  const handSrc = readFileSync(data('rashid.ts'), 'utf8');
+  const handCombos = handSrc.slice(handSrc.indexOf('export const COMBOS'), handSrc.indexOf('export const KNOCKDOWN_SITUATIONS'));
+  const handAttrs = [...handCombos.matchAll(/starter: '([^']*)', hitState: '([^']*)', position: '([^']*)'/g)]
+    .map(m => ({ starter: m[1], hitState: m[2], position: m[3] }));
+  const allAttrs = [...handAttrs, ...ARCHIVER_COMBOS];
+  const handCount = (handCombos.match(/^\s{4}id: 'c_/gm) ?? []).length;
+  check(`全コンボに始動技・ヒット状態・位置が入っている（手書き ${handAttrs.length}/${handCount}・取り込み ${ARCHIVER_COMBOS.length}）`,
+    handAttrs.length === handCount && allAttrs.every(a => STARTERS.includes(a.starter) && HIT_STATES.includes(a.hitState) && POSITIONS.includes(a.position)),
+    allAttrs.filter(a => !STARTERS.includes(a.starter) || !HIT_STATES.includes(a.hitState) || !POSITIONS.includes(a.position)).map(a => JSON.stringify(a)).join(' '));
+  check('始動技の推定: 5HK(CH) → 5HK / CH、214214K → SA2、リストに無い技は null',
+    JSON.stringify([inferStarter('5HK(CH) > DR'), inferStarter('214214K > 2HP'), inferStarter('66 > 2HP')])
+      === '[{"starter":"5HK","hitState":"CH"},{"starter":"SA2","hitState":"通常"},{"starter":null,"hitState":"通常"}]',
+    JSON.stringify([inferStarter('5HK(CH) > DR'), inferStarter('214214K > 2HP'), inferStarter('66 > 2HP')]));
 
   // 表記変換
   check('623HP → →↓↘HP', numpadToArrows('623HP') === '→↓↘HP', numpadToArrows('623HP'));

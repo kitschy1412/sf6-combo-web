@@ -274,6 +274,7 @@ function getComboScoreLabel(c: (typeof publicCombos)[0]): string {
                                   <a href={`/mock/combo/${c.id}#${r.leaf.id}`} class="row-link" style="display:inline; color:var(--text);">
                                     {r.leaf.routeLabel ?? '(無名ルート)'}
                                   </a>
+                                  {r.leaf.condition && <span class="tag" style="margin-left:6px;">{r.leaf.condition}</span>}
                                 </td>
                                 <td><Notation inputs={tailInputs} ghostInputs={ghostInputs} branchElbow={isLastRoute ? '└─›' : '├─›'} size="sm" /></td>
                                 <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>

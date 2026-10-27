@@ -121,6 +121,7 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
               <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; gap:8px;">
                 <h3 style="font-size:1rem; font-weight:700;">
                   {r.leaf.routeLabel ?? '(無名ルート)'}
+                  {r.leaf.condition && <span class="tag" style="margin-left:8px; font-weight:400;">{r.leaf.condition}</span>}
                 </h3>
                 <span class="dmg" style="font-size:1.3rem;">{(r.leaf.damage ?? 0).toLocaleString()}</span>
               </div>

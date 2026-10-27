@@ -2,6 +2,10 @@
 // Phase 1: 入力UIの設計確認用。バックエンド未接続。
 
 import { ARCHIVER_COMBOS, ARCHIVER_OKIZEME_SETUPS } from './rashid-archiver';
+import type { HitState, Position, Starter } from './rashid-starters';
+
+export { HIT_STATES, POSITIONS, STARTERS, inferStarter } from './rashid-starters';
+export type { HitState, Position, Starter } from './rashid-starters';
 
 export type SourceType = 'personal' | 'shared' | 'forked';
 export type Visibility = 'private' | 'unlisted' | 'public';
@@ -25,6 +29,7 @@ export type ComboNode = {
   id: string;                      // 葉の投票・選択用に必要
   segment: string;                 // "2MK > 236LP" 等のコマンド断片
   routeLabel?: string;             // 葉の別名（例: "214LKルート"）
+  condition?: string;              // 葉のみ。このルートを選ぶ条件（例: "画面端が近い場合"）
   damage?: number;                 // 葉のみ
   gauge?: number;                  // 葉のみ
   driveGauge?: number;             // 葉のみ
@@ -40,6 +45,9 @@ export type Combo = {
   title: string;
   categoryMajor?: string;          // 大分類: "ヒット時コンボ" / "セットプレイ" など
   categoryMinor?: string;          // 小分類: "2MK始動" / "5HK(CH)始動" など
+  starter: Starter;                // 始動技（一覧の見出し。並び順は STARTERS）
+  hitState: HitState;              // ヒット状態: 通常 / CH / PC（確反・シケ狩りは PC）
+  position: Position;              // 始動時の位置: 中央 / 端 / どこでも
   starterType: string;             // ツリー全体に共通
   sourceType: SourceType;
   visibility: Visibility;
@@ -81,7 +89,7 @@ export type OkizemeSetup = {
 };
 
 // ─── コマンド入力パレット ───
-// archiver 取り込みで、対応表で変換できなかった語がある or 〆技から enderClassId を推定できなかったもの
+// archiver 取り込みで、対応表で変換できなかった語がある or 〆技・始動技・位置を推定できなかったもの
 export type ArchiverUnresolved = {
   id: string;
   kind: 'combo' | 'okizeme';
@@ -89,6 +97,8 @@ export type ArchiverUnresolved = {
   recipeJa: string;                // 取り込み元の日本語レシピ
   unresolvedTerms: string[];       // 日本語のまま残った語
   enderUnknown: boolean;
+  starterUnknown?: boolean;        // コンボのみ。始動技を「その他」にした
+  positionUnknown?: boolean;       // コンボのみ。位置を「どこでも」にした
 };
 
 export type PaletteMove = {
@@ -159,8 +169,9 @@ export const COMBOS: Combo[] = [
   // ── 1本道コンボ ──
   {
     id: 'c_001',
-    title: '画面中央 2MK始動 基本コンボ',
+    title: '基本コンボ',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '2MK始動',
+    starter: '2MK', hitState: '通常', position: '中央',
     starterType: '下段',
     sourceType: 'personal',
     visibility: 'private',
@@ -171,15 +182,16 @@ export const COMBOS: Combo[] = [
       segment: '2MK > 236LP > 214LK',
       damage: 1820, gauge: 0, driveGauge: 1,
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['画面中央'],
+      situationTags: [],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   // ── 1本道コンボ（共有） ──
   {
     id: 'c_002',
-    title: '画面端 DR始動 高火力',
+    title: '高火力',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'DR始動',
+    starter: 'DR', hitState: '通常', position: '端',
     starterType: '中段',
     sourceType: 'shared',
     visibility: 'public',
@@ -191,15 +203,16 @@ export const COMBOS: Combo[] = [
       segment: 'DR > 5HP > 2MK > 214MK > 5HP > 214HK',
       damage: 3540, gauge: 0, driveGauge: 4,
       enderClassId: 'ec_strong_eagle',
-      situationTags: ['画面端', 'ドライブラッシュ'],
+      situationTags: ['ドライブラッシュ'],
       votes: { good: 12, bad: 1, brokenInCurrentVer: 0 },
     },
   },
   // ── 1本道コンボ（共有・現ver不可票あり） ──
   {
     id: 'c_003',
-    title: 'SA2始動 確反コンボ',
+    title: '確反コンボ',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'SA2確反',
+    starter: 'SA2', hitState: 'PC', position: '中央',
     starterType: '確定反撃',
     sourceType: 'shared',
     visibility: 'public',
@@ -210,15 +223,16 @@ export const COMBOS: Combo[] = [
       segment: '214214K > 2HP > 214LK',
       damage: 2980, gauge: 2, driveGauge: 0,
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['画面中央', '確反'],
+      situationTags: ['確反'],
       votes: { good: 28, bad: 0, brokenInCurrentVer: 5 },
     },
   },
   // ── fork済コンボ ──
   {
     id: 'c_004',
-    title: 'CH 5HK始動 ノーゲージ',
+    title: 'ノーゲージ',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '5HK(CH)始動',
+    starter: '5HK', hitState: 'CH', position: 'どこでも',
     starterType: 'カウンター',
     sourceType: 'forked',
     visibility: 'unlisted',
@@ -230,15 +244,16 @@ export const COMBOS: Combo[] = [
       segment: '5HK(CH) > DR > 5MP > 5HP > 214LK',
       damage: 2410, gauge: 0, driveGauge: 3,
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['カウンター', 'ドライブラッシュ'],
+      situationTags: ['ドライブラッシュ'],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   // ── ⭐ 分岐コンボ（2葉） ──
   {
     id: 'c_005',
-    title: '2MK始動 〆分岐コンボ群',
+    title: '〆分岐コンボ群',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '2MK始動',
+    starter: '2MK', hitState: '通常', position: '中央',
     starterType: '下段',
     sourceType: 'shared',
     visibility: 'public',
@@ -254,7 +269,7 @@ export const COMBOS: Combo[] = [
           routeLabel: '弱イーグル〆ルート',
           damage: 2200, gauge: 0, driveGauge: 1,
           enderClassId: 'ec_weak_eagle',
-          situationTags: ['画面中央'],
+          situationTags: [],
           notes: '安定ルート。起き攻めは弱イーグル〆の重ねを参照。',
           votes: { good: 15, bad: 0, brokenInCurrentVer: 0 },
         },
@@ -264,7 +279,7 @@ export const COMBOS: Combo[] = [
           routeLabel: 'OD強化ルート',
           damage: 3120, gauge: 0, driveGauge: 2,
           enderClassId: 'ec_strong_eagle',
-          situationTags: ['画面中央', 'Dゲージあり'],
+          situationTags: ['Dゲージあり'],
           notes: 'Dゲージ2本以上ある場合の高火力ルート。',
           votes: { good: 8, bad: 1, brokenInCurrentVer: 0 },
         },
@@ -274,8 +289,9 @@ export const COMBOS: Combo[] = [
   // ── ⭐ 分岐コンボ（3葉 + 再帰分岐） ──
   {
     id: 'c_006',
-    title: 'カウンター5HK始動 ルート選択コンボ',
+    title: 'ルート選択コンボ',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '5HK(CH)始動',
+    starter: '5HK', hitState: 'CH', position: 'どこでも',
     starterType: 'カウンター',
     sourceType: 'shared',
     visibility: 'public',
@@ -291,7 +307,7 @@ export const COMBOS: Combo[] = [
           routeLabel: 'ノーゲージ',
           damage: 2580, gauge: 0, driveGauge: 1,
           enderClassId: 'ec_weak_eagle',
-          situationTags: ['カウンター'],
+          situationTags: [],
           votes: { good: 6, bad: 0, brokenInCurrentVer: 0 },
         },
         {
@@ -302,9 +318,10 @@ export const COMBOS: Combo[] = [
               id: 'n_c006_b1',
               segment: '5HP > 214HK',
               routeLabel: 'OD始動 強イーグル〆',
+              condition: '画面端が近い場合',
               damage: 3340, gauge: 0, driveGauge: 2,
               enderClassId: 'ec_strong_eagle',
-              situationTags: ['カウンター', '画面端'],
+              situationTags: [],
               votes: { good: 4, bad: 0, brokenInCurrentVer: 0 },
             },
             {
@@ -313,7 +330,7 @@ export const COMBOS: Combo[] = [
               routeLabel: 'SA2締め',
               damage: 4280, gauge: 2, driveGauge: 2,
               enderClassId: 'ec_arabian',
-              situationTags: ['カウンター', 'キル確'],
+              situationTags: ['キル確'],
               notes: 'キル確認用。SA2ゲージ前提。',
               votes: { good: 11, bad: 0, brokenInCurrentVer: 0 },
             },
@@ -331,8 +348,9 @@ export const COMBOS: Combo[] = [
   // === 画面中央 ===
   {
     id: 'c_010',
-    title: '中央 5LP始動 暴れ潰し (ヒット/ガード分岐)',
+    title: '暴れ潰し (ヒット/ガード分岐)',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '5LP始動',
+    starter: '5LP', hitState: '通常', position: '中央',
     starterType: '暴れ潰し',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -345,7 +363,7 @@ export const COMBOS: Combo[] = [
           segment: '236MP',
           routeLabel: 'ヒット時 (中ミキサー)',
           enderClassId: 'ec_od_mixer',
-          situationTags: ['画面中央', 'ヒット時'],
+          situationTags: ['ヒット時'],
           notes: '中ミキサー後、ラッシュ中段(6HP) or 下段(2LK)で択。',
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
@@ -354,7 +372,7 @@ export const COMBOS: Combo[] = [
           segment: '214HP',
           routeLabel: 'ガード時 (大サイクロン)',
           enderClassId: 'ec_arabian',
-          situationTags: ['画面中央', 'ガード時'],
+          situationTags: ['ガード時'],
           notes: 'ガード時は大サイクロンで継続。',
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
@@ -363,8 +381,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_011',
-    title: '中央 2MK始動 弱スパイク〆',
+    title: '基本コンボ',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '2MK始動',
+    starter: '2MP', hitState: '通常', position: '中央',
     starterType: '下段',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -372,14 +391,15 @@ export const COMBOS: Combo[] = [
       id: 'n_c011_r',
       segment: '2MP > 5LK > 214LK',
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['画面中央'],
+      situationTags: [],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_012',
-    title: '中央 2MP始動 CR経由 中スパイク〆',
+    title: 'CR経由',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '2MP始動',
+    starter: '2MP', hitState: '通常', position: '中央',
     starterType: '中段確認',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -387,14 +407,15 @@ export const COMBOS: Combo[] = [
       id: 'n_c012_r',
       segment: '2MP > 5LK > CR > 5LP > 5MK > 5MP > 214MK',
       enderClassId: 'ec_mid_eagle',
-      situationTags: ['画面中央', 'キャンセルラッシュ'],
+      situationTags: ['キャンセルラッシュ'],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_013',
-    title: '中央 中P始動 ODサイクロン経由 (起き攻め分岐)',
+    title: 'ODサイクロン経由 (起き攻め分岐)',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '5MP始動',
+    starter: '5MP', hitState: '通常', position: '中央',
     starterType: '対空/拾い',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -408,7 +429,7 @@ export const COMBOS: Combo[] = [
           segment: '前ステ > 前ステ',
           routeLabel: '前ステ×2 (+5F)',
           enderClassId: 'ec_weak_eagle',
-          situationTags: ['画面中央', '起き攻め'],
+          situationTags: ['起き攻め'],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
         {
@@ -416,7 +437,7 @@ export const COMBOS: Combo[] = [
           segment: '前ステ > 6HP',
           routeLabel: '持続中段重ね',
           enderClassId: 'ec_weak_eagle',
-          situationTags: ['画面中央', '起き攻め', '中段'],
+          situationTags: ['起き攻め', '中段'],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
       ],
@@ -424,8 +445,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_014',
-    title: '中央 生ラッシュ始動 中スパイク〆 (始動別分岐)',
+    title: 'ラッシュ後の技で分岐',
     categoryMajor: 'ラッシュ始動', categoryMinor: '生ラッシュ',
+    starter: 'DR', hitState: '通常', position: '中央',
     starterType: '生ラッシュ',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -438,7 +460,7 @@ export const COMBOS: Combo[] = [
           segment: '5LK > 5MP > 214MK',
           routeLabel: 'ラッシュ弱K始動',
           enderClassId: 'ec_mid_eagle',
-          situationTags: ['画面中央'],
+          situationTags: [],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
         {
@@ -446,7 +468,7 @@ export const COMBOS: Combo[] = [
           segment: '2LK > 2MK > 214LK',
           routeLabel: 'ラッシュ2弱K始動',
           enderClassId: 'ec_weak_eagle',
-          situationTags: ['画面中央'],
+          situationTags: [],
           notes: 'めり込んでいれば中Pも可。',
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
@@ -455,7 +477,7 @@ export const COMBOS: Combo[] = [
           segment: '6HP > 5MP > 214MK',
           routeLabel: 'ラッシュ中段(6HP)始動',
           enderClassId: 'ec_mid_eagle',
-          situationTags: ['画面中央', '中段'],
+          situationTags: ['中段'],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
         {
@@ -463,7 +485,7 @@ export const COMBOS: Combo[] = [
           segment: '6HK > 5MP > 214MK',
           routeLabel: 'ラッシュ6HK始動 (対JP/距離取る相手)',
           enderClassId: 'ec_mid_eagle',
-          situationTags: ['画面中央'],
+          situationTags: [],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
       ],
@@ -473,8 +495,9 @@ export const COMBOS: Combo[] = [
   // === 画面端 ===
   {
     id: 'c_020',
-    title: '画面端 2MP始動 弱スパイク〆',
+    title: '基本コンボ',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '画面端',
+    starter: '2MP', hitState: '通常', position: '端',
     starterType: '下段',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -482,14 +505,15 @@ export const COMBOS: Combo[] = [
       id: 'n_c020_r',
       segment: '2MP > 5MP > 214MP > 5LK > 214LK',
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['画面端'],
+      situationTags: [],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_021',
-    title: '画面端 弱K始動 大スパイク〆',
+    title: 'CR経由',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '画面端',
+    starter: '5LK', hitState: '通常', position: '端',
     starterType: '弱K',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -497,14 +521,15 @@ export const COMBOS: Combo[] = [
       id: 'n_c021_r',
       segment: '5LK > CR > 5LP > 5MK > 5MP > 5HK > 214HK',
       enderClassId: 'ec_strong_eagle',
-      situationTags: ['画面端', 'キャンセルラッシュ'],
+      situationTags: ['キャンセルラッシュ'],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_022',
-    title: '画面端 5MP 5HK始動 弱サイクロン〆 (詐欺飛び)',
+    title: '詐欺飛び',
     categoryMajor: 'セットプレイ', categoryMinor: '画面端',
+    starter: '5MP', hitState: '通常', position: '端',
     starterType: '中P大K',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -512,15 +537,16 @@ export const COMBOS: Combo[] = [
       id: 'n_c022_r',
       segment: '5MP > 5HK > 236LP > 6MP > 214LP',
       enderClassId: 'ec_arabian',
-      situationTags: ['画面端', '詐欺飛び'],
+      situationTags: ['詐欺飛び'],
       notes: '弱サイクロン派生から詐欺飛びへ。',
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_023',
-    title: '画面端 SA3 イウサール〆',
+    title: 'SA3込み',
     categoryMajor: 'ヒット時コンボ', categoryMinor: '画面端',
+    starter: '5LP', hitState: '通常', position: '端',
     starterType: '弱P',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -528,7 +554,7 @@ export const COMBOS: Combo[] = [
       id: 'n_c023_r',
       segment: '5LP > CR > 5LP > 5MK > 5MP > 214MP > 5LK > 214LK > 236236P',
       enderClassId: 'ec_sa3_iusal',
-      situationTags: ['画面端', 'SA3'],
+      situationTags: ['SA3'],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
@@ -536,8 +562,9 @@ export const COMBOS: Combo[] = [
   // === 中足ラッシュ ===
   {
     id: 'c_030',
-    title: '中足ラッシュ ヒット時ルート分岐',
+    title: 'ラッシュ ヒット時ルート分岐',
     categoryMajor: 'ラッシュ始動', categoryMinor: '2MK > DR',
+    starter: '2MK', hitState: '通常', position: 'どこでも',
     starterType: '下段確認',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -574,9 +601,10 @@ export const COMBOS: Combo[] = [
         {
           id: 'n_c030_d',
           segment: '5MK > 5MP > 214MP > 5LK > 214LK',
-          routeLabel: '画面端 弱スパイク〆',
+          routeLabel: '弱スパイク〆',
+          condition: '画面端が近い場合',
           enderClassId: 'ec_weak_eagle',
-          situationTags: ['中足ラッシュ', '画面端'],
+          situationTags: ['中足ラッシュ'],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
       ],
@@ -584,8 +612,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_031',
-    title: '中足ラッシュ ガード時の択 (5LP始動)',
+    title: '中足ラッシュ ガード後の択',
     categoryMajor: 'セットプレイ', categoryMinor: '中足ラッシュ ガード',
+    starter: '2MK', hitState: '通常', position: 'どこでも',
     starterType: '中足ラッシュ',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -625,8 +654,9 @@ export const COMBOS: Combo[] = [
   // === 飛びが通った場合 ===
   {
     id: 'c_040',
-    title: 'J.HK始動 中スパイク〆 (シンプル)',
+    title: 'シンプル',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'ジャンプ攻撃',
+    starter: 'j.HK', hitState: '通常', position: 'どこでも',
     starterType: '飛び込み',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -641,8 +671,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_041',
-    title: 'J.HK始動 中Kつなぎ 中スパイク〆',
+    title: '中Kつなぎ',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'ジャンプ攻撃',
+    starter: 'j.HK', hitState: '通常', position: 'どこでも',
     starterType: '飛び込み',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -657,8 +688,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_042',
-    title: 'J.HK始動 ODサイクロン経由 (起き攻め分岐)',
+    title: 'ODサイクロン経由 (起き攻め分岐)',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'ジャンプ攻撃',
+    starter: 'j.HK', hitState: '通常', position: 'どこでも',
     starterType: '飛び込み',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -689,8 +721,9 @@ export const COMBOS: Combo[] = [
   // === ラッシュ中段(6HP) ===
   {
     id: 'c_050',
-    title: 'ラッシュ中段(6HP) → 中スパイク',
+    title: 'ラッシュ中段(6HP)',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'ラッシュ中段',
+    starter: 'DR', hitState: '通常', position: 'どこでも',
     starterType: 'ラッシュ中段',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -705,8 +738,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_051',
-    title: '画面端 ラッシュ中段始動 弱スパイク〆',
+    title: 'ラッシュ中段',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'ラッシュ中段',
+    starter: 'DR', hitState: '通常', position: '端',
     starterType: 'ラッシュ中段',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -715,14 +749,15 @@ export const COMBOS: Combo[] = [
       segment: 'DR > 6HP > 5MP > 214MP > 5LK > 214LK',
       damage: 2990,
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['ラッシュ中段', '画面端'],
+      situationTags: ['ラッシュ中段'],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_052',
-    title: '画面端 ラッシュ中段 → 弱ミキサー → 弱サイクロン重ね',
+    title: 'ラッシュ中段 → 弱サイクロン重ね',
     categoryMajor: 'セットプレイ', categoryMinor: 'ラッシュ中段',
+    starter: 'DR', hitState: '通常', position: '端',
     starterType: 'ラッシュ中段',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -730,15 +765,16 @@ export const COMBOS: Combo[] = [
       id: 'n_c052_r',
       segment: 'DR > 6HP > 5MP > 5HK > 236LP > 6MP > 214LP',
       enderClassId: 'ec_arabian',
-      situationTags: ['ラッシュ中段', '画面端', '中下択'],
+      situationTags: ['ラッシュ中段', '中下択'],
       notes: '弱サイクロン上派生で中下択。',
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_053',
-    title: '画面端 ラッシュ中段 パニカン時 弱スパイク〆',
+    title: 'ラッシュ中段',
     categoryMajor: 'ヒット時コンボ', categoryMinor: 'ラッシュ中段',
+    starter: 'DR', hitState: 'PC', position: '端',
     starterType: 'パニカン',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -747,7 +783,7 @@ export const COMBOS: Combo[] = [
       segment: 'DR > 6HP > 5HP > 214MP > 5LK > 214LK',
       damage: 3080,
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['ラッシュ中段', '画面端', 'パニカン'],
+      situationTags: ['ラッシュ中段'],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
@@ -757,6 +793,7 @@ export const COMBOS: Combo[] = [
     id: 'c_055',
     title: 'ラッシュ下段(2LK) ヒット/ガード分岐',
     categoryMajor: 'ラッシュ始動', categoryMinor: 'ラッシュ下段',
+    starter: 'DR', hitState: '通常', position: 'どこでも',
     starterType: 'ラッシュ下段',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -787,8 +824,9 @@ export const COMBOS: Combo[] = [
   // === カウンターヒット ===
   {
     id: 'c_060',
-    title: '5LP(CH)始動 中スパイク〆',
+    title: '基本コンボ',
     categoryMajor: 'カウンターヒット', categoryMinor: '5LP(CH)',
+    starter: '5LP', hitState: 'CH', position: 'どこでも',
     starterType: 'カウンター',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -796,14 +834,15 @@ export const COMBOS: Combo[] = [
       id: 'n_c060_r',
       segment: '5LP(CH) > 5MP > 214MK',
       enderClassId: 'ec_mid_eagle',
-      situationTags: ['カウンター'],
+      situationTags: [],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_061',
-    title: '5MK(CH)始動 距離別ルート分岐',
+    title: '距離別ルート分岐',
     categoryMajor: 'カウンターヒット', categoryMinor: '5MK(CH)',
+    starter: '5MK', hitState: 'CH', position: 'どこでも',
     starterType: 'カウンター',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -815,7 +854,7 @@ export const COMBOS: Combo[] = [
           id: 'n_c061_a',
           segment: '2HK',
           routeLabel: '遠距離: 2HK',
-          situationTags: ['カウンター', '遠距離'],
+          situationTags: ['遠距離'],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
         {
@@ -823,7 +862,7 @@ export const COMBOS: Combo[] = [
           segment: '5HP > 214HK',
           routeLabel: '近距離: 大スパイク',
           enderClassId: 'ec_strong_eagle',
-          situationTags: ['カウンター', '近距離'],
+          situationTags: ['近距離'],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
         {
@@ -831,7 +870,7 @@ export const COMBOS: Combo[] = [
           segment: '6MP > 214MK',
           routeLabel: '前中P > 中イーグル',
           enderClassId: 'ec_mid_eagle',
-          situationTags: ['カウンター'],
+          situationTags: [],
           votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
         },
       ],
@@ -841,8 +880,9 @@ export const COMBOS: Combo[] = [
   // === インパクト後 ===
   {
     id: 'c_070',
-    title: '画面中央 インパクト返し 大スパイク〆',
+    title: 'インパクト返し',
     categoryMajor: 'インパクト後', categoryMinor: '画面中央',
+    starter: 'インパクト', hitState: '通常', position: '中央',
     starterType: 'インパクト返し',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -850,15 +890,16 @@ export const COMBOS: Combo[] = [
       id: 'n_c070_r',
       segment: '垂直J > j.HK > 214HK',
       enderClassId: 'ec_strong_eagle',
-      situationTags: ['画面中央', 'インパクト後'],
+      situationTags: ['インパクト後'],
       notes: '〆後 2LP > 前J で詐欺飛び。',
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_071',
-    title: '画面中央 インパクト → 起き攻め 大スパイク〆',
+    title: '起き攻め重視',
     categoryMajor: 'インパクト後', categoryMinor: '画面中央',
+    starter: 'インパクト', hitState: '通常', position: '中央',
     starterType: 'インパクト後 起き攻め',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -866,15 +907,16 @@ export const COMBOS: Combo[] = [
       id: 'n_c071_r',
       segment: 'j.HK > 6MP > 214HK',
       enderClassId: 'ec_strong_eagle',
-      situationTags: ['画面中央', 'インパクト後', '起き攻め'],
+      situationTags: ['インパクト後', '起き攻め'],
       notes: '前ステ > 2MP で +8F。',
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_072',
-    title: '画面中央 インパクト(ダメージ重視) 弱スパイク〆',
+    title: 'ダメージ重視',
     categoryMajor: 'インパクト後', categoryMinor: '画面中央',
+    starter: 'インパクト', hitState: '通常', position: '中央',
     starterType: 'インパクト ダメージ取り',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -882,14 +924,15 @@ export const COMBOS: Combo[] = [
       id: 'n_c072_r',
       segment: 'j.HK > 5HK > 6MP > 214LK',
       enderClassId: 'ec_weak_eagle',
-      situationTags: ['画面中央', 'インパクト後'],
+      situationTags: ['インパクト後'],
       votes: { good: 0, bad: 0, brokenInCurrentVer: 0 },
     },
   },
   {
     id: 'c_073',
-    title: '画面中央 インパクト → SA2 → ODミキサーループ',
+    title: 'SA2 → ODミキサーループ',
     categoryMajor: 'インパクト後', categoryMinor: 'SA2ルート',
+    starter: 'インパクト', hitState: '通常', position: '中央',
     starterType: 'インパクト SA2',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -904,8 +947,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_074',
-    title: 'インパクトでスタン時 高ダメージルート',
+    title: '高ダメージルート',
     categoryMajor: 'インパクト後', categoryMinor: 'スタン時',
+    starter: 'スタン', hitState: '通常', position: 'どこでも',
     starterType: 'スタン',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -922,8 +966,9 @@ export const COMBOS: Combo[] = [
   // === 投げシケ狩り ===
   {
     id: 'c_080',
-    title: '投げシケ 5HP始動 大スパイク → 詐欺飛び',
+    title: '投げシケ 詐欺飛び',
     categoryMajor: '投げシケ狩り', categoryMinor: '5HP始動',
+    starter: '5HP', hitState: 'PC', position: 'どこでも',
     starterType: '投げシケ狩り',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -938,8 +983,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_081',
-    title: '投げシケ 5HP始動 ODスパイク → 弱スパイク',
+    title: '投げシケ ODスパイク経由',
     categoryMajor: '投げシケ狩り', categoryMinor: '5HP始動',
+    starter: '5HP', hitState: 'PC', position: 'どこでも',
     starterType: '投げシケ狩り',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -955,8 +1001,9 @@ export const COMBOS: Combo[] = [
   // === 大サイクロン攻め（セットプレイ） ===
   {
     id: 'c_090',
-    title: '中足ラッシュ → 大サイクロンで固める',
+    title: 'ラッシュ → 大サイクロンで固める',
     categoryMajor: 'セットプレイ', categoryMinor: '大サイクロン攻め',
+    starter: '2MK', hitState: '通常', position: 'どこでも',
     starterType: '中足ラッシュ',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -971,8 +1018,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_091',
-    title: '生ラッシュ 2LK始動 → 大サイクロン',
+    title: '下段 → 大サイクロン',
     categoryMajor: 'セットプレイ', categoryMinor: '大サイクロン攻め',
+    starter: 'DR', hitState: '通常', position: 'どこでも',
     starterType: '生ラッシュ',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -986,8 +1034,9 @@ export const COMBOS: Combo[] = [
   },
   {
     id: 'c_092',
-    title: '5LP > 大サイクロン > 5LK > 大サイクロン ループ',
+    title: '大サイクロン ループ',
     categoryMajor: 'セットプレイ', categoryMinor: '大サイクロン攻め',
+    starter: '5LP', hitState: '通常', position: 'どこでも',
     starterType: '5LP',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',
@@ -1003,8 +1052,9 @@ export const COMBOS: Combo[] = [
   // === 仕掛け（コンセプトルート） ===
   {
     id: 'c_100',
-    title: 'ODワール仕掛け 大ルート',
+    title: '仕掛け 大ルート',
     categoryMajor: 'セットプレイ', categoryMinor: '仕掛け',
+    starter: 'ODワール', hitState: '通常', position: 'どこでも',
     starterType: 'ODワール',
     sourceType: 'personal', visibility: 'private',
     patchVersion: '1.25',

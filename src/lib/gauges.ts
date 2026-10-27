@@ -16,3 +16,10 @@ export function calcGaugesFromSegs(pathSegs: string[]): { saGauge: number; dGaug
   }
   return { saGauge, dGauge };
 }
+
+// 絞り込み用のゲージ区分（ルート単位）。SA を使えば SA、Dゲージ（DR・CR・DI・OD技）だけなら OD
+export type GaugeClass = 'ノーゲージ' | 'OD' | 'SA';
+export function gaugeClassFromSegs(pathSegs: string[]): GaugeClass {
+  const { saGauge, dGauge } = calcGaugesFromSegs(pathSegs);
+  return saGauge > 0 ? 'SA' : dGauge > 0 ? 'OD' : 'ノーゲージ';
+}

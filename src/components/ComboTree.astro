@@ -25,6 +25,7 @@ const ender = node.enderClassId ? getEnderClassById(node.enderClassId) : null;
       showLeafMeta && (
         <span class="ctree-leaf-meta">
           {node.routeLabel && <span class="ctree-route-label">{node.routeLabel}</span>}
+          {node.condition && <span class="tag">{node.condition}</span>}
           {node.damage != null && <span class="dmg">{node.damage.toLocaleString()}</span>}
           {ender && <span class="ctree-ender">▲ {ender.displayName}</span>}
         </span>
