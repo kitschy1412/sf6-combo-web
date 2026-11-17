@@ -1,0 +1,332 @@
+/* コンボ一覧（キャラハブ・公開一覧）の表と行。
+   保存で足す行（キャラハブの buildNewComboRow）にも効くように、ページの scoped にしない */
+
+/* ── 表: 列幅を固定してコマンド欄を最大化 ── */
+#combo-table { table-layout: fixed; }
+#combo-table th,
+#combo-table td { padding: 5px 8px; }
+#combo-table td { font-size: 0.82rem; }
+/* 行の高さを抑える: 行の中の行送りを詰める（ページ全体の 1.6 だと、バッジやボタンの行がコマンドの行より高くなる）。
+   起き攻めパネルは OkizemePanel.astro の行送りのまま */
+#combo-table .combo-group td:not(.okizeme-panel-cell) { line-height: 1.3; }
+
+/* ── 列名（表の上に1回だけ） ── */
+#combo-table .combo-col-head th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 6px 8px;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+#combo-table .combo-col-head th.col-num { text-align: right; padding-right: 10px; }
+
+/* ── コンボ行の左レール（見出しの中であることを視覚的に示す） ── */
+.combo-group tr:not(.insert-here-row) td:first-child { border-left: 2px solid transparent; }
+.combo-group:hover tr:not(.insert-here-row) td:first-child { border-left-color: var(--border-strong); }
+
+.combo-parent-row td { background: var(--surface); }
+/* ゲージ・検索語で絞っているとき、合わないルートの行（combo-list-view.ts） */
+.combo-child-row.route-unmatched > td { opacity: 0.4; }
+
+/* ── コマンド欄: コマンド（主役）の後ろに .combo-sub を同じ行で続け、収まらないときだけ下の行に回す ── */
+.combo-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+/* ── コマンド（主役）: 押すと詳細へ ── */
+.combo-cmd {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.combo-cmd-link {
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+a.combo-cmd-link:hover { text-decoration: underline; }
+a.combo-cmd-link:hover .cmd-chip { border-color: #111; }
+.combo-branch-note {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+/* ── 分岐のルートを開くボタン ── */
+.branch-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px 2px 4px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: background 0.1s;
+}
+.branch-toggle:hover { background: var(--surface3); }
+.branch-toggle-icon {
+  font-size: 0.6rem;
+  color: var(--muted);
+  transition: transform 0.18s;
+  line-height: 1;
+}
+.branch-toggle.is-open .branch-toggle-icon { transform: rotate(90deg); }
+#combo-table .branch-toggle-count {
+  background: #111;
+  color: #fff;
+}
+
+/* ── コマンドの後ろ: 優先度・出典・コンボ名・状況タグを小さく薄く。全部隠すと幅0になり、行の高さも変わらない ── */
+.combo-sub {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  row-gap: 2px;
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--muted);
+}
+#combo-table .col-title {
+  font-weight: 400;
+  color: var(--muted);
+  text-decoration: none;
+}
+#combo-table .col-title:hover { color: var(--text); text-decoration: underline; }
+.combo-route-label { color: var(--muted-strong); text-decoration: none; }
+.combo-route-label:hover { color: var(--text); text-decoration: underline; }
+
+#combo-table .combo-group .tag { font-size: 0.68rem; padding: 1px 6px; }
+#combo-table .combo-group .combo-tag,
+#combo-table .combo-group .tag.combo-name {
+  font-weight: 400;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* 列表示メニュー（ComboColumnMenu.astro）で切ったもの */
+#combo-table.hide-title .combo-name,
+#combo-table.hide-situation .combo-tag,
+#combo-table.hide-priority .combo-sub [class*="tag-priority-"] { display: none; }
+
+/* ── ダメージ・〆分類・有利F ── */
+#combo-table .col-num { font-size: 0.85rem; padding-right: 10px; }
+#combo-table .col-num .dmg { font-size: 0.88rem; }
+#combo-table .col-num .dmg-empty { color: var(--muted); font-weight: 400; }
+.col-ender {
+  font-size: 0.76rem;
+  color: var(--muted-strong);
+  white-space: normal;
+}
+.col-frame {
+  white-space: nowrap;
+  overflow: hidden;
+}
+.frame-adv-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  border: 1px solid #f5d78e;
+  border-radius: 3px;
+  padding: 0 4px;
+  vertical-align: middle;
+}
+
+/* 分岐の親行（ComboParentStats.astro）: ダメージの幅と、ルートに出てくる〆と有利F を1行ずつ並べる */
+#combo-table .col-num .dmg-range {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--muted-strong);
+}
+.combo-parent-row .ender-line {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  min-height: 1.4em;
+}
+.combo-parent-row .col-ender .ender-line { color: var(--muted-strong); }
+.frame-adv-quiet {
+  font-size: 0.62rem;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+.frame-adv-toggle {
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s;
+}
+.frame-adv-toggle:hover {
+  background: #fde9b0;
+  border-color: #e0b74d;
+}
+.frame-adv-toggle.is-open {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #d98207;
+}
+
+/* ── 起き攻めパネルの行（中身のスタイルは OkizemePanel.astro） ── */
+.okizeme-panel-cell {
+  padding: 0 !important;
+  background: var(--surface2) !important;
+  border-top: none !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* ── 操作の列: 右寄せ。ボタンはマウスを乗せた行だけに出す ── */
+.col-actions {
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 10px !important;
+}
+/* 不可バッジは常時表示（重要情報のため隠さない） */
+.col-actions .broken-flag {
+  font-size: 0.62rem;
+  padding: 0 4px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.combo-group:hover .row-actions,
+.row-actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.btn-edit,
+.btn-upload,
+.btn-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* コマンドの行より高くしない（行の高さを抑える） */
+  width: 24px;
+  height: 22px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 0;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--muted-strong);
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.btn-edit:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+  border-color: #111;
+}
+.btn-upload:hover {
+  background: var(--good-bg);
+  color: var(--good-fg);
+  border-color: var(--good-fg);
+}
+.btn-delete:hover {
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  border-color: var(--warn-fg);
+}
+
+/* ── 並び替えハンドル（キャラハブ）: マウスを乗せた行だけに出す ── */
+.cell-handle {
+  width: 24px;
+  padding-left: 6px !important;
+  padding-right: 0 !important;
+  text-align: center;
+}
+.row-drag-handle {
+  display: inline-block;
+  color: var(--muted);
+  cursor: grab;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s;
+}
+.combo-group:hover .row-drag-handle,
+.sortable-chosen .row-drag-handle { opacity: 1; }
+.row-drag-handle:hover { color: var(--text) !important; }
+.row-drag-handle:active { cursor: grabbing; }
+
+/* SortableJS用のドラッグ状態スタイル */
+.sortable-ghost {
+  opacity: 0.3;
+  background: var(--surface) !important;
+}
+.sortable-ghost td { background: var(--surface) !important; }
+.sortable-chosen .row-drag-handle { color: var(--text) !important; }
+.sortable-drag {
+  opacity: 0.9 !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  background: #fff;
+}
+
+/* ── ホバー時のみ見える挿入ポイント（キャラハブ）: 行の高さは0で、行の境目の上下5px（セルの余白の中）に重ねて出す ── */
+.insert-here-row td {
+  position: relative;
+  height: 0;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+.insert-here-btn {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: block;
+  height: 10px;
+  line-height: 10px;
+  background: transparent;
+  border: none;
+  color: transparent;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  text-align: center;
+  transition: color 0.1s, background 0.1s;
+  border-radius: 3px;
+}
+.insert-here-row:hover .insert-here-btn,
+.insert-here-btn:hover {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+.insert-here-btn.is-active {
+  color: var(--text);
+  background: var(--accent-soft);
+}
+/* ドラッグ中は挿入ポイントを完全に隠す（誤クリック防止） */
+body.is-dragging-combo .insert-here-row { pointer-events: none; }
+body.is-dragging-combo .insert-here-btn { display: none; }

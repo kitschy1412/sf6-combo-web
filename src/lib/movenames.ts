@@ -3,6 +3,7 @@
 // 値: 日本語技名
 //
 // 追加方法: 対象キャラの Record に { 'コマンド': '技名' } を追記する
+// ラシードの技名は doskonnbu の動画の呼び方にそろえる（docs/rashid-terms.md の「動画での表記」）
 
 const MOVE_NAMES: Record<string, Record<string, string>> = {
   Ryu: {
@@ -55,27 +56,28 @@ const MOVE_NAMES: Record<string, Record<string, string>> = {
     // スピニングミキサー (236P)
     '236LP': '弱ミキサー',
     '236MP': '中ミキサー',
-    '236HP': '強ミキサー',
+    '236HP': '大ミキサー',
     '236PP': 'ODミキサー',
     // ワールウィンドショット (236K)
     '236LK': '弱ワール',
     '236MK': '中ワール',
-    '236HK': '強ワール',
+    '236HK': '大ワール',
     '236KK': 'ODワール',
+    '236K':  'ワール',   // 強度の指定がないもの（236K(最大溜め) など）
     // イーグルスパイク (214K)
-    '214LK': '弱イーグル',
-    '214MK': '中イーグル',
-    '214HK': '強イーグル',
-    '214KK': 'ODイーグル',
+    '214LK': '弱スパイク',
+    '214MK': '中スパイク',
+    '214HK': '大スパイク',
+    '214KK': 'ODスパイク',
     // アラビアンサイクロン (214P)
     '214LP': '弱サイクロン',
     '214MP': '中サイクロン',
-    '214HP': '強サイクロン',
+    '214HP': '大サイクロン',
     '214PP': 'ODサイクロン',
     // スカイハイクロー (j.214K)
     'j.214LK': '弱スカイハイ',
     'j.214MK': '中スカイハイ',
-    'j.214HK': '強スカイハイ',
+    'j.214HK': '大スカイハイ',
     'j.214KK': 'ODスカイハイ',
     // スーパーアーツ
     '236236K':  'SA1',
@@ -90,9 +92,48 @@ const MOVE_NAMES: Record<string, Record<string, string>> = {
   // },
 };
 
+// ── 文字表記で足す呼び方 ──────────────────────────────
+// 文字表記では必殺技（MOVE_NAMES）に加えて、通常技・共通行動も動画の字幕の呼び方にする。
+// キーの `>` は複数のトークンで1つの技になるもの（空白の有無は問わない）
+const RECIPE_WORDS: Record<string, Record<string, string>> = {
+  Rashid: {
+    // 立ち
+    '5LP': '弱P', '5MP': '中P', '5HP': '大P',
+    '5LK': '弱K', '5MK': '立中K', '5HK': '大K',
+    // しゃがみ（2MK は動画の「中足」ではなく 2中K と書く。ユーザー指定 2026-11-02）
+    '2LP': '2弱P', '2MP': '2中P', '2HP': '2大P',
+    '2LK': '小足', '2MK': '2中K', '2HK': '大足',
+    // 特殊技
+    '6MP': '前中P', '6HP': '中段', '6HK': '6大K', '6KK': 'フリップ',
+    // ジャンプ
+    'j.LP': 'J弱P', 'j.MP': 'J中P', 'j.HP': 'J大P',
+    'j.LK': 'J弱K', 'j.MK': 'J中K', 'j.HK': 'J大K', 'J.HK': 'J大K',
+    'j.2HP': 'J2大P', 'j.8HK': '垂直J大K',
+    // 共通行動
+    'DR': 'ラッシュ', 'CR': 'キャンセルラッシュ', 'DI': 'インパクト', '66': '前ステ', 'LPLK': '投げ', '4LPLK': '後ろ投げ',
+    // 溜め
+    '236K(微溜め)': '微溜めワール', '236K(最大溜め)': '最大溜めワール',
+    // 複数トークンで1つの技
+    '214LP>4K': '弱サイクロンストローク', '214MP>4K': '中サイクロンストローク', '214HP>4K': '大サイクロンストローク',
+    '214P>6K>K': 'サイクロンネイル', '214LP>6K>K': '弱サイクロンネイル', '214MP>6K>K': '中サイクロンネイル',
+    '66>6P': 'スライディング', '66>6K': 'テンペスト',
+  },
+};
+
+const RECIPE_TABLES: Record<string, Record<string, string>> = Object.fromEntries(
+  Object.entries(RECIPE_WORDS).map(([character, words]) => [character, { ...MOVE_NAMES[character], ...words }]),
+);
+
 /**
  * 指定キャラクターの技名テーブルを返す（未登録キャラは空オブジェクト）
  */
 export function getMoveTable(character: string): Record<string, string> {
   return MOVE_NAMES[character] ?? {};
+}
+
+/**
+ * 文字表記に使う呼び方の表を返す（未登録キャラは空オブジェクト）
+ */
+export function getRecipeTable(character: string): Record<string, string> {
+  return RECIPE_TABLES[character] ?? {};
 }

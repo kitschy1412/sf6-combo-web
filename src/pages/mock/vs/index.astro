@@ -1,0 +1,202 @@
+---
+// キャラ対策のトップ。頭に相手キャラの選択（ゲームのキャラ選択画面と同じ並び。スマホでもスクロールせず1画面に収める）を置き、
+// ランクマッチで相手キャラが出たらすぐ押せるようにする（2026-11-16 ユーザー要望）。
+// その下に、キャラごとの強い技・連携の名前（対策のポイント数つき）を並べ、技名からも相手キャラのページへ飛べるようにする。
+// 中身は archiver で取り込んだ対策動画（ACQUA さん＝共通、doskonnbu＝ラシード目線）。まとめ方は src/lib/matchups.ts
+import Layout from '../../../layouts/Layout.astro';
+import { groupAll, visibleMatchups } from '../../../lib/matchups';
+import { NAV_CHARACTER_COOKIE, selectedCharacterFromCookie } from '../../../lib/site-nav';
+import { SELECT_SCREEN_COLUMNS, SELECT_SCREEN_ROWS, characterBySlug } from '../../../lib/characters';
+import { normalizeSearch } from '../../../lib/combo-search';
+import { MATCHUPS } from '../../../mock-data/rashid';
+
+// 共通の対策が既定。キャラを選んでいれば（ヘッダーのキャラ選択）、そのキャラ目線の対策を足す
+const selected = selectedCharacterFromCookie(Astro.cookies.get(NAV_CHARACTER_COOKIE)?.value);
+const matchups = visibleMatchups(MATCHUPS, selected);
+const all = groupAll(matchups);
+const covered = all.filter(o => o.pointCount > 0);
+const uncovered = all.filter(o => o.pointCount === 0);
+const threatCount = covered.reduce((n, o) => n + o.threats.length, 0);
+const pointCount = covered.reduce((n, o) => n + o.pointCount, 0);
+const videoCount = new Set(matchups.map(e => e.youtubeId)).size;
+const channels = [...new Set(matchups.map(e => e.ownerLabel))];
+const ownCount = matchups.filter(e => e.perspective !== '共通').reduce((n, e) => n + e.points.length, 0);
+const searchOf = (...words: (string | undefined)[]) => normalizeSearch(words.filter(Boolean).join(' '));
+
+// キャラ選択のマス。段の人数が4人に満たないときは真ん中に寄せる（ゲームの画面と同じ）
+const bySlug = new Map(all.map(o => [o.slug, o]));
+const pickCells = SELECT_SCREEN_ROWS.flatMap((row, r) => {
+  const offset = Math.floor((SELECT_SCREEN_COLUMNS - row.length) / 2);
+  return row.map((slug, i) => ({ row: r + 1, col: offset + i + 1, info: characterBySlug(slug)!, o: bySlug.get(slug) }));
+});
+---
+
+<Layout title="キャラ対策 — モック" character="Rashid">
+  <!-- スマホは1画面に収めるため、パンくずを出さない（.breadcrumb の display が Tailwind に勝つので div で隠す） -->
+  <div class="max-sm:hidden">
+    <nav class="breadcrumb">
+      <a href="/mock/">モックトップ</a>
+      <span class="sep">/</span>
+      <span style="color:var(--text);">キャラ対策</span>
+    </nav>
+  </div>
+
+  <!-- 相手キャラの選択。高さは画面から ヘッダー(52)・main の上の余白(28)・題・下の余白 を引いた分で、9段を等分する -->
+  <section id="vs-pick" class="mx-auto mb-8 max-w-[640px]">
+    <div class="mb-2 flex flex-wrap items-baseline gap-x-3">
+      <h1 class="text-[1.2rem] font-bold">キャラ対策</h1>
+      <span class="text-[0.78rem] text-[var(--muted)]">相手キャラを選ぶ{selected && `（共通 ＋ ${selected.ja}目線）`}</span>
+    </div>
+    <div class="grid h-[calc(100dvh-136px)] max-h-[600px] min-h-[340px] gap-1 sm:gap-1.5"
+      style={`grid-template-columns: repeat(${SELECT_SCREEN_COLUMNS}, minmax(0, 1fr)); grid-template-rows: repeat(${SELECT_SCREEN_ROWS.length}, minmax(0, 1fr));`}>
+      {pickCells.map(c => (
+        <a href={`/mock/vs/${c.info.slug}`} data-vs-pick={c.info.slug} style={`grid-row:${c.row}; grid-column:${c.col};`}
+          class:list={[
+            'flex min-w-0 flex-col items-center justify-center rounded-md px-1 text-center no-underline',
+            c.o?.pointCount ? 'bg-[#111] text-white hover:bg-[#333]' : 'border border-dashed border-[var(--border-strong)] text-[var(--muted)] hover:border-[#111]',
+          ]}>
+          <span class="text-[0.76rem] font-bold leading-tight sm:text-[0.95rem]">{c.info.ja}</span>
+          <span class:list={['text-[0.6rem] leading-tight sm:text-[0.7rem]', c.o?.pointCount ? 'text-white/55' : '']}>
+            {c.o?.pointCount ? `${c.o.pointCount}ポイント` : 'まだ無し'}
+          </span>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <div class="page-head" style="border-radius:6px 6px 0 0;">
+    <div style="display:flex; gap:14px; align-items:baseline; flex-wrap:wrap;">
+      <h2>強い技・連携から探す</h2>
+      <span class="meta">{covered.length}キャラ ・ 強い技・連携 {threatCount} ・ {pointCount}ポイント ・ 出典 {channels.join(' / ')} の動画{videoCount}本</span>
+    </div>
+  </div>
+
+  <div class="filter-bar" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:20px;">
+    <label class="filter-label" for="vs-search">検索</label>
+    <input type="search" id="vs-search" class="input input-inline vs-search" autocomplete="off"
+      placeholder="キャラ名・技名（例: ネクサス、ワープ、百貫）" />
+    <span id="vs-search-count" class="vs-search-count" aria-live="polite"></span>
+  </div>
+
+  <p class="vs-lead">
+    キャラごとに、強い技・連携と、その対策のポイント数を並べています。技名を押すと、そのキャラのページのその技に飛びます。
+    {selected
+      ? <>どのキャラでも使える共通の対策に、選んでいる{selected.ja}の技を使う対策（{ownCount}ポイント。「{selected.ja.slice(0, 1)}」の印は{selected.ja}目線の対策だけの技・連携）を足しています。</>
+      : <>どのキャラでも使える共通の対策です。ヘッダーでキャラを選ぶと、そのキャラの技を使う対策も足して出します。</>}
+  </p>
+
+  <div class="vs-list">
+    {covered.map(o => (
+      <section class="vs-row" data-search={searchOf(o.ja, o.en, ...o.threats.map(t => t.name))}>
+        <div class="vs-row-head">
+          <a href={`/mock/vs/${o.slug}`} class="vs-char">{o.ja}</a>
+          <span class="vs-row-meta">{o.threats.length}技・連携 ・ {o.pointCount}ポイント ・ 動画{o.videoCount}本</span>
+        </div>
+        <div class="vs-threats">
+          {o.threats.map(t => (
+            <a href={`/mock/vs/${o.slug}#${t.anchor}`} class="vs-threat" data-search={searchOf(o.ja, o.en, t.name)}>
+              {t.name}<span class="vs-count">{t.points.length}</span>
+              {selected && !t.perspectives.includes('共通') && <span class="vs-only-rashid" title={`${selected.ja}目線の対策だけ`}>{selected.ja.slice(0, 1)}</span>}
+            </a>
+          ))}
+          {o.general.length > 0 && (
+            <a href={`/mock/vs/${o.slug}#general`} class="vs-threat vs-threat-general" data-search={searchOf(o.ja, o.en, '立ち回り全般')}>
+              立ち回り全般<span class="vs-count">{o.general.length}</span>
+            </a>
+          )}
+        </div>
+      </section>
+    ))}
+  </div>
+  <p id="vs-empty" class="vs-empty" hidden>当てはまる技・連携はありません</p>
+
+  {uncovered.length > 0 && (
+    <div class="vs-uncovered">
+      <span class="filter-label">まだ対策が無いキャラ</span>
+      <span>{uncovered.map(o => o.ja).join(' / ')}</span>
+    </div>
+  )}
+
+  <style>
+    .vs-search { width: 320px; }
+    .vs-search-count { font-size: 0.76rem; color: var(--muted); }
+    .vs-lead { margin: 0 0 14px; font-size: 0.82rem; color: var(--muted-strong); line-height: 1.6; }
+    .vs-list { display: flex; flex-direction: column; gap: 0; border-top: 2px solid #111; }
+    .vs-row { padding: 10px 2px 12px; border-bottom: 1px solid var(--border); }
+    .vs-row[hidden] { display: none; }
+    .vs-row-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+    .vs-char { font-size: 1rem; font-weight: 700; color: var(--text); text-decoration: none; }
+    .vs-char:hover { text-decoration: underline; }
+    .vs-row-meta { font-size: 0.74rem; color: var(--muted); }
+    .vs-threats { display: flex; flex-wrap: wrap; gap: 5px; }
+    .vs-threat {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 4px;
+      padding: 3px 9px;
+      font-size: 0.8rem;
+      color: var(--text-soft);
+      text-decoration: none;
+      background: #fff;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+    }
+    .vs-threat:hover { background: #111; color: #fff; border-color: #111; }
+    .vs-threat:hover .vs-count, .vs-threat:hover .vs-only-rashid { color: #bbb; border-color: #555; }
+    .vs-threat[hidden] { display: none; }
+    .vs-threat-general { color: var(--muted-strong); border-style: dashed; }
+    .vs-count { font-size: 0.7rem; color: var(--muted); }
+    .vs-only-rashid {
+      padding: 0 3px;
+      font-size: 0.62rem;
+      color: var(--muted);
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+    }
+    .vs-empty { padding: 20px 0; color: var(--muted); font-size: 0.86rem; }
+    .vs-uncovered {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 8px;
+      align-items: baseline;
+      margin-top: 18px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: var(--muted-strong);
+      background: var(--surface);
+      border: 1px dashed var(--border-strong);
+      border-radius: 6px;
+    }
+  </style>
+
+  <script>
+    import { matchesSearch, searchTermsOf } from '../../../lib/combo-search';
+
+    const input = document.getElementById('vs-search') as HTMLInputElement | null;
+    const count = document.getElementById('vs-search-count');
+    const empty = document.getElementById('vs-empty');
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.vs-row'));
+
+    // キャラ名に当たればそのキャラの技を全部、技名に当たればその技だけを出す
+    function apply() {
+      const terms = searchTermsOf(input?.value ?? '');
+      let shownThreats = 0;
+      let shownRows = 0;
+      for (const row of rows) {
+        const chips = Array.from(row.querySelectorAll<HTMLElement>('.vs-threat'));
+        let inRow = 0;
+        for (const chip of chips) {
+          const on = terms.length === 0 || matchesSearch(chip.dataset.search ?? '', terms);
+          chip.hidden = !on;
+          if (on) inRow++;
+        }
+        row.hidden = inRow === 0;
+        if (inRow > 0) shownRows++;
+        shownThreats += inRow;
+      }
+      if (count) count.textContent = terms.length ? `${shownRows}キャラ ・ ${shownThreats}件` : '';
+      if (empty) empty.hidden = shownRows > 0;
+    }
+    input?.addEventListener('input', apply);
+  </script>
+</Layout>

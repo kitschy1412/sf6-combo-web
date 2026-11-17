@@ -4,12 +4,15 @@ import Layout from '../../layouts/Layout.astro';
 const screens = [
   { path: '/mock/explore/rashid', title: '公開コンボ一覧 (Rashid)', desc: '世界全体の公開コンボ一覧・読み取り専用。ソートトグル・fork ボタン・投票スコア表示' },
   { path: '/mock/character/rashid', title: 'キャラハブ (Rashid)', desc: 'コンボ・起き攻め・ダウン状況の一覧 + フィルタ。コンボの入力・編集は一覧の中のインラインエディタ（「＋ コンボ」/ ✎）' },
+  { path: '/mock/okizeme/', title: '起き攻め 一覧', desc: '〆分類（〆技、または「もにょもにょ」などの連携名）ごとに起き攻めを並べる。同じ連携でタイミングだけ違うもの（+24F / +23F）は小見出しで分ける' },
+  { path: '/mock/vs/', title: 'キャラ対策 一覧', desc: 'キャラごとの強い技・連携と、その対策のポイント数。技名で検索でき、押すとそのキャラのページのその技に飛ぶ' },
+  { path: '/mock/vs/sagat', title: 'キャラ対策 (サガット)', desc: '強い技・連携ごとに対策を並べる（ACQUA さん＝共通、doskonnbu＝ラシード目線）。▶ / 時刻で右の動画がその場面から再生。目線・種類で絞り込み' },
   { path: '/mock/combo/c_001', title: 'コンボ詳細 (自分のメモ)', desc: '投票UI非表示・編集ボタン表示' },
   { path: '/mock/combo/c_002', title: 'コンボ詳細 (共有)', desc: '投票UI表示 (Good/Bad + 現verでは不可)' },
   { path: '/mock/combo/c_003', title: 'コンボ詳細 (現ver不可票あり)', desc: '不可票5件の状態' },
   { path: '/mock/combo/c_004', title: 'コンボ詳細 (fork済)', desc: '他人のコンボを自分用にコピー' },
   { path: '/mock/combo/c_005', title: 'コンボ詳細 (⭐ 2分岐)', desc: '2MK>236LPの後に2ルート (弱イーグル / OD強化)' },
-  { path: '/mock/combo/c_006', title: 'コンボ詳細 (⭐ 3葉ツリー)', desc: 'カウンター始動 + 再帰分岐 (ノーゲージ / OD-強イーグル / OD-SA2)' },
+  { path: '/mock/combo/c_006', title: 'コンボ詳細 (⭐ 3葉ツリー)', desc: 'カウンター始動 + 再帰分岐 (弱スパイク〆 / OD-強イーグル / OD-SA2)' },
   { path: '/mock/okizeme/new', title: '起き攻め入力フォーム', desc: '〆分類への紐付け + 相手行動別タブ' },
   { path: '/mock/situation/new', title: 'ダウン状況入力フォーム', desc: '状況ラベル + 〆分類割当' },
   { path: '/mock/situation/s_003', title: 'ダウン状況詳細 (投げ後)', desc: '〆分類経由で起き攻めが自動表示' },
@@ -21,7 +24,7 @@ const screens = [
 ];
 
 const points = [
-  { title: '一覧の見直し（2026-10-23 の方針）', desc: '始動技の1段でまとめる・行はコマンドが主役・分岐はルートを1本ずつ書く・詳細は動画の横でルートを選ぶ（backlog で順に反映中）', target: '/mock/character/rashid' },
+  { title: '一覧の見直し（2026-10-23 の方針、見出しは 2026-11-02 に変更）', desc: '中央 / 端 と場面の見出しでまとめ、優先度で並べる・行はコマンドが主役・分岐はルートを1本ずつ書く・詳細は動画の横でルートを選ぶ（backlog で順に反映中）', target: '/mock/character/rashid' },
   { title: 'コマンド入力（C: ハイブリッド採用）', desc: 'テキスト直打ち + パレット補助。キャラハブの「＋ コンボ」/ ✎ で開くインラインエディタ', target: '/mock/character/rashid' },
   { title: '〆分類による自動紐付け', desc: '同分類の起き攻めが全コンボ・状況から自動引き', target: '/mock/combo/c_001' },
   { title: 'personal / shared / forked の視覚区別', desc: 'バッジ色とフィルタで切り分け', target: '/mock/character/rashid' },
@@ -70,7 +73,7 @@ const points = [
         <div class="section-label">未決の論点</div>
         <ul style="margin:0; padding-left:1.2em; font-size:0.88rem; color:var(--text-soft); display:flex; flex-direction:column; gap:8px;">
           <li>
-            <strong>始動技・ヒット状態・位置の持ち方</strong><br />
+            <strong>始動技・ヒット状態・位置・優先度の持ち方</strong><br />
             <span style="font-size:0.78rem; color:var(--muted);">大分類/小分類は廃止。始動技のリストをマスタにするか定数にするか</span>
           </li>
           <li>

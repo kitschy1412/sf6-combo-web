@@ -1,0 +1,62 @@
+---
+// 一覧（キャラハブ・公開一覧）の行のコマンド欄。見た目は src/styles/combo-list.css
+// コマンド（主役。押すと詳細へ）の後ろに、優先度・出典・コンボ名・状況タグを小さく薄く続ける（収まらないときだけ下の行に回る）。
+// 分岐コンボは route なしで親の行（共通部分と ▶ ルートボタン）、route ありでそのルートの行になる。
+// 保存で足す行はキャラハブの buildNewComboRow が同じ形を JS で組み立てるので、形を変えたらそちらも直す
+import Notation from './Notation.astro';
+import { getComboRoutes, hitTagClass, positionTagOf, priorityTagClass } from '../mock-data/rashid';
+import type { Combo, RouteSummary } from '../mock-data/rashid';
+
+interface Props {
+  combo: Combo;
+  /** 分岐コンボのルートの行のとき、そのルート */
+  route?: RouteSummary;
+  /** ルートの行で、最後のルートか（罫線の形が変わる） */
+  lastRoute?: boolean;
+}
+const { combo: c, route, lastRoute = false } = Astro.props;
+const routes = getComboRoutes(c);
+const isParent = !route && routes.length > 1;
+const hitClass = hitTagClass(c.hitState);
+const positionTag = positionTagOf(c);
+const href = `/mock/combo/${c.id}${route ? `#${route.leaf.id}` : ''}`;
+const inputs = route ? route.pathSegments[route.pathSegments.length - 1] : isParent ? c.root.segment : routes[0].fullInputs;
+const ghostInputs = route?.pathSegments.slice(0, -1).join(' > ');
+const situationTags = (isParent ? undefined : (route ?? routes[0]).leaf.situationTags) ?? [];
+---
+
+<div class="combo-line">
+  <div class="combo-cmd">
+    {hitClass && <span class:list={[hitClass, route && 'cmd-ghost']}>{c.hitState}</span>}
+    <a href={href} class="combo-cmd-link">
+      <Notation inputs={inputs} ghostInputs={ghostInputs} branchElbow={lastRoute ? '└─›' : '├─›'} size="sm" />
+    </a>
+    {isParent && (
+      <>
+        <span class="combo-branch-note">…の後に分岐</span>
+        <button type="button" class="branch-toggle" data-combo-id={c.id} title="分岐ルートを展開/折り畳み">
+          <span class="branch-toggle-icon">▶</span>
+          <span class="tag branch-toggle-count">{routes.length}ルート</span>
+        </button>
+      </>
+    )}
+  </div>
+  <div class="combo-sub">
+    {route ? (
+      <>
+        <a href={href} class="combo-route-label">{route.leaf.routeLabel ?? '(無名ルート)'}</a>
+        {route.leaf.condition && <span class="tag">{route.leaf.condition}</span>}
+      </>
+    ) : (
+      <>
+        <span class={priorityTagClass(c.priority)}>{c.priority}</span>
+        {c.sourceType === 'forked' && <span class="tag combo-name">fork</span>}
+        {c.sourceType !== 'personal' && <span class="combo-name">{c.ownerLabel}</span>}
+        <a href={href} class="col-title combo-name">{c.title}</a>
+        {positionTag && <span class="tag combo-tag">{positionTag}</span>}
+      </>
+    )}
+    {situationTags.map(t => <span class="tag combo-tag">{t}</span>)}
+    {!route && c.visibility === 'unlisted' && <span class="tag tag-unlisted">🔗</span>}
+  </div>
+</div>

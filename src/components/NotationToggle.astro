@@ -1,19 +1,33 @@
 ---
 // 表記の切り替えボタン。設定は localStorage に保存し、ページへの反映は Layout.astro が行う
 // （技名の変換テーブルは Layout の character で決まる）
+interface Props {
+  /** 文字/チップの切り替えを出す（Notation を使うページ用。data-original のページには文字表記が無い） */
+  styleToggle?: boolean;
+}
+const { styleToggle = false } = Astro.props;
 ---
 
 <div id="notation-toggle-bar" style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:10px 0; margin-bottom:16px;">
 
+  <!-- 表示トグル -->
+  {styleToggle && (
+    <div class="ntoggle-group">
+      <span class="ntoggle-label">表示</span>
+      <button class="ntoggle-btn" data-group="style" data-value="text">文字</button>
+      <button class="ntoggle-btn" data-group="style" data-value="chip">チップ</button>
+    </div>
+  )}
+
   <!-- 方向入力トグル -->
-  <div style="display:flex; align-items:center; gap:6px;">
+  <div class:list={['ntoggle-group', styleToggle && 'ntoggle-chip-only']}>
     <span class="ntoggle-label">方向</span>
     <button class="ntoggle-btn" data-group="dir" data-value="numpad">数字</button>
     <button class="ntoggle-btn" data-group="dir" data-value="arrows">矢印</button>
   </div>
 
   <!-- 必殺技名トグル -->
-  <div style="display:flex; align-items:center; gap:6px;">
+  <div class:list={['ntoggle-group', styleToggle && 'ntoggle-chip-only']}>
     <span class="ntoggle-label">必殺技</span>
     <button class="ntoggle-btn" data-group="name" data-value="command">コマンド</button>
     <button class="ntoggle-btn" data-group="name" data-value="name">技名</button>
@@ -27,20 +41,20 @@
   // data-group を持つボタンだけが対象（ComboEditor 内の同じ見た目のトグルは data-editor-toggle で別扱い）
   const buttons = document.querySelectorAll<HTMLButtonElement>('.ntoggle-btn[data-group]');
 
+  const groupOf = (btn: HTMLButtonElement) => btn.dataset.group as keyof typeof NOTATION_STORAGE_KEYS;
+
   // ボタンの選択状態を保存済みの設定に合わせる
   function syncButtons(): void {
     const prefs = readNotationPrefs(localStorage);
     buttons.forEach((btn) => {
-      const current = btn.dataset.group === 'dir' ? prefs.dir : prefs.name;
-      btn.classList.toggle('ntoggle-active', btn.dataset.value === current);
+      btn.classList.toggle('ntoggle-active', btn.dataset.value === prefs[groupOf(btn)]);
     });
   }
 
   // ── トグルクリック: 保存して全体に知らせる ──────────────────
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => {
-      const key = btn.dataset.group === 'dir' ? NOTATION_STORAGE_KEYS.dir : NOTATION_STORAGE_KEYS.name;
-      localStorage.setItem(key, btn.dataset.value ?? '');
+      localStorage.setItem(NOTATION_STORAGE_KEYS[groupOf(btn)], btn.dataset.value ?? '');
       document.dispatchEvent(new CustomEvent(NOTATION_CHANGE_EVENT));
     });
   });

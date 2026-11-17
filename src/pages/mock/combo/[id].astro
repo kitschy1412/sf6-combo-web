@@ -1,12 +1,11 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import ComboTree from '../../../components/ComboTree.astro';
 import Notation from '../../../components/Notation.astro';
 import NotationToggle from '../../../components/NotationToggle.astro';
+import StarterLabel from '../../../components/StarterLabel.astro';
 import {
-  getComboById, getEnderClassById, getOkizemeLinks,
-  getComboRoutes, hasBranches, getComboMaxDamage, getComboBrokenCount,
-  type EnderClass,
+  getComboById, getEnderClassById, getOkizemeLinks, okizemeSourceName,
+  getComboRoutes, hasBranches, getComboMaxDamage, priorityTagClass,
 } from '../../../mock-data/rashid';
 
 const { id } = Astro.params;
@@ -17,21 +16,21 @@ const routes = getComboRoutes(combo);
 const branched = hasBranches(combo);
 const maxDamage = getComboMaxDamage(combo);
 const minDamage = Math.min(...routes.map(r => r.leaf.damage ?? 0));
-const totalBroken = getComboBrokenCount(combo);
 const isShared = combo.sourceType === 'shared';
 
-// YouTube 埋め込み（docs/DATA.md の埋め込みURL仕様に合わせる）
+// YouTube 埋め込み（docs/DATA.md の埋め込みURL仕様に合わせる）。
+// 最初のルートの開始秒で出し、ルートを選ぶとクライアント側で切り替える（葉の startSec があればそれ）。
+// enablejsapi はリピート（IFrame API で区間の終わりに開始秒へ戻す）に使う
+const routeStartSec = (leaf: { startSec?: number }) => leaf.startSec ?? combo.startSec ?? 0;
+const firstStartSec = routes[0] ? routeStartSec(routes[0].leaf) : (combo.startSec ?? 0);
 const embedUrl = combo.youtubeId
-  ? `https://www.youtube.com/embed/${combo.youtubeId}?start=${combo.startSec ?? 0}`
+  ? `https://www.youtube.com/embed/${combo.youtubeId}?start=${firstStartSec}&enablejsapi=1`
   : null;
 const youtubeUrl = combo.youtubeId
-  ? `https://www.youtube.com/watch?v=${combo.youtubeId}&t=${combo.startSec ?? 0}s`
+  ? `https://www.youtube.com/watch?v=${combo.youtubeId}&t=${firstStartSec}s`
   : null;
-
-// 起き攻めは各ルートの〆分類で紐付ける（同じ有利フレームの別〆は参考。getOkizemeLinks）
-const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)))
-  .map(id => (id ? getEnderClassById(id) : undefined))
-  .filter((e): e is EnderClass => Boolean(e));
+const REPEAT_DEFAULT_SEC = 10;
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 ---
 
 <Layout title={`${combo.title} — モック`} character="Rashid">
@@ -43,13 +42,15 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
     <span style="color:var(--text);">コンボ詳細</span>
   </nav>
 
-  <NotationToggle />
+  <NotationToggle styleToggle />
 
-  <div class="page-head" style="border-radius:6px 6px 0 0; align-items:flex-start;">
+  <div class="page-head" style="border-radius:6px; align-items:flex-start; margin-bottom:16px;">
     <div style="flex:1;">
       <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px; flex-wrap:wrap;">
-        {combo.categoryMajor && <span class="tag" style="background:#e8f0fe; color:#1a56db;">{combo.categoryMajor}</span>}
-        {combo.categoryMinor && <span class="tag" style="background:#e8f0fe; color:#1a56db; opacity:0.85;">{combo.categoryMinor}</span>}
+        <span class="tag" style="background:#e8f0fe; color:#1a56db;"><StarterLabel starter={combo.starter} />始動</span>
+        {combo.hitState !== '通常' && <span class="tag" style="background:#e8f0fe; color:#1a56db; opacity:0.85;">{combo.hitState}</span>}
+        {combo.position !== 'どこでも' && <span class="tag" style="background:#e8f0fe; color:#1a56db; opacity:0.85;">{combo.position}</span>}
+        <span class={priorityTagClass(combo.priority)}>{combo.priority}</span>
         {combo.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
         {combo.sourceType === 'shared' && <span class="tag tag-shared">共有 / {combo.ownerLabel}</span>}
         {combo.sourceType === 'forked' && <span class="tag">fork / {combo.ownerLabel}</span>}
@@ -71,181 +72,232 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
     </div>
   </div>
 
-  <div class="card" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:18px;">
-    <ComboTree node={combo.root} />
-  </div>
-
-  {embedUrl && (
-    <div style="max-width:640px; margin-bottom:18px;">
-      <div style="position:relative; width:100%; padding-bottom:56.25%; border-radius:10px; overflow:hidden; background:#000;">
-        <iframe
-          style="position:absolute; inset:0; width:100%; height:100%;"
-          src={embedUrl}
-          title={combo.title}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen
-        />
+  <!-- 上段: 左に動画、右にルート一覧（1ルート1行）。動画が無ければルート一覧が全幅。
+       ルートを選ぶ（クリック / URL の #葉ID）と、下段がそのルートの詳細に切り替わる -->
+  <div class="flex flex-wrap gap-4 mb-4 items-start">
+    {embedUrl && (
+      <div class="flex-[1_1_480px] min-w-0">
+        <div style="position:relative; width:100%; padding-bottom:56.25%; border-radius:10px; overflow:hidden; background:#000;">
+          <iframe
+            id="combo-video"
+            data-video-id={combo.youtubeId}
+            data-start-sec={firstStartSec}
+            style="position:absolute; inset:0; width:100%; height:100%;"
+            src={embedUrl}
+            title={combo.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          />
+        </div>
+        <!-- 練習用: 選んだルートの開始秒から N 秒をくり返す -->
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer font-semibold">
+            <input type="checkbox" id="repeat-toggle" class="cursor-pointer" />
+            🔁 該当シーンからリピート
+          </label>
+          <label class="inline-flex items-center gap-1 text-[var(--muted)]">
+            長さ
+            <input type="number" id="repeat-len" min="2" max="120" step="1" value={REPEAT_DEFAULT_SEC}
+              class="w-16 rounded border border-[var(--border-strong)] bg-[var(--bg)] px-1.5 py-0.5 text-[var(--text)]" />
+            秒
+          </label>
+          <span id="repeat-range" class="dmg text-xs text-[var(--muted)]">
+            {mmss(firstStartSec)}〜{mmss(firstStartSec + REPEAT_DEFAULT_SEC)}
+          </span>
+        </div>
+      </div>
+    )}
+    <div class="flex-[1_1_320px] min-w-0" id="route-list">
+      <div class="text-xs font-bold text-[var(--muted)] mb-1.5">
+        {branched ? `${routes.length}ルート（選ぶと下に詳細が出ます）` : 'ルート'}
+      </div>
+      <div class="grid gap-1.5">
+        {routes.map((r, i) => {
+          const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+          const v = r.leaf.votes;
+          return (
+            <button
+              type="button"
+              data-route-row={r.leaf.id}
+              data-start-sec={routeStartSec(r.leaf)}
+              aria-pressed={i === 0 ? 'true' : 'false'}
+              class="w-full text-left rounded-md border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2 cursor-pointer hover:bg-[var(--surface2)] aria-pressed:border-[var(--accent)] aria-pressed:border-l-4 aria-pressed:bg-[var(--surface)]"
+            >
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="font-bold text-sm">
+                  {r.leaf.routeLabel ?? (branched ? '(無名ルート)' : combo.title)}
+                  {r.leaf.condition && <span class="tag ml-1.5 font-normal">{r.leaf.condition}</span>}
+                </span>
+                <span class="dmg text-base">{(r.leaf.damage ?? 0).toLocaleString()}</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-[var(--muted)]">
+                {ender ? <span class="tag" style="background:#111; color:#fff;">{ender.displayName}</span> : <span>〆 —</span>}
+                {ender?.frameAdvantage && <span class="dmg">{ender.frameAdvantage}</span>}
+                <span class="flex-1"></span>
+                {isShared && v
+                  ? <span>👍{v.good} 👎{v.bad}{v.brokenInCurrentVer > 0 && <span class="text-[var(--warn-fg)]"> ⚠{v.brokenInCurrentVer}</span>}</span>
+                  : <span>投票なし</span>}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
-  )}
+  </div>
 
   <div style="display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap;">
     {combo.sourceType === 'shared' && <button class="btn btn-primary">自分用にコピー（fork）</button>}
     {combo.sourceType !== 'shared' && <a href={`/mock/character/rashid?edit=${combo.id}`} class="btn">編集</a>}
     {combo.sourceType === 'personal' && <button class="btn btn-primary">アップロード（公開）</button>}
-    <button class="btn">編集提案</button>
+    {combo.sourceType !== 'personal' && <button class="btn">編集提案</button>}
     {combo.sourceType !== 'shared' && (
       <button type="button" class="btn btn-warn" id="btn-delete-combo" data-combo-title={combo.title}>削除</button>
     )}
     <span style="flex:1;"></span>
     {youtubeUrl && (
-      <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" class="btn">
-        ▶ YouTube ({combo.startSec}s〜)
+      <a href={youtubeUrl} id="youtube-link" target="_blank" rel="noopener noreferrer" class="btn">
+        ▶ YouTube (<span id="youtube-link-sec">{firstStartSec}</span>s〜)
       </a>
     )}
   </div>
 
-  <!-- 各ルートの詳細 -->
-  <section style="margin-bottom:24px;">
-    <div class="section-head">
-      <h2>{branched ? `${routes.length}ルートの詳細` : 'コンボ詳細'}</h2>
-      {branched && <span style="font-size:0.78rem; color:var(--muted);">ルートごとに数値・〆分類・投票が独立</span>}
-    </div>
-    <div style="display:grid; gap:14px;">
-      {routes.map(r => {
-        const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
-        const rVotes = r.leaf.votes ?? { good: 0, bad: 0, brokenInCurrentVer: 0 };
-        return (
-          <div class={`card${branched ? ' card-emph' : ''}`} id={r.leaf.id}>
-            {branched && (
-              <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; gap:8px;">
-                <h3 style="font-size:1rem; font-weight:700;">
-                  {r.leaf.routeLabel ?? '(無名ルート)'}
-                  {r.leaf.condition && <span class="tag" style="margin-left:8px; font-weight:400;">{r.leaf.condition}</span>}
-                </h3>
-                <span class="dmg" style="font-size:1.3rem;">{(r.leaf.damage ?? 0).toLocaleString()}</span>
-              </div>
-            )}
-            {branched && (
-              <div style="margin-bottom:12px;">
-                <div style="font-size:0.74rem; color:var(--muted); margin-bottom:4px; font-weight:600;">フルコマンド</div>
-                <Notation inputs={r.fullInputs} size="sm" />
-              </div>
-            )}
-
-            <table class="data-table" style="margin-bottom:12px;">
-              <thead>
-                <tr><th>SAゲージ</th><th>Dゲージ</th><th>〆分類</th><th>状況タグ</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><span class="dmg">{r.leaf.gauge ?? 0}</span></td>
-                  <td><span class="dmg">{r.leaf.driveGauge ?? 0}</span></td>
-                  <td>
-                    {ender ? <span class="tag" style="background:#111; color:#fff;">{ender.displayName}</span> : '—'}
-                    {ender?.frameAdvantage && (
-                      <span class="tag" style="background:#fef3c7; color:#b45309; border:1px solid #f5d78e; font-family:'JetBrains Mono',monospace; margin-left:4px;">
-                        {ender.frameAdvantage}
-                      </span>
-                    )}
-                  </td>
-                  <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            {r.leaf.notes && (
-              <div style="font-size:0.85rem; color:var(--muted-strong); margin-bottom:12px; padding:8px 12px; background:var(--surface); border-radius:5px;">
-                {r.leaf.notes}
-              </div>
-            )}
-
-            {isShared ? (
-              <div class="vote-bar" style="margin:0;">
-                <span class="vote-label">このルートへの投票</span>
-                <button class="btn btn-sm">👍 Good ({rVotes.good})</button>
-                <button class="btn btn-sm">👎 Bad ({rVotes.bad})</button>
-                <button class="btn btn-sm btn-warn">⚠ 現verでは不可 ({rVotes.brokenInCurrentVer})</button>
-              </div>
-            ) : (
-              <div style="font-size:0.78rem; color:var(--muted); text-align:center; padding:8px;">
-                {combo.sourceType === 'personal' ? '自分のメモ' : 'forkコピー'}のため投票UIなし
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  </section>
-
-  <!-- 紐づく起き攻め（ルートの〆分類ごと。同じ有利フレームの別〆は参考として薄く） -->
-  {enderClassesUsed.length > 0 && (
-    <section id="combo-okizeme" style="margin-bottom:20px;">
-      <div class="section-head">
-        <h2>このコンボから繋がる起き攻め</h2>
-        <a href="/mock/okizeme/new" class="btn btn-sm">＋ 追加</a>
-      </div>
-      <div style="font-size:0.8rem; color:var(--muted); margin-bottom:10px;">
-        各ルートの〆分類に紐づく起き攻めを表示。〆が違っても有利フレームが同じものは「参考」として薄く出します（距離が合わないことがあります）。
-      </div>
-      {enderClassesUsed.map(ender => {
-        const oki = getOkizemeLinks(ender.id);
-        const groups = [
-          { rel: 'main', items: oki.main },
-          { rel: 'ref', items: oki.reference },
-        ].filter(g => g.items.length > 0);
-        return (
-          <div style="margin-bottom:14px;">
-            <div style="font-size:0.85rem; font-weight:700; margin-bottom:6px; color:var(--muted-strong);">
-              ▲ {ender.displayName}
-              {ender.frameAdvantage && <span class="dmg" style="font-size:0.9rem; margin-left:4px;">{ender.frameAdvantage}</span>}
-              {' '}<span style="font-weight:400; color:var(--muted);">({oki.main.length}件)</span>
+  <!-- 下段: 選んだルートの詳細（1ルート1パネル。選ばれていないものは hidden） -->
+  {routes.map((r, i) => {
+    const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+    const rVotes = r.leaf.votes ?? { good: 0, bad: 0, brokenInCurrentVer: 0 };
+    // 分岐コンボは、最後の分岐点までを共通部分として薄く出す
+    const sharedInputs = branched ? r.pathSegments.slice(0, -1).join(' > ') : '';
+    const ownInputs = branched ? r.leaf.segment : r.fullInputs;
+    // 起き攻めはルートの〆分類で紐付ける（同じ有利フレームの別〆は参考。getOkizemeLinks）
+    const oki = ender ? getOkizemeLinks(ender.id) : null;
+    const okiGroups = oki ? [
+      { rel: 'main', items: oki.main },
+      { rel: 'ref', items: oki.reference },
+    ].filter(g => g.items.length > 0) : [];
+    return (
+      <section data-route-panel={r.leaf.id} hidden={i !== 0} class="mb-6">
+        <div class="card card-emph mb-4">
+          {branched && (
+            <div class="flex items-baseline justify-between gap-2 mb-2.5">
+              <h2 class="text-base font-bold">
+                {r.leaf.routeLabel ?? '(無名ルート)'}
+                {r.leaf.condition && <span class="tag ml-2 font-normal">{r.leaf.condition}</span>}
+              </h2>
+              <span class="dmg text-xl">{(r.leaf.damage ?? 0).toLocaleString()}</span>
             </div>
-            {oki.main.length === 0 && (
-              <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; font-size:0.85rem;">
-                登録なし
-              </div>
-            )}
-            {groups.map(g => (
-              <div style={g.rel === 'ref' ? 'margin-top:10px;' : undefined}>
-                {g.rel === 'ref' && (
-                  <div style="font-size:0.76rem; font-weight:700; color:var(--muted); margin-bottom:6px;">
-                    参考（同じ {oki.frameAdvantage}）
-                    <span style="font-weight:400; margin-left:6px;">〆が違うため、距離が合わないことがあります</span>
-                  </div>
-                )}
-                <div style={`display:grid; gap:8px;${g.rel === 'ref' ? ' opacity:0.55;' : ''}`}>
-                  {g.items.map(o => (
-                    <div class="card" data-okizeme-id={o.id} data-okizeme-rel={g.rel}>
-                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
-                        <div style="display:flex; gap:6px; align-items:center;">
-                          {o.sourceType === 'personal' && <span class="tag tag-personal">自分</span>}
-                          {o.sourceType === 'shared' && <span class="tag tag-shared">{o.ownerLabel}</span>}
-                          <strong>{o.title}</strong>
-                          {g.rel === 'ref' && (
-                            <span style="font-size:0.7rem; color:var(--muted); background:var(--surface3); padding:1px 6px; border-radius:3px;">
-                              {getEnderClassById(o.enderClassId)?.displayName}
-                            </span>
-                          )}
-                        </div>
-                        <div style="display:flex; gap:4px;">
-                          {o.flags.mid && <span class="tag tag-warn">中段</span>}
-                          {o.flags.low && <span class="tag tag-personal">下段</span>}
-                          {o.flags.throw && <span class="tag tag-shared">投げ</span>}
-                          {o.flags.safeJump && <span class="tag">詐欺</span>}
-                        </div>
-                      </div>
-                      <Notation inputs={o.inputs} size="sm" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+          )}
+          <div class="mb-3">
+            <div class="text-xs text-[var(--muted)] mb-1 font-semibold">フルコマンド</div>
+            <Notation inputs={ownInputs} ghostInputs={sharedInputs || undefined} branchElbow="›" />
           </div>
-        );
-      })}
-    </section>
-  )}
+
+          <table class="data-table" style="margin-bottom:12px;">
+            <thead>
+              <tr><th>SAゲージ</th><th>Dゲージ</th><th>〆分類</th><th>状況タグ</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="dmg">{r.leaf.gauge ?? 0}</span></td>
+                <td><span class="dmg">{r.leaf.driveGauge ?? 0}</span></td>
+                <td>
+                  {ender ? <span class="tag" style="background:#111; color:#fff;">{ender.displayName}</span> : '—'}
+                  {ender?.frameAdvantage && (
+                    <span class="tag" style="background:#fef3c7; color:#b45309; border:1px solid #f5d78e; font-family:'JetBrains Mono',monospace; margin-left:4px;">
+                      {ender.frameAdvantage}
+                    </span>
+                  )}
+                </td>
+                <td>{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {r.leaf.notes && (
+            <div style="font-size:0.85rem; color:var(--muted-strong); margin-bottom:12px; padding:8px 12px; background:var(--surface); border-radius:5px;">
+              {r.leaf.notes}
+            </div>
+          )}
+
+          {isShared ? (
+            <div class="vote-bar" style="margin:0;">
+              <span class="vote-label">このルートへの投票</span>
+              <button class="btn btn-sm">👍 Good ({rVotes.good})</button>
+              <button class="btn btn-sm">👎 Bad ({rVotes.bad})</button>
+              <button class="btn btn-sm btn-warn">⚠ 現verでは不可 ({rVotes.brokenInCurrentVer})</button>
+            </div>
+          ) : (
+            <div style="font-size:0.78rem; color:var(--muted); text-align:center; padding:8px;">
+              {combo.sourceType === 'personal' ? '自分のメモ' : 'forkコピー'}のため投票UIなし
+            </div>
+          )}
+        </div>
+
+        <div data-route-okizeme={r.leaf.id}>
+          <div class="section-head">
+            <h2>このルートの後の起き攻め</h2>
+            <a href="/mock/okizeme/new" class="btn btn-sm">＋ 追加</a>
+          </div>
+          {!ender && (
+            <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; font-size:0.85rem;">
+              〆分類が未設定のため、起き攻めは紐づきません
+            </div>
+          )}
+          {ender && oki && (
+            <>
+              <div style="font-size:0.85rem; font-weight:700; margin-bottom:6px; color:var(--muted-strong);">
+                ▲ {ender.displayName}
+                {ender.frameAdvantage && <span class="dmg" style="font-size:0.9rem; margin-left:4px;">{ender.frameAdvantage}</span>}
+                {' '}<span style="font-weight:400; color:var(--muted);">({oki.main.length}件)</span>
+                <a href={`/mock/okizeme/#${ender.id}`} style="float:right; font-weight:400; font-size:0.76rem; color:var(--muted);">この〆の起き攻め一覧 →</a>
+              </div>
+              {oki.main.length === 0 && (
+                <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; font-size:0.85rem;">
+                  登録なし
+                </div>
+              )}
+              {okiGroups.map(g => (
+                <div style={g.rel === 'ref' ? 'margin-top:10px;' : undefined}>
+                  {g.rel === 'ref' && (
+                    <div style="font-size:0.76rem; font-weight:700; color:var(--muted); margin-bottom:6px;">
+                      参考（同じ {oki.frameAdvantage}）
+                      <span style="font-weight:400; margin-left:6px;">〆が違うため、距離が合わないことがあります</span>
+                    </div>
+                  )}
+                  <div style={`display:grid; gap:8px;${g.rel === 'ref' ? ' opacity:0.55;' : ''}`}>
+                    {g.items.map(o => (
+                      <div class="card" data-okizeme-id={o.id} data-okizeme-rel={g.rel}>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+                          <div style="display:flex; gap:6px; align-items:center;">
+                            {o.sourceType === 'personal' && <span class="tag tag-personal">自分</span>}
+                            {o.sourceType === 'shared' && <span class="tag tag-shared">{o.ownerLabel}</span>}
+                            {o.alsoIn && <span class="text-[0.7rem] text-[var(--muted)]" title={o.alsoIn.map(okizemeSourceName).join('\n')}>ほか{o.alsoIn.length}件</span>}
+                            <strong>{o.title}</strong>
+                            {o.pattern && <span class="tag">{o.pattern}</span>}
+                            {g.rel === 'ref' && (
+                              <span style="font-size:0.7rem; color:var(--muted); background:var(--surface3); padding:1px 6px; border-radius:3px;">
+                                {getEnderClassById(o.enderClassId)?.displayName}
+                              </span>
+                            )}
+                          </div>
+                          <div style="display:flex; gap:4px;">
+                            {o.flags.mid && <span class="tag tag-warn">中段</span>}
+                            {o.flags.low && <span class="tag tag-personal">下段</span>}
+                            {o.flags.throw && <span class="tag tag-shared">投げ</span>}
+                            {o.flags.safeJump && <span class="tag">詐欺</span>}
+                          </div>
+                        </div>
+                        <Notation inputs={o.inputs} size="sm" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </section>
+    );
+  })}
 
   <script>
     // 削除は一覧側の DOM 操作が正だが、詳細ページ単体では対象行を持たないため
@@ -256,5 +308,106 @@ const enderClassesUsed = Array.from(new Set(routes.map(r => r.leaf.enderClassId)
       if (!confirm(`「${title}」を削除しますか？`)) return;
       location.href = '/mock/character/rashid';
     });
+
+    // 動画のリピート（練習用）: ルートの開始秒から N 秒を区間再生し、終わったら開始秒からまた流す。
+    // 埋め込みURLの end + loop=1&playlist=ID だと、2周目以降は動画の頭から流れてしまうため、
+    // リピートを ON にしたときだけ YouTube IFrame API を読み、区間の終わり（ENDED）で読み直す
+    type YTPlayer = {
+      loadVideoById(o: { videoId: string; startSeconds?: number; endSeconds?: number }): void;
+      cueVideoById(o: { videoId: string; startSeconds?: number }): void;
+    };
+    type YTNamespace = {
+      Player: new (el: HTMLIFrameElement, opts: {
+        events: { onReady: (e: { target: YTPlayer }) => void; onStateChange: (e: { data: number }) => void };
+      }) => unknown;
+    };
+    type YTWindow = Window & { YT?: YTNamespace; onYouTubeIframeAPIReady?: () => void };
+
+    const videoRepeat = (() => {
+      const video = document.getElementById('combo-video') as HTMLIFrameElement | null;
+      const toggle = document.getElementById('repeat-toggle') as HTMLInputElement | null;
+      const lenInput = document.getElementById('repeat-len') as HTMLInputElement | null;
+      const rangeEl = document.getElementById('repeat-range');
+      const ytLink = document.getElementById('youtube-link') as HTMLAnchorElement | null;
+      const ytLinkSec = document.getElementById('youtube-link-sec');
+      if (!video || !toggle || !lenInput) return null;
+      const videoId = video.dataset.videoId ?? '';
+      let startSec = Number(video.dataset.startSec ?? 0);
+      const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      const repeatLen = () => {
+        const n = Math.round(Number(lenInput.value));
+        return Number.isFinite(n) && n >= 2 ? Math.min(n, 120) : 10;
+      };
+      const endSec = () => startSec + repeatLen();
+
+      let playerPromise: Promise<YTPlayer> | null = null;
+      const getPlayer = () => {
+        playerPromise ??= new Promise<YTPlayer>(resolve => {
+          const w = window as YTWindow;
+          const create = () => {
+            new w.YT!.Player(video, {
+              events: {
+                onReady: e => resolve(e.target),
+                // 0 = ENDED（endSeconds に達した）。リピート中なら開始秒から読み直す
+                // 読み直しの途中にも ENDED が来ることがあるので、直後の分は無視する
+                onStateChange: e => { if (e.data === 0 && toggle.checked && Date.now() > reloadingUntil) play(); },
+              },
+            });
+          };
+          if (w.YT?.Player) { create(); return; }
+          const prev = w.onYouTubeIframeAPIReady;
+          w.onYouTubeIframeAPIReady = () => { prev?.(); create(); };
+          const s = document.createElement('script');
+          s.src = 'https://www.youtube.com/iframe_api';
+          document.head.appendChild(s);
+        });
+        return playerPromise;
+      };
+      let reloadingUntil = 0;
+      const play = () => getPlayer().then(p => {
+        reloadingUntil = Date.now() + 1500;
+        p.loadVideoById({ videoId, startSeconds: startSec, endSeconds: endSec() });
+      });
+      const cue = () => playerPromise?.then(p => p.cueVideoById({ videoId, startSeconds: startSec }));
+      const render = () => {
+        if (rangeEl) rangeEl.textContent = `${mmss(startSec)}〜${mmss(endSec())}`;
+        if (ytLink) ytLink.href = `https://www.youtube.com/watch?v=${videoId}&t=${startSec}s`;
+        if (ytLinkSec) ytLinkSec.textContent = String(startSec);
+      };
+
+      toggle.addEventListener('change', () => { if (toggle.checked) play(); else cue(); });
+      lenInput.addEventListener('change', () => { render(); if (toggle.checked) play(); });
+      return {
+        setStart(sec: number) {
+          if (sec === startSec) return;
+          startSec = sec;
+          render();
+          if (toggle.checked) { play(); return; }
+          // API 未使用なら埋め込みURLの start を差し替える
+          if (playerPromise) cue();
+          else video.src = `https://www.youtube.com/embed/${videoId}?start=${startSec}&enablejsapi=1`;
+        },
+      };
+    })();
+
+    // ルート選択: 上段の行をクリック、または URL の #葉ID（キャラハブの子ルート行・起き攻めパネルから来る）。
+    // 葉IDを要素の id にはしない（ブラウザが下段へスクロールして動画が隠れるため）
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-route-row]'));
+    const panels = Array.from(document.querySelectorAll<HTMLElement>('[data-route-panel]'));
+    function selectRoute(leafId: string): boolean {
+      if (!panels.some(p => p.dataset.routePanel === leafId)) return false;
+      rows.forEach(r => r.setAttribute('aria-pressed', String(r.dataset.routeRow === leafId)));
+      panels.forEach(p => { p.hidden = p.dataset.routePanel !== leafId; });
+      const row = rows.find(r => r.dataset.routeRow === leafId);
+      if (row?.dataset.startSec) videoRepeat?.setStart(Number(row.dataset.startSec));
+      return true;
+    }
+    rows.forEach(r => r.addEventListener('click', () => {
+      const leafId = r.dataset.routeRow ?? '';
+      if (selectRoute(leafId)) history.replaceState(null, '', `#${leafId}`);
+    }));
+    const fromHash = () => selectRoute(decodeURIComponent(location.hash.slice(1)));
+    fromHash();
+    window.addEventListener('hashchange', fromHash);
   </script>
 </Layout>

@@ -91,6 +91,20 @@
 .notation-sm { font-size: 0.82rem; gap: 4px; }
 .notation-sm .cmd-chip { padding: 2px 6px; font-size: 0.78rem; }
 
+/* 文字表記（既定）: 動画の字幕の書き方。折り返すときは手順の切れ目で */
+.notation-text { font-size: 0.95rem; font-weight: 600; line-height: 1.5; color: var(--text); }
+.notation-text-sm { font-size: 0.84rem; }
+.recipe-step { white-space: nowrap; }
+.recipe-sep { color: #999; font-size: 0.8em; font-weight: 400; }
+
+/* 文字/チップの切り替え: チップを選ぶと <html data-notation-style="chip"> になる */
+.notation.notation-chips { display: none; }
+[data-notation-style="chip"] .notation.notation-chips { display: inline-flex; }
+[data-notation-style="chip"] .notation-text { display: none; }
+.only-chip-style { display: none; }
+[data-notation-style="chip"] .only-chip-style { display: inline; }
+[data-notation-style="chip"] .only-text-style { display: none; }
+
 /* ── Tag pills ─────────────────────────────────────────── */
 .tag {
   display: inline-flex;
@@ -110,6 +124,13 @@
 .tag-private  { background: #1e1e1e; color: #888; }
 .tag-unlisted { background: #e8e8e8; color: #555; }
 .tag-public   { background: #d1fae5; color: #065f46; }
+/* 優先度（rashid-starters.ts の priorityTagClass）: よく使う / ときどき / あまり使わない */
+.tag-priority-1 { background: var(--good-bg); color: var(--good-fg); font-weight: 600; }
+.tag-priority-3 { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
+/* ヒット状態（rashid-starters.ts の hitTagClass）: 幅をそろえて、後ろのコマンドの左端をそろえる */
+.tag-hit { width: 2.8em; justify-content: center; }
+.tag-hit-ch { background: var(--info-bg); color: var(--info-fg); }
+.tag-hit-pc { background: var(--warn-bg); color: var(--warn-fg); }
 
 /* ── Buttons ───────────────────────────────────────────── */
 .btn {
@@ -368,6 +389,9 @@
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .ntoggle-btn:hover { background: var(--surface2); }
+.ntoggle-group { display: flex; align-items: center; gap: 6px; }
+/* 方向・必殺技はチップのときの設定なので、文字表記では出さない */
+:root:not([data-notation-style="chip"]) .ntoggle-chip-only { display: none; }
 .ntoggle-btn.ntoggle-active {
   background: #111;
   color: #fff;

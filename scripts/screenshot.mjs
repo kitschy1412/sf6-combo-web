@@ -1,8 +1,9 @@
 // ヘッドレス Edge で画面のスクリーンショットを撮る（依存なし・CDP 直叩き）。
 // 使い方: node scripts/screenshot.mjs <shots.json> <出力フォルダ>
-//   shots.json: [{ name, url, width?, height?, chunk?: 1000, maxChunks?: 4, startY?, startSelector?, actions?: [JS式], evals?: [JS式] }]
+//   shots.json: [{ name, url, width?, height?, chunk?: 1000, maxChunks?: 4, startY?, startSelector?, actions?: [JS式], hover?: セレクタ, evals?: [JS式] }]
 //   - 縦長のページは chunk(px) ごとに name_0.png, name_1.png… に分けて保存する
 //   - actions はクリック等を行う JS（例: "document.getElementById('btn-add-combo-top').click()"）
+//   - hover は actions の後でその要素の中心へマウスを動かす（:hover は JS の click では出せない）。撮影後にマウスは左上へ戻す
 //   - startSelector を指定するとその要素の位置から撮る。固定ヘッダーが重なるときは actions で position を static にする
 //   - 出力はプロジェクト外（スクラッチパッド等）に置く。Edge は終了せず 9333 番で起動したまま残る
 import { spawn } from 'node:child_process';
@@ -90,6 +91,11 @@ for (const s of shots) {
     if (r !== undefined) console.log(`  [${s.name}] action -> ${typeof r === 'string' ? r : JSON.stringify(r)}`);
     await sleep(350);
   }
+  if (s.hover) {
+    const point = await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(s.hover)}); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await sleep(350);
+  }
   for (const e of s.evals ?? []) {
     const r = await evaluate(e);
     console.log(`  [${s.name}] eval -> ${typeof r === 'string' ? r : JSON.stringify(r)}`);
@@ -109,6 +115,7 @@ for (const s of shots) {
     writeFileSync(file, Buffer.from(shot.data, 'base64'));
     y += chunk; n++;
   }
+  if (s.hover) await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
   console.log(`${s.name}: fullHeight=${fullH}px, saved ${n} chunk(s)${logs.length ? '\n    ' + logs.join('\n    ') : ''}`);
 }
 

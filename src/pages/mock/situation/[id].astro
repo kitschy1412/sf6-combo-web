@@ -1,7 +1,7 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
 import Notation from '../../../components/Notation.astro';
-import { getSituationById, getEnderClassById, getOkizemeLinks } from '../../../mock-data/rashid';
+import { getSituationById, getEnderClassById, getOkizemeLinks, okizemeSourceName } from '../../../mock-data/rashid';
 
 const { id } = Astro.params;
 const sit = getSituationById(id!);
@@ -63,6 +63,7 @@ const groups = [
                 <div style="display:flex; gap:6px; align-items:center;">
                   {o.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
                   {o.sourceType === 'shared' && <span class="tag tag-shared">共有 / {o.ownerLabel}</span>}
+                  {o.alsoIn && <span class="text-[0.7rem] text-[var(--muted)]" title={o.alsoIn.map(okizemeSourceName).join('\n')}>ほか{o.alsoIn.length}件</span>}
                   <strong>{o.title}</strong>
                   {g.rel === 'ref' && (
                     <span style="font-size:0.7rem; color:var(--muted); background:var(--surface3); padding:1px 6px; border-radius:3px;">

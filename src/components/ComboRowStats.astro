@@ -1,0 +1,32 @@
+---
+// 一覧（キャラハブ・公開一覧）の行の ダメージ・〆分類・有利F の列。見た目は src/styles/combo-list.css
+// 有利F のバッジは起き攻めパネルの開閉を兼ねる（src/lib/combo-list-view.ts）
+// 保存で足す行はキャラハブの buildNewComboRow（statsHtml）が同じ形を JS で組み立てるので、形を変えたらそちらも直す
+import { formatDamage } from '../lib/combo-list-view';
+import type { ComboNode, EnderClass, OkizemeLinks } from '../mock-data/rashid';
+
+interface Props {
+  leaf: ComboNode;
+  ender?: EnderClass | null;
+  okizeme: OkizemeLinks;
+}
+const { leaf, ender, okizeme } = Astro.props;
+const okizemeTotal = okizeme.main.length + okizeme.reference.length;
+---
+
+<td class="col-num"><span class:list={['dmg', !leaf.damage && 'dmg-empty']}>{formatDamage(leaf.damage)}</span></td>
+<td class="col-ender">
+  <span title={ender?.displayName}>{ender ? ender.displayName : '—'}</span>
+</td>
+<td class="col-frame">
+  {ender?.frameAdvantage && (
+    okizemeTotal > 0 ? (
+      <button type="button" class="frame-adv-badge frame-adv-toggle" data-okizeme-toggle={leaf.id}
+        title={`起き攻め ${okizeme.main.length}件${okizeme.reference.length > 0 ? `（参考 ${okizeme.reference.length}件）` : ''}を展開`}>
+        {ender.frameAdvantage}
+      </button>
+    ) : (
+      <span class="frame-adv-badge">{ender.frameAdvantage}</span>
+    )
+  )}
+</td>

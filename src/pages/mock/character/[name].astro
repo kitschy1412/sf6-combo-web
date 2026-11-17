@@ -1,15 +1,25 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import Notation from '../../../components/Notation.astro';
 import NotationToggle from '../../../components/NotationToggle.astro';
+import ComboColumnMenu from '../../../components/ComboColumnMenu.astro';
+import ComboListHead from '../../../components/ComboListHead.astro';
+import ComboLowRow from '../../../components/ComboLowRow.astro';
+import ComboRowCommand from '../../../components/ComboRowCommand.astro';
+import ComboRowStats from '../../../components/ComboRowStats.astro';
+import ComboParentStats from '../../../components/ComboParentStats.astro';
 import ComboEditor from '../../../components/ComboEditor.astro';
 import OkizemePanel from '../../../components/OkizemePanel.astro';
+import { getRecipeTable } from '../../../lib/movenames';
+import { recipeSteps } from '../../../lib/notation';
+import { GAUGE_CLASSES, GAUGE_CLASS_HINTS, gaugeClassFromSegs, gaugeClassesOf } from '../../../lib/gauges';
+import { comboSearchTexts } from '../../../lib/combo-search';
 import {
-  COMBOS, ENDER_CLASSES, KNOCKDOWN_SITUATIONS,
+  COMBOS, ENDER_CLASSES, FOLDED_PRIORITY, HIT_STATES, KNOCKDOWN_SITUATIONS, PRIORITIES, STARTERS,
   getEnderClassById, getComboRoutes, hasBranches, getComboBrokenCount,
-  getOkizemeLinks, getEnderClassCounts,
+  getOkizemeLinks, getEnderClassCounts, groupCombosForList,
 } from '../../../mock-data/rashid';
 import { ARCHIVER_UNRESOLVED } from '../../../mock-data/rashid-archiver';
+import '../../../styles/combo-list.css';
 
 const { name } = Astro.params;
 // モックデータは Rashid のみ。未知のキャラ名は他のモックページと同様 /mock/ へ戻す
@@ -24,28 +34,16 @@ const counts = {
 };
 const selfMadeCount = counts.personal + counts.shared;
 
-const majorVals = [...new Set(COMBOS.map(c => c.categoryMajor).filter(Boolean))] as string[];
-const minorsByMajor: Record<string, string[]> = {};
-for (const c of COMBOS) {
-  if (!c.categoryMajor) continue;
-  const list = (minorsByMajor[c.categoryMajor] ??= []);
-  if (c.categoryMinor && !list.includes(c.categoryMinor)) list.push(c.categoryMinor);
-}
+// 見出しごとのグループ。コンボの無い見出しも出しておき、件数0のあいだは隠す（新規保存で足されたときの受け皿）
+const listSections = groupCombosForList(COMBOS);
+const usedStarters = STARTERS.filter(st => COMBOS.some(c => c.starter === st));
 
-// 2段階グループ: 大分類 → 小分類[] → コンボ[]
-type MinorGroup = { minor: string; items: typeof COMBOS };
-type MajorGroup = { major: string; total: number; minors: MinorGroup[] };
-const majorGroups: MajorGroup[] = [];
-for (const c of COMBOS) {
-  const major = c.categoryMajor ?? '';
-  const minor = c.categoryMinor ?? '';
-  let mg = majorGroups.find(g => g.major === major);
-  if (!mg) { mg = { major, total: 0, minors: [] }; majorGroups.push(mg); }
-  let ming = mg.minors.find(m => m.minor === minor);
-  if (!ming) { ming = { minor, items: [] }; mg.minors.push(ming); }
-  ming.items.push(c);
-  mg.total++;
-}
+// 絞り込みの選択肢は文字/チップで切り替えられないので、呼び方とコマンドを両方出す
+const recipeTable = getRecipeTable(charName);
+const starterOption = (st: string) => {
+  const word = recipeSteps(st, recipeTable).join(' > ');
+  return word === st ? st : `${word}（${st}）`;
+};
 ---
 
 <Layout title={`${charName} — モック`} character={charName}>
@@ -76,6 +74,13 @@ for (const c of COMBOS) {
   </div>
 
   <div class="filter-bar filter-bar-row" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:24px;">
+    <div class="filter-search">
+      <label class="filter-label" for="filter-text">検索</label>
+      <input type="search" id="filter-text" class="input input-inline" autocomplete="off"
+        placeholder="コマンド・技名・コンボ名（例: 236HK、スパイク）" />
+      <span id="filter-text-count" class="filter-text-count" aria-live="polite"></span>
+    </div>
+
     <button type="button" id="filter-self-only" class="chip chip-toggle" aria-pressed="false">
       <span class="chip-toggle-mark" aria-hidden="true"></span>
       自身作成のみ
@@ -84,136 +89,79 @@ for (const c of COMBOS) {
 
     <span class="filter-divider" aria-hidden="true"></span>
 
-    <span class="filter-label">分類</span>
-    <select id="filter-major" class="select select-inline">
-      <option value="">大分類すべて</option>
-      {majorVals.map(m => <option value={m}>{m}</option>)}
-    </select>
-    <select id="filter-minor" class="select select-inline">
-      <option value="">小分類すべて</option>
-      {Object.entries(minorsByMajor).flatMap(([maj, minors]) =>
-        minors.map(min => <option value={min} data-major={maj}>{min}</option>)
-      )}
+    <span class="filter-label">始動技</span>
+    <select id="filter-starter" class="select select-inline">
+      <option value="">すべて</option>
+      {usedStarters.map(st => <option value={st}>{starterOption(st)}</option>)}
     </select>
 
     <span class="filter-divider" aria-hidden="true"></span>
 
-    <span class="filter-label">タグ</span>
-    <button class="chip">画面端</button>
-    <button class="chip">画面中央</button>
-    <button class="chip">DR始動</button>
-    <button class="chip">確反</button>
+    <span class="filter-label">優先度</span>
+    {PRIORITIES.map(p => <button type="button" class="chip" data-filter-priority={p} aria-pressed="false">{p}</button>)}
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">ヒット状態</span>
+    {HIT_STATES.filter(hs => hs !== '通常').map(hs => <button type="button" class="chip" data-filter-hit={hs} aria-pressed="false">{hs}</button>)}
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">ゲージ</span>
+    {GAUGE_CLASSES.map(g => <button type="button" class="chip" data-filter-gauge={g} aria-pressed="false" title={GAUGE_CLASS_HINTS[g]}>{g}</button>)}
   </div>
 
   <section style="margin-bottom:32px;">
     <div class="section-head">
       <h2>コンボ</h2>
-      <span style="font-size:0.76rem; color:var(--muted);">≡ をドラッグで並び替え／行間ホバーで挿入</span>
+      <span style="font-size:0.76rem; color:var(--muted);">マウスを乗せた行の ≡ をドラッグで並び替え（同じ見出し・同じ優先度の中）／行間ホバーで挿入</span>
     </div>
 
     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-      <NotationToggle />
-      <div class="col-vis-wrap">
-        <button type="button" id="col-vis-toggle" class="btn btn-sm">列表示 ▾</button>
-        <div id="col-vis-menu" class="col-vis-menu" style="display:none;">
-          <label class="col-vis-item"><input type="checkbox" data-col-vis="command" checked />コマンド</label>
-          <label class="col-vis-item"><input type="checkbox" data-col-vis="situation" checked />状況</label>
-          <label class="col-vis-item"><input type="checkbox" data-col-vis="poster" checked />投稿者</label>
-          <label class="col-vis-item"><input type="checkbox" data-col-vis="ender" checked />〆分類</label>
-          <label class="col-vis-item"><input type="checkbox" data-col-vis="frame" checked />有利フレーム</label>
-          <label class="col-vis-item"><input type="checkbox" data-col-vis="damage" checked />ダメージ</label>
-        </div>
-      </div>
+      <NotationToggle styleToggle />
+      <ComboColumnMenu />
     </div>
 
     <div class="combo-table-scroll">
     <table class="data-table" id="combo-table">
       <colgroup>
         <col data-col="handle" style="width:24px;" />
-        <col data-col="title" style="width:190px;" />
         <col data-col="command" />
-        <col data-col="situation" style="width:124px;" />
-        <col data-col="poster" style="width:96px;" />
+        <col data-col="damage" style="width:64px;" />
         <col data-col="ender" style="width:140px;" />
-        <col data-col="frame" style="width:84px;" />
-        <col data-col="damage" style="width:72px;" />
+        <col data-col="frame" style="width:56px;" />
         <col data-col="actions" style="width:96px;" />
       </colgroup>
-      {majorGroups.map(({ major, total, minors }) => (
+      <!-- ── 列名（表の上に1回だけ） ── -->
+      <thead class="combo-col-head">
+        <tr>
+          <th></th>
+          <th>コマンド</th>
+          <th class="col-num">ダメージ</th>
+          <th>〆分類</th>
+          <th>有利F</th>
+          <th></th>
+        </tr>
+      </thead>
+      {listSections.map(({ section, buckets, count }) => (
         <>
-          <!-- ── 大分類ヘッダー ── -->
-          <tbody class="combo-major-head" data-head-major={major}>
-            <tr>
-              <td colspan="9" class="combo-major-cell">
-                <div class="combo-major-inner">
-                  <button type="button" class="combo-major-toggle" data-major-toggle={major} aria-expanded="true" title="折りたたむ/開く">
-                    <span class="combo-toggle-icon">▼</span>
-                  </button>
-                  <span class="combo-major-title">{major || '未分類'}</span>
-                  <button type="button" class="btn-major-rename" data-major={major} title="大分類名を変更">✎</button>
-                  <span class="combo-major-count">{total}コンボ</span>
-                  <div class="combo-major-actions">
-                    <button type="button" class="btn-add-minor" data-major={major}>＋ 小分類追加</button>
-                    <button type="button" class="btn-major-delete" data-major={major} title="この大分類を削除（配下が空の場合のみ）">削除</button>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-
-          <!-- ── 列名（大分類の下） ── -->
-          <tbody class="combo-col-head" data-head-major={major}>
-            <tr>
-              <th style="padding-left:8px; padding-right:0;"></th>
-              <th>タイトル</th>
-              <th>コマンド</th>
-              <th>状況</th>
-              <th>投稿者</th>
-              <th>〆分類</th>
-              <th class="col-frame">有利フレーム</th>
-              <th class="col-num">ダメージ</th>
-              <th></th>
-            </tr>
-          </tbody>
-
-          {minors.map(({ minor, items }) => (
+          <!-- ── 大見出し（小見出しの無いものは大見出しが見出しを兼ねる） ── -->
+          <ComboListHead section={section} bucket={buckets[0].scene ? undefined : buckets[0].key} count={count} colspan={6} addable />
+          {buckets.map(({ key, scene, items }) => (
             <>
-              <!-- ── 小分類サブヘッダー ── -->
-              <tbody class="combo-section-head" data-head-major={major} data-head-minor={minor}>
-                <tr>
-                  <td colspan="9" class="combo-minor-cell">
-                    <div class="combo-minor-inner">
-                      <button type="button" class="combo-minor-toggle" data-major={major} data-minor={minor} aria-expanded="true" title="折りたたむ/開く">
-                        <span class="combo-toggle-icon">▼</span>
-                      </button>
-                      <span class="combo-minor-title">{minor || '未分類'}</span>
-                      <button type="button" class="btn-minor-rename" data-major={major} data-minor={minor} title="小分類名を変更">✎</button>
-                      <span class="combo-minor-rule" />
-                      <span class="combo-minor-count">{items.length}件</span>
-                      <div class="combo-minor-actions">
-                        <button type="button" class="btn-add-combo-minor" data-major={major} data-minor={minor}>＋ コンボ追加</button>
-                        <button type="button" class="btn-minor-delete" data-major={major} data-minor={minor} title="この小分類を削除（空の場合のみ）">削除</button>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-              <!-- ── 空ドロップゾーン（コンボなし小分類用） ── -->
-              <tbody class={`combo-group combo-drop-zone${items.length === 0 ? ' dz-empty' : ''}`} data-major={major} data-minor={minor}>
-                <tr>
-                  <td colspan="9" class="drop-zone-cell">
-                    <span class="drop-zone-hint">コンボをここにドラッグして追加</span>
-                  </td>
-                </tr>
-              </tbody>
+              {scene && <ComboListHead section={section} scene={scene} bucket={key} count={items.length} colspan={6} addable />}
               {items.map((c) => {
         const routes = getComboRoutes(c);
         const branched = hasBranches(c);
         const broken = getComboBrokenCount(c);
+        const search = comboSearchTexts(c, routes, recipeTable);
         return (
-          <tbody class="combo-group" data-combo-id={c.id} data-source={c.sourceType} data-major={c.categoryMajor ?? ''} data-minor={c.categoryMinor ?? ''}>
+          <tbody class="combo-group" data-combo-id={c.id} data-source={c.sourceType} data-starter={c.starter}
+            data-section={section} data-bucket={key} data-priority={c.priority}
+            data-hit-state={c.hitState} data-gauges={gaugeClassesOf(routes).join(' ')} data-search={search.group}
+            style={c.priority === FOLDED_PRIORITY ? 'display:none;' : undefined}>
             <tr class="insert-here-row">
-              <td colspan="9"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
+              <td colspan="6"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
             </tr>
             {!branched && (() => {
               const r = routes[0];
@@ -224,32 +172,8 @@ for (const c of COMBOS) {
                 <>
                   <tr>
                     <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
-                    <td><a href={`/mock/combo/${c.id}`} class="row-link col-title" title={c.title}>{c.title}</a></td>
-                    <td><Notation inputs={r.fullInputs} size="sm" /></td>
-                    <td class="col-situation">{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
-                    <td class="col-poster">
-                      {c.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
-                      {c.sourceType === 'shared' && <span class="poster-name">{c.ownerLabel}</span>}
-                      {c.sourceType === 'forked' && <><span class="tag">fork</span><span class="poster-name">{c.ownerLabel}</span></>}
-                      {c.visibility === 'private' && <span class="tag tag-private">🔒</span>}
-                      {c.visibility === 'unlisted' && <span class="tag tag-unlisted">🔗</span>}
-                    </td>
-                    <td class="col-ender">
-                      <span title={ender?.displayName}>{ender ? ender.displayName : '—'}</span>
-                    </td>
-                    <td class="col-frame">
-                      {ender?.frameAdvantage && (
-                        okizemeTotal > 0 ? (
-                          <button type="button" class="frame-adv-badge frame-adv-toggle" data-okizeme-toggle={r.leaf.id}
-                            title={`起き攻め ${okizeme.main.length}件${okizeme.reference.length > 0 ? `（参考 ${okizeme.reference.length}件）` : ''}を展開`}>
-                            {ender.frameAdvantage}
-                          </button>
-                        ) : (
-                          <span class="frame-adv-badge">{ender.frameAdvantage}</span>
-                        )
-                      )}
-                    </td>
-                    <td class="col-num"><span class="dmg">{(r.leaf.damage ?? 0).toLocaleString()}</span></td>
+                    <td><ComboRowCommand combo={c} /></td>
+                    <ComboRowStats leaf={r.leaf} ender={ender} okizeme={okizeme} />
                     <td class="col-actions">
                       {broken > 0 && <span class="tag tag-warn broken-flag">⚠{broken}</span>}
                       <div class="row-actions">
@@ -263,8 +187,8 @@ for (const c of COMBOS) {
                   </tr>
                   {okizemeTotal > 0 && (
                     <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} style="display:none;">
-                      <td colspan="9" class="okizeme-panel-cell">
-                        <OkizemePanel links={okizeme} ender={ender} />
+                      <td colspan="6" class="okizeme-panel-cell">
+                        <OkizemePanel links={okizeme} ender={ender} comboId={c.id} leafId={r.leaf.id} />
                       </td>
                     </tr>
                   )}
@@ -276,29 +200,8 @@ for (const c of COMBOS) {
               <>
                 <tr class="combo-parent-row">
                   <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
-                  <td>
-                    <a href={`/mock/combo/${c.id}`} class="row-link col-title">
-                      {c.title}
-                    </a>
-                    <button type="button" class="branch-toggle" data-combo-id={c.id} title="分岐ルートを展開/折り畳み">
-                      <span class="branch-toggle-icon">▶</span>
-                      <span class="tag" style="background:#111; color:#fff; font-size:0.66rem;">{routes.length}ルート</span>
-                    </button>
-                  </td>
-                  <td colspan="2" style="color:var(--muted); font-size:0.82rem;">
-                    <Notation inputs={c.root.segment} size="sm" />
-                    <span style="margin-left:8px; color:var(--muted);">…の後に分岐</span>
-                  </td>
-                  <td class="col-poster">
-                    {c.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
-                    {c.sourceType === 'shared' && <span class="poster-name">{c.ownerLabel}</span>}
-                    {c.sourceType === 'forked' && <><span class="tag">fork</span><span class="poster-name">{c.ownerLabel}</span></>}
-                    {c.visibility === 'private' && <span class="tag tag-private">🔒</span>}
-                    {c.visibility === 'unlisted' && <span class="tag tag-unlisted">🔗</span>}
-                  </td>
-                  <td></td>
-                  <td></td>
-                  <td></td>
+                  <td><ComboRowCommand combo={c} /></td>
+                  <ComboParentStats routes={routes} />
                   <td class="col-actions">
                     {broken > 0 && <span class="tag tag-warn broken-flag">⚠{broken}</span>}
                     <div class="row-actions">
@@ -312,48 +215,20 @@ for (const c of COMBOS) {
                 </tr>
                 {routes.map((r, ri) => {
                   const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
-                  const tailInputs = r.pathSegments[r.pathSegments.length - 1];
-                  const ghostInputs = r.pathSegments.slice(0, -1).join(' > ');
-                  const isLastRoute = ri === routes.length - 1;
                   const okizeme = getOkizemeLinks(r.leaf.enderClassId);
                   const okizemeTotal = okizeme.main.length + okizeme.reference.length;
                   return (
                     <>
-                      <tr class="combo-child-row" data-branch-of={c.id} style="display:none;">
+                      <tr class="combo-child-row" data-branch-of={c.id} data-gauge={gaugeClassFromSegs(r.pathSegments)} data-search={search.routes[ri]} style="display:none;">
                         <td class="cell-handle"></td>
-                        <td style="padding-left:32px; color:var(--muted-strong); font-size:0.85rem;">
-                          <span style="color:var(--muted); font-family:'JetBrains Mono',monospace;">{isLastRoute ? '└─' : '├─'}</span>
-                          {' '}
-                          <a href={`/mock/combo/${c.id}#${r.leaf.id}`} class="row-link" style="display:inline; color:var(--text);">
-                            {r.leaf.routeLabel ?? '(無名ルート)'}
-                          </a>
-                          {r.leaf.condition && <span class="tag" style="margin-left:6px;">{r.leaf.condition}</span>}
-                        </td>
-                        <td><Notation inputs={tailInputs} ghostInputs={ghostInputs} branchElbow={isLastRoute ? '└─›' : '├─›'} size="sm" /></td>
-                        <td class="col-situation">{(r.leaf.situationTags ?? []).map(t => <span class="tag" style="margin-right:3px;">{t}</span>)}</td>
-                        <td></td>
-                        <td class="col-ender">
-                          <span title={ender?.displayName}>{ender ? ender.displayName : '—'}</span>
-                        </td>
-                        <td class="col-frame">
-                          {ender?.frameAdvantage && (
-                            okizemeTotal > 0 ? (
-                              <button type="button" class="frame-adv-badge frame-adv-toggle" data-okizeme-toggle={r.leaf.id}
-                                title={`起き攻め ${okizeme.main.length}件${okizeme.reference.length > 0 ? `（参考 ${okizeme.reference.length}件）` : ''}を展開`}>
-                                {ender.frameAdvantage}
-                              </button>
-                            ) : (
-                              <span class="frame-adv-badge">{ender.frameAdvantage}</span>
-                            )
-                          )}
-                        </td>
-                        <td class="col-num"><span class="dmg">{(r.leaf.damage ?? 0).toLocaleString()}</span></td>
+                        <td><ComboRowCommand combo={c} route={r} lastRoute={ri === routes.length - 1} /></td>
+                        <ComboRowStats leaf={r.leaf} ender={ender} okizeme={okizeme} />
                         <td>{(r.leaf.votes?.brokenInCurrentVer ?? 0) > 0 && <span class="tag tag-warn">⚠ {r.leaf.votes!.brokenInCurrentVer}</span>}</td>
                       </tr>
                       {okizemeTotal > 0 && (
                         <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} data-okizeme-branch-of={c.id} style="display:none;">
-                          <td colspan="9" class="okizeme-panel-cell">
-                            <OkizemePanel links={okizeme} ender={ender} />
+                          <td colspan="6" class="okizeme-panel-cell">
+                            <OkizemePanel links={okizeme} ender={ender} comboId={c.id} leafId={r.leaf.id} />
                           </td>
                         </tr>
                       )}
@@ -365,6 +240,7 @@ for (const c of COMBOS) {
           </tbody>
         );
       })}
+              <ComboLowRow bucket={key} count={items.filter(c => c.priority === FOLDED_PRIORITY).length} colspan={6} />
             </>
           ))}
         </>
@@ -373,7 +249,7 @@ for (const c of COMBOS) {
       <!-- インラインエディタ（初期は非表示、＋クリックで表示。tbodyとしてテーブル内を移動できる） -->
       <tbody id="inline-editor-host" class="inline-editor-tbody" style="display:none;">
         <tr class="editor-drag-chip-row">
-          <td colspan="9" style="padding:4px 8px;">
+          <td colspan="6" style="padding:4px 8px;">
             <div class="editor-drag-chip">
               <button type="button" id="editor-drag-handle" class="editor-drag-btn" title="ドラッグして挿入位置を変更">≡</button>
               <strong id="editor-mode-label">新規コンボを追加</strong>
@@ -382,9 +258,9 @@ for (const c of COMBOS) {
           </td>
         </tr>
         <tr class="editor-card-row">
-          <td colspan="9" style="padding:0;">
+          <td colspan="6" style="padding:0;">
             <div class="card card-emph" style="padding:14px 16px; margin:8px 0; background:var(--surface);">
-              <ComboEditor mode="inline" />
+              <ComboEditor mode="inline" character={charName} />
             </div>
           </td>
         </tr>
@@ -393,7 +269,7 @@ for (const c of COMBOS) {
       <!-- 末尾の挿入ポイント（最後のコンボの後に挿入するための領域） -->
       <tbody class="combo-tail">
         <tr class="insert-here-row">
-          <td colspan="9"><button type="button" class="insert-here-btn" data-insert-pos="end">＋ ここに挿入</button></td>
+          <td colspan="6"><button type="button" class="insert-here-btn" data-insert-pos="end">＋ ここに挿入</button></td>
         </tr>
       </tbody>
     </table>
@@ -421,8 +297,9 @@ for (const c of COMBOS) {
         <tbody>
           {ARCHIVER_UNRESOLVED.map(u => (
             <tr>
-              <td><span class="tag">{u.kind === 'combo' ? 'コンボ' : 'セットプレイ'}</span></td>
-              <td>{u.kind === 'combo' ? <a href={`/mock/combo/${u.id}`} class="row-link">{u.title}</a> : u.title}</td>
+              <td><span class="tag">{u.kind === 'combo' ? 'コンボ' : u.kind === 'matchup' ? 'キャラ対策' : 'セットプレイ'}</span></td>
+              <td>{u.kind === 'combo' ? <a href={`/mock/combo/${u.id}`} class="row-link">{u.title}</a>
+                : u.kind === 'matchup' && u.href ? <a href={u.href} class="row-link">{u.title}</a> : u.title}</td>
               <td>{u.recipeJa}</td>
               <td>{u.unresolvedTerms.length > 0 ? u.unresolvedTerms.map(t => <span class="tag tag-warn" style="margin-right:3px;">{t}</span>) : '—'}</td>
               <td>{u.enderUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
@@ -509,82 +386,6 @@ for (const c of COMBOS) {
       overflow-x: auto;
     }
 
-    /* ── アクション列: 右寄せ・アイコン。行ホバーでフェード表示 ── */
-    .col-actions {
-      text-align: right;
-      white-space: nowrap;
-      padding-right: 10px !important;
-    }
-    /* 不可バッジは常時表示（重要情報のため隠さない） */
-    .col-actions .broken-flag {
-      font-size: 0.62rem;
-      padding: 0 4px;
-      margin-right: 5px;
-      vertical-align: middle;
-    }
-    .row-actions {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      vertical-align: middle;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.12s ease;
-    }
-    .combo-group:hover .row-actions,
-    .row-actions:focus-within {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    /* アイコンボタン共通 */
-    .btn-edit,
-    .btn-upload,
-    .btn-delete {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 26px;
-      height: 26px;
-      background: transparent;
-      border: 1px solid var(--border-strong);
-      border-radius: 4px;
-      padding: 0;
-      font-size: 0.82rem;
-      font-family: inherit;
-      color: var(--muted-strong);
-      cursor: pointer;
-      line-height: 1;
-      transition: background 0.1s, color 0.1s, border-color 0.1s;
-    }
-    .btn-edit:hover {
-      background: var(--accent-soft);
-      color: var(--text);
-      border-color: #111;
-    }
-    .btn-upload:hover {
-      background: var(--good-bg);
-      color: var(--good-fg);
-      border-color: var(--good-fg);
-    }
-    .btn-delete:hover {
-      background: var(--warn-bg);
-      color: var(--warn-fg);
-      border-color: var(--warn-fg);
-    }
-
-    /* ── 列名行（各大分類の直下） ── */
-    .combo-col-head th {
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: var(--muted);
-      letter-spacing: 0.04em;
-      text-align: left;
-      padding: 6px 8px;
-      background: transparent;
-      border-bottom: 1px solid var(--border);
-    }
-    .combo-col-head th.col-num { text-align: right; padding-right: 10px; }
-
     /* ── フィルタバー（1行統合レイアウト） ── */
     .filter-bar-row {
       display: flex;
@@ -605,6 +406,24 @@ for (const c of COMBOS) {
       font-size: 0.8rem;
       width: auto;
       min-width: 132px;
+    }
+    /* 検索欄（チップの行を崩さないように1行目に単独で置く） */
+    .filter-search {
+      flex-basis: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .input-inline {
+      height: 26px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      width: 340px;
+      min-width: 0;
+    }
+    .filter-text-count {
+      font-size: 0.72rem;
+      color: var(--muted);
     }
     /* チップ・トグル（チェック付きピル） */
     .chip-toggle {
@@ -644,311 +463,10 @@ for (const c of COMBOS) {
       color: var(--text);
     }
 
-    /* ── 大分類ヘッダー（独立した重厚なセクション帯） ── */
-    .combo-major-cell {
-      padding: 0 !important;
-      border-bottom: none !important;
-      background: transparent !important;
-    }
-    .combo-major-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 14px 8px 12px;
-      margin-top: 12px;
-      border-left: 4px solid #f59e0b;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      background: var(--surface);
-    }
-    .combo-major-head:first-of-type .combo-major-inner { margin-top: 0; }
-    .combo-major-title {
-      font-size: 1rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      color: var(--text);
-    }
-    .combo-major-count {
-      font-size: 0.76rem;
-      color: var(--muted);
-      font-weight: 600;
-      letter-spacing: 0.04em;
-    }
-
-    /* ── 折りたたみトグル（大分類・小分類 共通） ── */
-    .combo-major-toggle,
-    .combo-minor-toggle {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      padding: 2px;
-      margin-right: 2px;
-      flex-shrink: 0;
-      color: var(--muted-strong);
-      border-radius: 3px;
-      transition: background 0.1s, color 0.1s;
-    }
-    .combo-major-toggle:hover,
-    .combo-minor-toggle:hover {
-      background: var(--surface3);
-      color: var(--text);
-    }
-    .combo-toggle-icon {
-      font-size: 0.6rem;
-      line-height: 1;
-      display: inline-block;
-      transition: transform 0.15s;
-    }
-    .combo-major-toggle[aria-expanded="false"] .combo-toggle-icon,
-    .combo-minor-toggle[aria-expanded="false"] .combo-toggle-icon {
-      transform: rotate(-90deg);
-    }
-
-    /* ── 小分類サブヘッダー（バンド型・配下のコンボが明確に） ── */
-    .combo-minor-cell {
-      padding: 0 !important;
-      border-bottom: none !important;
-      background: transparent !important;
-    }
-    .combo-minor-inner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 4px 14px 4px 10px;
-      margin-top: 3px;
-      background: var(--surface2);
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border-strong);
-      position: relative;
-    }
-    .combo-minor-title {
-      font-size: 0.84rem;
-      font-weight: 700;
-      color: var(--text-soft);
-      letter-spacing: 0.03em;
-      white-space: nowrap;
-    }
-    .combo-minor-rule { display: none; }
-    .combo-minor-count {
-      font-size: 0.72rem;
-      color: var(--muted);
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    /* ── コンボ行に左レール（小分類内であることを視覚的に示す） ── */
-    .combo-group tr:not(.insert-here-row) td:first-child {
-      border-left: 2px solid transparent;
-    }
-    .combo-group:hover tr:not(.insert-here-row) td:first-child {
-      border-left-color: var(--border-strong);
-    }
-
     /* ── テーブル: 全体的に行の縦幅をコンパクトに ── */
     .data-table th,
     .data-table td { padding-top: 5px; padding-bottom: 5px; }
     .data-table td { font-size: 0.82rem; }
-
-    /* ── テーブル: 列幅を固定してコマンド欄を最大化 ── */
-    #combo-table { table-layout: fixed; }
-    #combo-table th,
-    #combo-table td { padding-left: 8px; padding-right: 8px; }
-    #combo-table th { font-size: 0.7rem; padding-left: 8px; padding-right: 8px; }
-
-    /* ── タイトル列: 小さめ・折返し可 ── */
-    #combo-table .col-title {
-      font-size: 0.8rem;
-      font-weight: 600;
-      line-height: 1.35;
-      display: block;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    /* ── 状況タグ列: 1行に収める ── */
-    .col-situation {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    /* ── 投稿者列: 統一スタイル ── */
-    .col-poster {
-      font-size: 0.74rem;
-      color: var(--muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .col-poster .tag { vertical-align: middle; font-size: 0.68rem; padding: 1px 6px; }
-    .col-poster .poster-name { margin-left: 4px; vertical-align: middle; }
-
-    /* ── 〆分類列: 折返し防止＋小さめ ── */
-    .col-ender {
-      font-size: 0.76rem;
-      color: var(--muted-strong);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    /* ── 列の表示/非表示コントロール ── */
-    .col-vis-wrap { position: relative; flex-shrink: 0; }
-    .col-vis-menu {
-      position: absolute;
-      top: calc(100% + 4px);
-      right: 0;
-      background: #fff;
-      border: 1px solid var(--border-strong);
-      border-radius: 6px;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.14);
-      padding: 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      z-index: 50;
-      min-width: 140px;
-    }
-    .col-vis-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      font-size: 0.8rem;
-      padding: 5px 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      white-space: nowrap;
-    }
-    .col-vis-item:hover { background: var(--surface2); }
-    .col-vis-item input { cursor: pointer; }
-
-    /* ── 有利フレーム列（〆分類とは独立した列） ── */
-    .col-frame {
-      white-space: nowrap;
-      overflow: hidden;
-    }
-    .combo-col-head th.col-frame { text-align: left; }
-    .frame-adv-badge {
-      display: inline-flex;
-      align-items: center;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.68rem;
-      font-weight: 700;
-      color: #b45309;
-      background: #fef3c7;
-      border: 1px solid #f5d78e;
-      border-radius: 3px;
-      padding: 0 4px;
-      vertical-align: middle;
-    }
-
-    /* ── ダメージ列: コンパクト ── */
-    #combo-table .col-num { font-size: 0.85rem; padding-right: 10px; }
-    #combo-table .col-num .dmg { font-size: 0.88rem; }
-
-    /* ── 状況タグ: コンパクト＋折返し可 ── */
-    #combo-table td .tag { font-size: 0.68rem; padding: 1px 6px; }
-
-    .combo-parent-row td { background: var(--surface); font-weight: 600; }
-    .combo-parent-row td a { color: var(--text); }
-    .combo-child-row td { background: #fff; }
-
-    /* ── 分岐トグルボタン ── */
-    .branch-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      padding: 2px 6px 2px 4px;
-      border-radius: 4px;
-      margin-left: 6px;
-      font-family: inherit;
-      transition: background 0.1s;
-    }
-    .branch-toggle:hover { background: var(--surface3); }
-    .branch-toggle-icon {
-      font-size: 0.6rem;
-      color: var(--muted);
-      transition: transform 0.18s;
-      line-height: 1;
-    }
-    .branch-toggle.is-open .branch-toggle-icon { transform: rotate(90deg); }
-
-    /* ── 並び替えハンドル ── */
-    .cell-handle {
-      width: 24px;
-      padding-left: 6px !important;
-      padding-right: 0 !important;
-      text-align: center;
-    }
-    .row-drag-handle {
-      display: inline-block;
-      color: var(--border-strong);
-      cursor: grab;
-      font-size: 1rem;
-      line-height: 1;
-      padding: 4px 2px;
-      user-select: none;
-      transition: color 0.12s;
-    }
-    .combo-group:hover .row-drag-handle { color: var(--muted); }
-    .row-drag-handle:hover { color: var(--text) !important; }
-    .row-drag-handle:active { cursor: grabbing; }
-
-    /* SortableJS用のドラッグ状態スタイル */
-    .sortable-ghost {
-      opacity: 0.3;
-      background: var(--surface) !important;
-    }
-    .sortable-ghost td { background: var(--surface) !important; }
-    .sortable-chosen .row-drag-handle { color: var(--text) !important; }
-    .sortable-drag {
-      opacity: 0.9 !important;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.18);
-      background: #fff;
-    }
-
-    /* ── ホバー時のみ見える挿入ポイント ── */
-    .insert-here-row td {
-      padding: 0 !important;
-      border: none !important;
-      background: transparent !important;
-      height: 10px;
-    }
-    .insert-here-btn {
-      display: block;
-      width: 100%;
-      height: 10px;
-      line-height: 10px;
-      background: transparent;
-      border: none;
-      color: transparent;
-      font-size: 0.68rem;
-      font-weight: 600;
-      cursor: pointer;
-      padding: 0;
-      font-family: inherit;
-      text-align: center;
-      transition: color 0.1s, background 0.1s;
-      border-radius: 3px;
-    }
-    .insert-here-row:hover .insert-here-btn,
-    .insert-here-btn:hover {
-      color: var(--text);
-      background: var(--accent-soft);
-    }
-    .insert-here-btn.is-active {
-      color: var(--text);
-      background: var(--accent-soft);
-    }
-    /* ドラッグ中は挿入ポイントを完全に隠す（誤クリック防止） */
-    body.is-dragging-combo .insert-here-row { pointer-events: none; }
-    body.is-dragging-combo .insert-here-btn { display: none; }
 
     /* ── インラインエディタ（テーブル内 tbody として配置） ── */
     .inline-editor-tbody > tr > td { background: transparent !important; border: none !important; }
@@ -1013,275 +531,31 @@ for (const c of COMBOS) {
       user-select: none !important;
     }
     body.editor-dragging * { user-select: none !important; }
-
-    /* ── 起き攻めトグルボタン ── */
-    .col-ender { white-space: normal; }
-    /* ── 有利フレームバッジ = 起き攻め展開トグル ── */
-    .frame-adv-toggle {
-      cursor: pointer;
-      transition: background 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s;
-    }
-    .frame-adv-toggle:hover {
-      background: #fde9b0;
-      border-color: #e0b74d;
-    }
-    .frame-adv-toggle.is-open {
-      background: #f59e0b;
-      color: #fff;
-      border-color: #d98207;
-    }
-
-
-    /* ── 起き攻めパネルの行（中身のスタイルは OkizemePanel.astro） ── */
-    .okizeme-panel-cell {
-      padding: 0 !important;
-      background: var(--surface2) !important;
-      border-top: none !important;
-      border-bottom: 1px solid var(--border) !important;
-    }
-
-    /* ── 小分類アクションボタン群 ── */
-    .combo-minor-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-left: auto;
-    }
-    .btn-add-combo-minor,
-    .btn-minor-delete {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      background: transparent;
-      border: 1px solid var(--border-strong);
-      border-radius: 4px;
-      padding: 2px 8px;
-      font-size: 0.7rem;
-      font-family: inherit;
-      color: var(--muted-strong);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.1s, color 0.1s, border-color 0.1s;
-      line-height: 1.5;
-    }
-
-    /* ── 分類名変更（鉛筆アイコン、タイトル直後に配置） ── */
-    .btn-major-rename,
-    .btn-minor-rename {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      padding: 2px 3px;
-      flex-shrink: 0;
-      font-size: 0.72rem;
-      color: var(--muted);
-      border-radius: 3px;
-      transition: background 0.1s, color 0.1s;
-    }
-    .btn-major-rename:hover,
-    .btn-minor-rename:hover {
-      background: var(--surface3);
-      color: var(--text);
-    }
-    .btn-add-combo-minor {
-      border-color: #f59e0b;
-      color: #b45309;
-    }
-    .btn-add-combo-minor:hover { background: #fef3c7; color: #92400e; border-color: #d97706; }
-    .btn-minor-delete:hover { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-fg); }
-
-    /* ── 大分類ヘッダーのアクション群 ── */
-    .combo-major-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-left: auto;
-    }
-    .btn-add-minor {
-      display: inline-flex;
-      align-items: center;
-      background: #fff;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      padding: 3px 12px;
-      font-size: 0.74rem;
-      font-weight: 600;
-      font-family: inherit;
-      color: #111;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s;
-      line-height: 1.55;
-    }
-    .btn-add-minor:hover {
-      background: #f59e0b;
-      border-color: #f59e0b;
-      color: #111;
-      box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
-    }
-    .btn-major-delete {
-      display: inline-flex;
-      align-items: center;
-      background: #fff;
-      border: 1px solid #d1d5db;
-      border-radius: 4px;
-      padding: 3px 12px;
-      font-size: 0.74rem;
-      font-weight: 600;
-      font-family: inherit;
-      color: var(--muted-strong);
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.1s, color 0.1s, border-color 0.1s;
-      line-height: 1.55;
-    }
-    .btn-major-delete:hover {
-      background: var(--warn-bg);
-      border-color: var(--warn-fg);
-      color: var(--warn-fg);
-    }
-
-    /* ── 空小分類のドロップゾーン ── */
-    .drop-zone-cell {
-      padding: 10px 16px 10px 24px !important;
-      background: transparent !important;
-      border: none !important;
-    }
-    .drop-zone-hint {
-      display: inline-block;
-      width: 100%;
-      padding: 8px 12px;
-      border: 2px dashed var(--border-strong);
-      border-radius: 5px;
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-align: center;
-      transition: border-color 0.15s, background 0.15s, color 0.15s;
-    }
-    /* ドロップゾーンは dz-empty クラスがあるときだけ表示 */
-    .combo-drop-zone { display: none; }
-    .combo-drop-zone.dz-empty { display: table-row-group; }
-    /* ドラッグ中はオレンジ強調 */
-    body.is-dragging-combo .combo-drop-zone.dz-empty .drop-zone-hint {
-      border-color: #f59e0b;
-      background: #fef9ee;
-      color: #92400e;
-    }
   </style>
 
   <script>
     import Sortable from 'sortablejs';
-    import { COMBOS, inferStarter } from '../../../mock-data/rashid';
-    import type { Combo } from '../../../mock-data/rashid';
+    import { COMBOS, getComboRoutes, getEnderClassById } from '../../../mock-data/rashid';
+    import type { Combo, RouteSummary } from '../../../mock-data/rashid';
+    import { gaugeClassesOf, gaugeClassFromSegs } from '../../../lib/gauges';
+    import { comboSearchTexts } from '../../../lib/combo-search';
+    import {
+      FOLDED_PRIORITY, PRIORITIES, bucketOf, bucketPreset, hitTagClass, positionTagOf, priorityTagClass, sectionOf,
+    } from '../../../mock-data/rashid-starters';
+    import type { BucketPreset, Priority } from '../../../mock-data/rashid-starters';
+    import { bindBranchToggle, formatDamage, initComboListView } from '../../../lib/combo-list-view';
+    import { getMoveTable, getRecipeTable } from '../../../lib/movenames';
+    import { chipClassOf, formatToken, readNotationPrefs, recipeSteps } from '../../../lib/notation';
 
-    // ── 分岐ツリー 折り畳みトグル ──
-    document.querySelectorAll<HTMLButtonElement>('.branch-toggle').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const comboId = btn.dataset.comboId;
-        const isOpen = btn.classList.toggle('is-open');
-        document.querySelectorAll<HTMLElement>(`tr[data-branch-of="${comboId}"]`).forEach(row => {
-          row.style.display = isOpen ? '' : 'none';
-        });
-        // 折り畳み時: 子行の起き攻めパネルをすべて閉じる
-        if (!isOpen) {
-          document.querySelectorAll<HTMLElement>(`[data-okizeme-branch-of="${comboId}"]`).forEach(panel => {
-            panel.style.display = 'none';
-            const panelId = panel.dataset.okizemePanel;
-            if (panelId) {
-              const toggleBtn = document.querySelector<HTMLElement>(`[data-okizeme-toggle="${panelId}"]`);
-              toggleBtn?.classList.remove('is-open');
-            }
-          });
-        }
-      });
+    // ── 自身作成のみ / 始動技 フィルタ（検索欄、優先度・ヒット状態・ゲージのチップと見出しの折りたたみは combo-list-view） ──
+    const filters = { selfOnly: false, starter: '' };
+    const listView = initComboListView(grp => {
+      const src = grp.dataset.source ?? '';
+      const okSource = !filters.selfOnly || src === 'personal' || src === 'shared';
+      const okStarter = !filters.starter || grp.dataset.starter === filters.starter;
+      return okSource && okStarter;
     });
-
-    // ── 起き攻め展開トグル ──
-    document.querySelectorAll<HTMLButtonElement>('.frame-adv-toggle').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const leafId = btn.dataset.okizemeToggle;
-        const isOpen = btn.classList.toggle('is-open');
-        const panel = document.querySelector<HTMLElement>(`[data-okizeme-panel="${leafId}"]`);
-        if (panel) panel.style.display = isOpen ? '' : 'none';
-      });
-    });
-
-    // ── 自身作成のみ / 大分類 / 小分類 フィルタ ──
-    const filters = { selfOnly: false, major: '', minor: '' };
-    // ── 折りたたみ状態（大分類・小分類） ──
-    const collapsedMajors = new Set<string>();
-    const collapsedMinors = new Set<string>(); // key: `${major}:${minor}`
-    const minorKey = (major: string, minor: string) => `${major}:${minor}`;
-
-    function applyFilters() {
-      // 各コンボ行: フィルタ一致判定（折りたたみとは独立に保持。ヘッダー表示判定に使う）
-      document.querySelectorAll<HTMLElement>('tbody.combo-group').forEach(grp => {
-        const src = grp.dataset.source ?? '';
-        const major = grp.dataset.major ?? '';
-        const minor = grp.dataset.minor ?? '';
-        const okSource = !filters.selfOnly || src === 'personal' || src === 'shared';
-        const okMajor = !filters.major || major === filters.major;
-        const okMinor = !filters.minor || minor === filters.minor;
-        const filterMatch = okSource && okMajor && okMinor;
-        grp.dataset.filterMatch = filterMatch ? '1' : '0';
-        const collapsed = collapsedMajors.has(major) || collapsedMinors.has(minorKey(major, minor));
-        const editing = grp.dataset.editing === '1';
-        grp.style.display = (filterMatch && !collapsed && !editing) ? '' : 'none';
-      });
-      // 小分類サブヘッダ: 配下にフィルタ一致するコンボが1件以上、かつ親の大分類が折りたたまれていなければ表示
-      document.querySelectorAll<HTMLElement>('tbody.combo-section-head').forEach(head => {
-        const hMajor = head.dataset.headMajor ?? '';
-        const hMinor = head.dataset.headMinor ?? '';
-        const hasMatch = Array.from(
-          document.querySelectorAll<HTMLElement>('tbody.combo-group')
-        ).some(grp => grp.dataset.filterMatch === '1' && grp.dataset.major === hMajor && grp.dataset.minor === hMinor);
-        head.style.display = (hasMatch && !collapsedMajors.has(hMajor)) ? '' : 'none';
-      });
-      // 列名ヘッダ: 大分類が折りたたまれていなければ、配下に一致があるときのみ表示
-      document.querySelectorAll<HTMLElement>('tbody.combo-col-head').forEach(head => {
-        const hMajor = head.dataset.headMajor ?? '';
-        const hasMatch = Array.from(
-          document.querySelectorAll<HTMLElement>('tbody.combo-group')
-        ).some(grp => grp.dataset.filterMatch === '1' && grp.dataset.major === hMajor);
-        head.style.display = (hasMatch && !collapsedMajors.has(hMajor)) ? '' : 'none';
-      });
-      // 大分類ヘッダ: 配下にフィルタ一致するコンボが1件以上あれば表示（折りたたみ中でも再展開できるよう常に表示）
-      document.querySelectorAll<HTMLElement>('tbody.combo-major-head').forEach(head => {
-        const hMajor = head.dataset.headMajor ?? '';
-        const hasMatch = Array.from(
-          document.querySelectorAll<HTMLElement>('tbody.combo-group')
-        ).some(grp => grp.dataset.filterMatch === '1' && grp.dataset.major === hMajor);
-        head.style.display = hasMatch ? '' : 'none';
-      });
-    }
-
-    // ── 大分類 折りたたみトグル ──
-    document.querySelectorAll<HTMLButtonElement>('.combo-major-toggle').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const major = btn.dataset.majorToggle ?? '';
-        const nowCollapsed = !collapsedMajors.has(major);
-        if (nowCollapsed) collapsedMajors.add(major); else collapsedMajors.delete(major);
-        btn.setAttribute('aria-expanded', String(!nowCollapsed));
-        applyFilters();
-      });
-    });
-
-    // ── 小分類 折りたたみトグル ──
-    document.querySelectorAll<HTMLButtonElement>('.combo-minor-toggle').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const major = btn.dataset.major ?? '';
-        const minor = btn.dataset.minor ?? '';
-        const key = minorKey(major, minor);
-        const nowCollapsed = !collapsedMinors.has(key);
-        if (nowCollapsed) collapsedMinors.add(key); else collapsedMinors.delete(key);
-        btn.setAttribute('aria-expanded', String(!nowCollapsed));
-        applyFilters();
-      });
-    });
+    const applyFilters = listView.apply;
 
     const selfOnlyBtn = document.getElementById('filter-self-only') as HTMLButtonElement | null;
     selfOnlyBtn?.addEventListener('click', () => {
@@ -1292,62 +566,10 @@ for (const c of COMBOS) {
       applyFilters();
     });
 
-    const majorSel = document.getElementById('filter-major') as HTMLSelectElement | null;
-    const minorSel = document.getElementById('filter-minor') as HTMLSelectElement | null;
-    if (majorSel && minorSel) {
-      majorSel.addEventListener('change', () => {
-        filters.major = majorSel.value;
-        // 小分類の候補を大分類で絞り込み
-        Array.from(minorSel.options).forEach(opt => {
-          if (!opt.value) return;
-          opt.hidden = !!filters.major && opt.dataset.major !== filters.major;
-        });
-        // 選択中の小分類が候補から外れたらリセット
-        const cur = Array.from(minorSel.options).find(o => o.value === minorSel.value);
-        if (cur?.hidden) { minorSel.value = ''; filters.minor = ''; }
-        applyFilters();
-      });
-      minorSel.addEventListener('change', () => {
-        filters.minor = minorSel.value;
-        applyFilters();
-      });
-    }
-
-    // ── 列の表示/非表示 ──
-    const COL_VIS_KEY = 'sf6-combo-col-vis';
-    function loadColVis(): Record<string, boolean> {
-      try { return JSON.parse(localStorage.getItem(COL_VIS_KEY) ?? '{}'); }
-      catch { return {}; }
-    }
-    function applyColVis(colKey: string, visible: boolean) {
-      const col = document.querySelector<HTMLTableColElement>(`#combo-table col[data-col="${colKey}"]`);
-      if (col) col.style.visibility = visible ? '' : 'collapse';
-    }
-    const colVisState = loadColVis();
-    document.querySelectorAll<HTMLInputElement>('[data-col-vis]').forEach(cb => {
-      const key = cb.dataset.colVis ?? '';
-      if (key in colVisState) {
-        cb.checked = colVisState[key];
-      }
-      applyColVis(key, cb.checked);
-      cb.addEventListener('change', () => {
-        applyColVis(key, cb.checked);
-        colVisState[key] = cb.checked;
-        localStorage.setItem(COL_VIS_KEY, JSON.stringify(colVisState));
-      });
-    });
-    const colVisToggle = document.getElementById('col-vis-toggle');
-    const colVisMenu = document.getElementById('col-vis-menu');
-    colVisToggle?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (!colVisMenu) return;
-      colVisMenu.style.display = colVisMenu.style.display === 'none' ? 'flex' : 'none';
-    });
-    document.addEventListener('click', (e) => {
-      if (!colVisMenu || colVisMenu.style.display === 'none') return;
-      const target = e.target as HTMLElement;
-      if (colVisMenu.contains(target) || target === colVisToggle) return;
-      colVisMenu.style.display = 'none';
+    const starterSel = document.getElementById('filter-starter') as HTMLSelectElement | null;
+    starterSel?.addEventListener('change', () => {
+      filters.starter = starterSel.value;
+      applyFilters();
     });
 
     // ── インラインエディタ展開（エディタ自体がテーブル内を移動する） ──
@@ -1373,8 +595,7 @@ for (const c of COMBOS) {
         labelEl.textContent = `「${editingTitle}」を編集中`;
         return;
       }
-      // 空の小分類用ドロップゾーンは数えない（実際のコンボだけ）
-      const realGroups = Array.from(document.querySelectorAll<HTMLElement>('tbody.combo-group:not(.combo-drop-zone)'));
+      const realGroups = Array.from(document.querySelectorAll<HTMLElement>('tbody.combo-group'));
       const beforeCount = realGroups.filter(g => {
         const pos = editorHost.compareDocumentPosition(g);
         return (pos & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
@@ -1389,22 +610,26 @@ for (const c of COMBOS) {
     const editorModeLabel = document.getElementById('editor-mode-label');
     // deno-lint-ignore no-explicit-any
     const editorAPI = () => (window as any).comboEditorAPI as
-      | { loadCombo: (c: unknown) => void; reset: () => void; comboId: string | null }
+      | { loadCombo: (c: unknown) => void; reset: (preset?: BucketPreset) => void; comboId: string | null }
       | undefined;
 
-    function setEditorNewMode() {
+    function setEditorNewMode(preset?: BucketPreset) {
       if (editorModeLabel) editorModeLabel.textContent = '新規コンボを追加';
-      editorAPI()?.reset();
+      editorAPI()?.reset(preset);
     }
 
-    function openEditorAt(btn: HTMLElement) {
+    // 行間の「＋ ここに挿入」は、その行の見出しに入る値と優先度を入れた状態で開く（usePreset=false なら空で開く）
+    function openEditorAt(btn: HTMLElement, usePreset = true) {
       activeBtn?.classList.remove('is-active');
       activeBtn = btn;
       btn.classList.add('is-active');
       setEditingGroup(null);
-      setEditorNewMode();
-
       const pos = btn.dataset.insertPos;
+      const owner = pos === 'end' ? null : btn.closest<HTMLElement>('tbody.combo-group');
+      setEditorNewMode(usePreset && owner
+        ? { ...bucketPreset(owner.dataset.bucket ?? ''), priority: owner.dataset.priority as Priority }
+        : undefined);
+
       if (pos === 'end') {
         const tail = comboTableEl.querySelector('tbody.combo-tail');
         if (tail) tail.before(editorHost);
@@ -1433,7 +658,7 @@ for (const c of COMBOS) {
 
     document.getElementById('btn-add-combo-top')?.addEventListener('click', () => {
       const firstBtn = document.querySelector<HTMLElement>('tbody.combo-group .insert-here-btn');
-      if (firstBtn) openEditorAt(firstBtn);
+      if (firstBtn) openEditorAt(firstBtn, false);
     });
 
     editorHost.addEventListener('combo-editor:cancel', () => closeEditor());
@@ -1489,45 +714,20 @@ for (const c of COMBOS) {
       document.addEventListener('pointerup', onUp);
     });
 
-    // ── 小分類のどのセクションにcobo-groupが属するか判定 ──
-    function getComboSection(el: HTMLElement): { major: string; minor: string } {
-      let prev = el.previousElementSibling as HTMLElement | null;
-      while (prev) {
-        if (prev.classList.contains('combo-section-head')) {
-          return { major: prev.dataset.headMajor ?? '', minor: prev.dataset.headMinor ?? '' };
-        }
-        prev = prev.previousElementSibling as HTMLElement | null;
-      }
-      return { major: '', minor: '' };
+    // ── 見出しの中のコンボ行と見出しの行 ──
+    function bucketGroups(bucket: string): HTMLElement[] {
+      return Array.from(document.querySelectorAll<HTMLElement>(`tbody.combo-group[data-bucket="${CSS.escape(bucket)}"]`));
+    }
+    function bucketHead(bucket: string): HTMLElement | null {
+      return document.querySelector<HTMLElement>(`tbody[data-head-bucket="${CSS.escape(bucket)}"]`);
     }
 
-    // ── ドロップゾーンの表示/非表示を更新 ──
-    // excludeItem: ドラッグ中のアイテム（まだ DOM に残っているため件数から除外）
-    function updateDropZones(excludeItem?: HTMLElement) {
-      document.querySelectorAll<HTMLElement>('tbody.combo-section-head').forEach(head => {
-        const major = head.dataset.headMajor ?? '';
-        const minor = head.dataset.headMinor ?? '';
-        const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
-          `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
-        )).filter(el => el !== excludeItem);
-        const dz = document.querySelector<HTMLElement>(
-          `tbody.combo-drop-zone[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
-        );
-        if (dz) dz.classList.toggle('dz-empty', realCombos.length === 0);
-        const countEl = head.querySelector('.combo-minor-count');
-        if (countEl) countEl.textContent = `${realCombos.length}件`;
-      });
-    }
-
-    // ページ初期表示時に同期
-    updateDropZones();
-
-    // ── SortableJS で並び替え ──
+    // ── SortableJS で並び替え（同じ見出し・同じ優先度の中だけ） ──
     const comboTable = document.getElementById('combo-table');
     if (comboTable) {
       Sortable.create(comboTable, {
         handle: '.row-drag-handle',
-        draggable: 'tbody.combo-group:not(.combo-drop-zone)',
+        draggable: 'tbody.combo-group',
         animation: 180,
         easing: 'cubic-bezier(0.2, 0, 0.2, 1)',
         ghostClass: 'sortable-ghost',
@@ -1535,241 +735,37 @@ for (const c of COMBOS) {
         dragClass: 'sortable-drag',
         forceFallback: true,
         fallbackTolerance: 3,
-        onStart: (evt) => {
+        onStart: () => {
           document.body.classList.add('is-dragging-combo');
-          updateDropZones(evt.item as HTMLElement);
         },
-        onEnd: (evt) => {
+        // 挿入先は related の隣なので、related が同じ見出し・同じ優先度のときだけ動かす
+        onMove: (evt) => evt.related.dataset.bucket === evt.dragged.dataset.bucket
+          && evt.related.dataset.priority === evt.dragged.dataset.priority,
+        onEnd: () => {
           document.body.classList.remove('is-dragging-combo');
           updatePosLabel();
-          const movedItem = evt.item as HTMLElement;
-          const { major, minor } = getComboSection(movedItem);
-          movedItem.dataset.major = major;
-          movedItem.dataset.minor = minor;
-          updateDropZones();
           applyFilters();
         },
       });
     }
 
-    // ── 小分類追加 ──
-    function createSectionHead(major: string, minor: string): HTMLElement {
-      const tbody = document.createElement('tbody');
-      tbody.className = 'combo-section-head';
-      tbody.dataset.headMajor = major;
-      tbody.dataset.headMinor = minor;
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="9" class="combo-minor-cell">
-            <div class="combo-minor-inner">
-              <button type="button" class="combo-minor-toggle" data-major="${major}" data-minor="${minor}" aria-expanded="true" title="折りたたむ/開く">
-                <span class="combo-toggle-icon">▼</span>
-              </button>
-              <span class="combo-minor-title">${minor || '未分類'}</span>
-              <button type="button" class="btn-minor-rename" data-major="${major}" data-minor="${minor}" title="小分類名を変更">✎</button>
-              <span class="combo-minor-rule"></span>
-              <span class="combo-minor-count">0件</span>
-              <div class="combo-minor-actions">
-                <button type="button" class="btn-add-combo-minor" data-major="${major}" data-minor="${minor}">＋ コンボ追加</button>
-                <button type="button" class="btn-minor-delete" data-major="${major}" data-minor="${minor}" title="この小分類を削除（空の場合のみ）">削除</button>
-              </div>
-            </div>
-          </td>
-        </tr>`;
-      return tbody;
-    }
-
-    function createDropZone(major: string, minor: string): HTMLElement {
-      const tbody = document.createElement('tbody');
-      tbody.className = 'combo-group combo-drop-zone dz-empty';
-      tbody.dataset.major = major;
-      tbody.dataset.minor = minor;
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="9" class="drop-zone-cell">
-            <span class="drop-zone-hint">コンボをここにドラッグして追加</span>
-          </td>
-        </tr>`;
-      return tbody;
-    }
-
-    function attachMinorActionHandlers(container: HTMLElement) {
-      container.querySelectorAll<HTMLButtonElement>('.combo-minor-toggle').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const major = btn.dataset.major ?? '';
-          const minor = btn.dataset.minor ?? '';
-          const key = minorKey(major, minor);
-          const nowCollapsed = !collapsedMinors.has(key);
-          if (nowCollapsed) collapsedMinors.add(key); else collapsedMinors.delete(key);
-          btn.setAttribute('aria-expanded', String(!nowCollapsed));
-          applyFilters();
-        });
-      });
-      container.querySelectorAll<HTMLButtonElement>('.btn-minor-rename').forEach(btn => {
-        btn.addEventListener('click', () => handleMinorRename(btn));
-      });
-      container.querySelectorAll<HTMLButtonElement>('.btn-add-combo-minor').forEach(btn => {
-        btn.addEventListener('click', () => handleAddComboToMinor(btn));
-      });
-      container.querySelectorAll<HTMLButtonElement>('.btn-minor-delete').forEach(btn => {
-        btn.addEventListener('click', () => handleMinorDelete(btn));
-      });
-    }
-
-    // ── 小分類削除（配下にコンボが残っている場合は保護） ──
-    function handleMinorDelete(btn: HTMLButtonElement) {
-      const major = btn.dataset.major ?? '';
-      const minor = btn.dataset.minor ?? '';
-      const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
-        `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
-      ));
-      if (realCombos.length > 0) {
-        alert(`「${minor || '未分類'}」にはコンボが${realCombos.length}件残っているため削除できません。`);
-        return;
-      }
-      if (!confirm(`小分類「${minor || '未分類'}」を削除しますか？`)) return;
-
-      document.querySelector<HTMLElement>(
-        `tbody.combo-section-head[data-head-major="${CSS.escape(major)}"][data-head-minor="${CSS.escape(minor)}"]`
-      )?.remove();
-      document.querySelector<HTMLElement>(
-        `tbody.combo-drop-zone[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
-      )?.remove();
-    }
-
-    // ── 大分類削除（配下にコンボが残っている場合は保護） ──
-    function handleMajorDelete(btn: HTMLButtonElement) {
-      const major = btn.dataset.major ?? '';
-      const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
-        `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"]`
-      ));
-      if (realCombos.length > 0) {
-        alert(`「${major || '未分類'}」にはコンボが${realCombos.length}件残っているため削除できません。`);
-        return;
-      }
-      if (!confirm(`大分類「${major || '未分類'}」を削除しますか？（配下の小分類もすべて削除されます）`)) return;
-
-      document.querySelectorAll<HTMLElement>(`[data-head-major="${CSS.escape(major)}"]`).forEach(el => el.remove());
-      document.querySelectorAll<HTMLElement>(`tbody.combo-drop-zone[data-major="${CSS.escape(major)}"]`).forEach(el => el.remove());
-    }
-
-    document.querySelectorAll<HTMLButtonElement>('.btn-major-delete').forEach(btn => {
-      btn.addEventListener('click', () => handleMajorDelete(btn));
-    });
-
-    // ── 大分類名変更 ──
-    function handleMajorRename(btn: HTMLButtonElement) {
-      const oldMajor = btn.dataset.major ?? '';
-      const newName = window.prompt('新しい大分類名を入力してください：', oldMajor);
-      if (!newName || newName === oldMajor) return;
-
-      document.querySelectorAll<HTMLElement>(`tbody.combo-major-head[data-head-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
-        el.dataset.headMajor = newName;
-        const titleEl = el.querySelector('.combo-major-title');
-        if (titleEl) titleEl.textContent = newName;
-        el.querySelectorAll<HTMLButtonElement>('[data-major]').forEach(b => { b.dataset.major = newName; });
-        const toggleBtn = el.querySelector<HTMLButtonElement>('.combo-major-toggle');
-        if (toggleBtn) toggleBtn.dataset.majorToggle = newName;
-      });
-      document.querySelectorAll<HTMLElement>(`tbody.combo-col-head[data-head-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
-        el.dataset.headMajor = newName;
-      });
-      document.querySelectorAll<HTMLElement>(`tbody.combo-section-head[data-head-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
-        el.dataset.headMajor = newName;
-        el.querySelectorAll<HTMLButtonElement>('[data-major]').forEach(b => { b.dataset.major = newName; });
-      });
-      document.querySelectorAll<HTMLElement>(`tbody.combo-group[data-major="${CSS.escape(oldMajor)}"]`).forEach(el => {
-        el.dataset.major = newName;
-      });
-    }
-
-    document.querySelectorAll<HTMLButtonElement>('.btn-major-rename').forEach(btn => {
-      btn.addEventListener('click', () => handleMajorRename(btn));
-    });
-
-    // ── 小分類名変更 ──
-    function handleMinorRename(btn: HTMLButtonElement) {
-      const major = btn.dataset.major ?? '';
-      const oldMinor = btn.dataset.minor ?? '';
-      const newName = window.prompt('新しい小分類名を入力してください：', oldMinor);
-      if (!newName || newName === oldMinor) return;
-
-      // 同じ大分類内の全section-head・combo-group・drop-zoneを更新
-      document.querySelectorAll<HTMLElement>(`tbody.combo-section-head[data-head-major="${CSS.escape(major)}"][data-head-minor="${CSS.escape(oldMinor)}"]`).forEach(el => {
-        el.dataset.headMinor = newName;
-        const titleEl = el.querySelector('.combo-minor-title');
-        if (titleEl) titleEl.textContent = newName;
-        el.querySelectorAll<HTMLButtonElement>('[data-minor]').forEach(b => { b.dataset.minor = newName; });
-      });
-      document.querySelectorAll<HTMLElement>(`tbody.combo-group[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(oldMinor)}"]`).forEach(el => {
-        el.dataset.minor = newName;
-      });
-    }
-
-    // ── 小分類内にコンボ追加（エディタを末尾に配置） ──
-    function handleAddComboToMinor(btn: HTMLButtonElement) {
-      setEditorNewMode();
-      const major = btn.dataset.major ?? '';
-      const minor = btn.dataset.minor ?? '';
-      const realCombos = Array.from(document.querySelectorAll<HTMLElement>(
-        `tbody.combo-group:not(.combo-drop-zone)[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
-      ));
-      if (realCombos.length > 0) {
-        realCombos[realCombos.length - 1].after(editorHost);
-      } else {
-        const dz = document.querySelector<HTMLElement>(
-          `tbody.combo-drop-zone[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
-        );
-        (dz ?? document.querySelector<HTMLElement>(`tbody.combo-section-head[data-head-major="${CSS.escape(major)}"][data-head-minor="${CSS.escape(minor)}"]`))?.after(editorHost);
-      }
+    // ── 見出しの「＋」: その見出しに入る値を入れた状態で、見出しの末尾にエディタを開く ──
+    function handleAddComboToBucket(btn: HTMLButtonElement) {
+      const bucket = btn.dataset.bucket ?? '';
+      activeBtn?.classList.remove('is-active');
+      activeBtn = null;
+      setEditingGroup(null);
+      setEditorNewMode(bucketPreset(bucket));
+      listView.reveal(bucket);
+      (bucketGroups(bucket).at(-1) ?? bucketHead(bucket))?.after(editorHost);
       editorHost.style.display = '';
       editorOpen = true;
       updatePosLabel();
       editorHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
-    // ── 大分類への小分類追加 ──
-    document.querySelectorAll<HTMLButtonElement>('.btn-add-minor').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const major = btn.dataset.major ?? '';
-        const name = window.prompt('新しい小分類の名前を入力してください：', '');
-        if (!name) return;
-
-        // 同じ大分類の最後のセクション（またはドロップゾーン）の後に挿入
-        const allHeads = Array.from(document.querySelectorAll<HTMLElement>(
-          `tbody.combo-section-head[data-head-major="${CSS.escape(major)}"]`
-        ));
-        let insertAfter: Element | null = null;
-        if (allHeads.length > 0) {
-          const lastHead = allHeads[allHeads.length - 1];
-          // その小分類の最後のcombo-groupを探す
-          const minor = lastHead.dataset.headMinor ?? '';
-          const combosInLast = Array.from(document.querySelectorAll<HTMLElement>(
-            `tbody.combo-group[data-major="${CSS.escape(major)}"][data-minor="${CSS.escape(minor)}"]`
-          ));
-          insertAfter = combosInLast.length > 0
-            ? combosInLast[combosInLast.length - 1]
-            : lastHead;
-        } else {
-          insertAfter = btn.closest<HTMLElement>('tbody.combo-major-head');
-        }
-
-        const newHead = createSectionHead(major, name);
-        const newDz = createDropZone(major, name);
-        if (insertAfter) {
-          insertAfter.after(newHead);
-          newHead.after(newDz);
-        } else {
-          const tail = comboTableEl.querySelector('tbody.combo-tail');
-          tail?.before(newHead);
-          newHead.after(newDz);
-        }
-        attachMinorActionHandlers(newHead);
-      });
+    document.querySelectorAll<HTMLButtonElement>('.btn-add-combo-bucket').forEach(btn => {
+      btn.addEventListener('click', () => handleAddComboToBucket(btn));
     });
-
-    // 既存ボタンにハンドラを付ける
-    attachMinorActionHandlers(document.body);
 
     // ── アップロードボタン（visibility を public に切替） ──
     function handleUploadClick(btn: HTMLButtonElement) {
@@ -1779,13 +775,13 @@ for (const c of COMBOS) {
         : btn.closest<HTMLElement>('tbody.combo-group');
       if (!tbody) return;
 
-      const posterCell = tbody.querySelector<HTMLElement>('.col-poster');
-      if (posterCell) {
-        posterCell.querySelector<HTMLElement>('.tag-private, .tag-unlisted')?.remove();
+      const sub = tbody.querySelector<HTMLElement>('.combo-sub');
+      if (sub) {
+        sub.querySelector<HTMLElement>('.tag-unlisted')?.remove();
         const badge = document.createElement('span');
         badge.className = 'tag tag-public';
         badge.textContent = '🌐 公開';
-        posterCell.appendChild(badge);
+        sub.appendChild(badge);
       }
       btn.remove();
     }
@@ -1838,7 +834,6 @@ for (const c of COMBOS) {
         closeEditor();
       }
       tbody.remove();
-      updateDropZones();
       applyFilters();
     }
     document.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach(btn => {
@@ -1868,76 +863,220 @@ for (const c of COMBOS) {
 
     interface ComboSaveDetail {
       id: string;
+      sourceId: string | null;   // ✎ で開いた元のコンボ（新規は null）
       title: string;
-      categoryMajor: string;
-      categoryMinor: string;
-      starterType: string;
+      starter: Combo['starter'];
+      hitState: Combo['hitState'];
+      position: Combo['position'];
+      priority: Combo['priority'];
       root: Combo['root'];
-      fullInputsDisplay: string;
+      fullInputs: string;
+      fullInputsDisplay: string;   // 保存した時点のエディタの表記（行のチップは fullInputs から作るので使わない）
       damage: number;
       enderDisplayName: string | null;
       situationTags: string[];
       routeCount: number;
+      youtubeId: string | null;
+      startSec: number | null;
     }
 
-    function buildNewComboRow(combo: Combo, view: ComboSaveDetail): HTMLElement {
+    // コマンド表記（文字とチップ）。形は Notation.astro に合わせる（チップは data-token を Layout.astro が表記設定に合わせて書き換える。最初の表記もここで合わせる）
+    function notationHtml(inputs: string, ghostInputs = '', elbow = '└─›'): string {
+      const character = document.body.dataset.character ?? '';
+      const recipeTable = getRecipeTable(character);
+      const prefs = readNotationPrefs(localStorage);
+      const moveTable = getMoveTable(character);
+      const toks = (str: string) => str.split('>').map(t => t.trim()).filter(Boolean);
+      const steps = recipeSteps(inputs, recipeTable).map(st => `<span class="recipe-step">${escapeHtml(st)}</span>`);
+      const ghostSteps = recipeSteps(ghostInputs, recipeTable).map(st => `<span class="recipe-step cmd-ghost">${escapeHtml(st)}</span>`);
+      const chip = (tok: string, ghost: boolean) =>
+        `<span class="${chipClassOf(tok, ghost)}" data-token="${escapeHtml(tok)}">${escapeHtml(formatToken(tok, prefs, moveTable))}</span>`;
+      const chips = toks(inputs).map(t => chip(t, false));
+      const ghostChips = toks(ghostInputs).map(t => chip(t, true));
+      const text = ghostSteps.join('<span class="recipe-sep cmd-ghost"> &gt; </span>')
+        + (ghostSteps.length && steps.length ? `<span class="recipe-sep cmd-branch-elbow"> ${elbow} </span>` : '')
+        + steps.join('<span class="recipe-sep"> &gt; </span>');
+      const chipsHtml = ghostChips.join('<span class="cmd-sep cmd-ghost">›</span>')
+        + (ghostChips.length && chips.length ? `<span class="cmd-sep cmd-branch-elbow">${elbow}</span>` : '')
+        + chips.join('<span class="cmd-sep">›</span>');
+      return `<span class="notation-text notation-text-sm">${text}</span><span class="notation notation-chips notation-sm">${chipsHtml}</span>`;
+    }
+
+    // ダメージ・〆分類・有利F の列（ComboRowStats.astro。起き攻めパネルは作らないので、有利F は開閉しないバッジ）
+    function statsHtml(r: RouteSummary): string {
+      const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : undefined;
+      return `<td class="col-num"><span class="dmg${r.leaf.damage ? '' : ' dmg-empty'}">${formatDamage(r.leaf.damage)}</span></td>
+          <td class="col-ender"><span${ender ? ` title="${escapeHtml(ender.displayName)}"` : ''}>${ender ? escapeHtml(ender.displayName) : '—'}</span></td>
+          <td class="col-frame">${ender?.frameAdvantage ? `<span class="frame-adv-badge">${escapeHtml(ender.frameAdvantage)}</span>` : ''}</td>`;
+    }
+
+    // 分岐コンボの親行の列（ComboParentStats.astro）: ダメージの幅と、ルートに出てくる〆
+    function parentStatsHtml(routes: RouteSummary[]): string {
+      const damages = routes.map(r => r.leaf.damage ?? 0).filter(d => d > 0);
+      const min = damages.length ? Math.min(...damages) : 0;
+      const max = damages.length ? Math.max(...damages) : 0;
+      const enders = [...new Set(routes.map(r => r.leaf.enderClassId).filter((id): id is string => !!id))]
+        .map(id => getEnderClassById(id))
+        .filter((e): e is NonNullable<typeof e> => !!e);
+      const enderHtml = enders.length
+        ? enders.map(e => `<span class="ender-line" title="${escapeHtml(e.displayName)}">${escapeHtml(e.displayName)}</span>`).join('')
+        : '<span>—</span>';
+      const frameHtml = enders
+        .map(e => `<span class="ender-line">${e.frameAdvantage ? `<span class="frame-adv-badge frame-adv-quiet">${escapeHtml(e.frameAdvantage)}</span>` : ''}</span>`)
+        .join('');
+      return `<td class="col-num"><span class="dmg${min ? '' : ' dmg-empty'}">${formatDamage(min)}</span>${max > min ? `<span class="dmg-range">〜${formatDamage(max)}</span>` : ''}</td>
+          <td class="col-ender">${enderHtml}</td>
+          <td class="col-frame">${frameHtml}</td>`;
+    }
+
+    // 保存で足す行。形はサーバー側（ComboRowCommand.astro / ComboRowStats.astro / ComboParentStats.astro）に合わせる。
+    // 分岐コンボは親行（共通部分と ▶ ルートボタン）とルートの行を作る。モックの保存行には詳細ページが無いのでリンクにしない
+    function buildNewComboRow(combo: Combo): HTMLElement {
+      const routes = getComboRoutes(combo);
+      const recipeTable = getRecipeTable(document.body.dataset.character ?? '');
+      const search = comboSearchTexts(combo, routes, recipeTable);
       const tbody = document.createElement('tbody');
       tbody.className = 'combo-group';
       tbody.dataset.comboId = combo.id;
       tbody.dataset.source = combo.sourceType;
-      tbody.dataset.major = combo.categoryMajor ?? '';
-      tbody.dataset.minor = combo.categoryMinor ?? '';
-      const tagsHtml = view.situationTags.map(t => `<span class="tag" style="margin-right:3px;">${escapeHtml(t)}</span>`).join('');
-      tbody.innerHTML = `
-        <tr class="insert-here-row">
-          <td colspan="9"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
-        </tr>
-        <tr>
-          <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
-          <td><span class="row-link col-title">${escapeHtml(combo.title)}</span></td>
-          <td><span class="mono" style="font-size:0.82rem;">${escapeHtml(view.fullInputsDisplay)}</span></td>
-          <td class="col-situation">${tagsHtml}</td>
-          <td class="col-poster"><span class="tag tag-personal">自分のメモ</span><span class="tag tag-private">🔒</span></td>
-          <td class="col-ender"><span>${view.enderDisplayName ? escapeHtml(view.enderDisplayName) : '—'}</span></td>
-          <td class="col-frame"></td>
-          <td class="col-num"><span class="dmg">${view.damage.toLocaleString()}</span></td>
-          <td class="col-actions">
+      tbody.dataset.starter = combo.starter;
+      tbody.dataset.section = sectionOf(combo);
+      tbody.dataset.bucket = bucketOf(combo);
+      tbody.dataset.priority = combo.priority;
+      tbody.dataset.hitState = combo.hitState;
+      tbody.dataset.gauges = gaugeClassesOf(routes).join(' ');
+      tbody.dataset.search = search.group;
+      const positionTag = positionTagOf(combo);
+      const tagHtml = (t: string) => `<span class="tag combo-tag">${escapeHtml(t)}</span>`;
+      const hitClass = hitTagClass(combo.hitState);
+      const hitHtml = (ghost: boolean) => (hitClass ? `<span class="${hitClass}${ghost ? ' cmd-ghost' : ''}">${combo.hitState}</span>` : '');
+      // fork は「fork」と元の投稿者を添える
+      const forkHtml = combo.sourceType === 'forked'
+        ? `<span class="tag combo-name">fork</span>${combo.ownerLabel ? `<span class="combo-name">${escapeHtml(combo.ownerLabel)}</span>` : ''}`
+        : '';
+      const comboSub = `<span class="${priorityTagClass(combo.priority)}">${escapeHtml(combo.priority)}</span>${forkHtml}`
+        + `<span class="col-title combo-name">${escapeHtml(combo.title)}</span>${positionTag ? tagHtml(positionTag) : ''}`;
+      const actionsHtml = `<td class="col-actions">
             <div class="row-actions">
               <button type="button" class="btn-edit" data-edit-combo-id="${combo.id}" title="編集" aria-label="編集">✎</button>
               <button type="button" class="btn-upload" data-combo-id="${combo.id}" title="アップロード" aria-label="アップロード">⤴</button>
               <button type="button" class="btn-delete" data-delete-combo-id="${combo.id}" title="このコンボを削除" aria-label="削除">🗑</button>
             </div>
-          </td>
+          </td>`;
+      const insertRow = `<tr class="insert-here-row">
+          <td colspan="6"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
         </tr>`;
+      const handle = '<td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>';
+
+      if (routes.length === 1) {
+        const r = routes[0];
+        tbody.innerHTML = `${insertRow}
+        <tr>
+          ${handle}
+          <td>
+            <div class="combo-line">
+              <div class="combo-cmd">${hitHtml(false)}<span class="combo-cmd-link">${notationHtml(r.fullInputs)}</span></div>
+              <div class="combo-sub">${comboSub}${(r.leaf.situationTags ?? []).map(tagHtml).join('')}</div>
+            </div>
+          </td>
+          ${statsHtml(r)}
+          ${actionsHtml}
+        </tr>`;
+        return tbody;
+      }
+
+      const routeRows = routes.map((r, i) => {
+        const elbow = i === routes.length - 1 ? '└─›' : '├─›';
+        const inputs = r.pathSegments[r.pathSegments.length - 1];
+        const ghost = r.pathSegments.slice(0, -1).filter(seg => seg.trim()).join(' > ');
+        const label = `<span class="combo-route-label">${escapeHtml(r.leaf.routeLabel ?? '(無名ルート)')}</span>`;
+        const cond = r.leaf.condition ? `<span class="tag">${escapeHtml(r.leaf.condition)}</span>` : '';
+        return `<tr class="combo-child-row" data-branch-of="${combo.id}" data-gauge="${gaugeClassFromSegs(r.pathSegments)}" data-search="${escapeHtml(search.routes[i] ?? '')}" style="display:none;">
+          <td class="cell-handle"></td>
+          <td>
+            <div class="combo-line">
+              <div class="combo-cmd">${hitHtml(true)}<span class="combo-cmd-link">${notationHtml(inputs, ghost, elbow)}</span></div>
+              <div class="combo-sub">${label}${cond}${(r.leaf.situationTags ?? []).map(tagHtml).join('')}</div>
+            </div>
+          </td>
+          ${statsHtml(r)}
+          <td></td>
+        </tr>`;
+      }).join('');
+      tbody.innerHTML = `${insertRow}
+        <tr class="combo-parent-row">
+          ${handle}
+          <td>
+            <div class="combo-line">
+              <div class="combo-cmd">
+                ${hitHtml(false)}<span class="combo-cmd-link">${notationHtml(combo.root.segment)}</span>
+                <span class="combo-branch-note">…の後に分岐</span>
+                <button type="button" class="branch-toggle" data-combo-id="${combo.id}" title="分岐ルートを展開/折り畳み">
+                  <span class="branch-toggle-icon">▶</span>
+                  <span class="tag branch-toggle-count">${routes.length}ルート</span>
+                </button>
+              </div>
+              <div class="combo-sub">${comboSub}</div>
+            </div>
+          </td>
+          ${parentStatsHtml(routes)}
+          ${actionsHtml}
+        </tr>
+        ${routeRows}`;
+      tbody.querySelectorAll<HTMLButtonElement>('.branch-toggle').forEach(bindBranchToggle);
       return tbody;
     }
 
+    // 保存した行の置き場所: エディタが同じ見出し・同じ優先度の行の隣にあればその位置、違えば見出しの中の同じ優先度の末尾
+    function placeNewRow(row: HTMLElement, bucket: string, priority: Priority) {
+      const neighbors = [editorHost.previousElementSibling, editorHost.nextElementSibling] as (HTMLElement | null)[];
+      if (neighbors.some(el => el?.dataset.bucket === bucket && el?.dataset.priority === priority)) {
+        editorHost.before(row);
+        return;
+      }
+      const rank = (p: string | undefined) => PRIORITIES.indexOf(p as Priority);
+      const upper = bucketGroups(bucket).filter(g => rank(g.dataset.priority) <= rank(priority));
+      (upper.at(-1) ?? bucketHead(bucket))?.after(row);
+    }
+
+    // 保存: 新規は行を足す。✎ で開いた自分のメモは元の行（と COMBOS の要素）を置き換え、
+    // 共有・他人のコンボは fork として新しい行を足して元の行は残す
     editorHost.addEventListener('combo-editor:save', ((e: CustomEvent<ComboSaveDetail>) => {
       const detail = e.detail;
-      // 始動技・ヒット状態はコマンドの先頭から仮に決める（エディタの入力欄は次のタスクで置き換える）
-      const inferred = inferStarter(detail.root.segment);
-      const combo: Combo = {
-        id: detail.id,
+      const source = detail.sourceId ? COMBOS.find(c => c.id === detail.sourceId) : undefined;
+      const replace = source?.sourceType === 'personal';
+      const fields = {
         title: detail.title,
-        categoryMajor: detail.categoryMajor || undefined,
-        categoryMinor: detail.categoryMinor || undefined,
-        starter: inferred.starter ?? 'その他',
-        hitState: inferred.hitState,
-        position: 'どこでも',
-        starterType: detail.starterType,
-        sourceType: 'personal',
-        visibility: 'private',
-        patchVersion: COMBOS[0]?.patchVersion ?? '1.25',
+        starter: detail.starter,
+        hitState: detail.hitState,
+        position: detail.position,
+        priority: detail.priority,
         root: detail.root,
+        youtubeId: detail.youtubeId ?? undefined,
+        startSec: detail.youtubeId ? (detail.startSec ?? 0) : undefined,
       };
-      COMBOS.push(combo);
+      const combo: Combo = replace && source
+        ? { ...source, ...fields }
+        : {
+            ...fields,
+            id: detail.id,
+            sourceType: source ? 'forked' : 'personal',
+            ...(source ? { forkedFrom: source.id, ownerLabel: source.ownerLabel } : {}),
+            visibility: 'private',
+            patchVersion: COMBOS[0]?.patchVersion ?? '1.25',
+          };
+      if (replace && source) COMBOS[COMBOS.indexOf(source)] = combo;
+      else COMBOS.push(combo);
 
-      const row = buildNewComboRow(combo, detail);
-      editorHost.before(row);
+      const row = buildNewComboRow(combo);
+      const bucket = bucketOf(combo);
+      // 置き換えのときは、隠していた元の行の隣（見出し・優先度が同じなら同じ位置）に置いてから元の行を消す
+      const original = replace ? editingGroup : null;
+      placeNewRow(row, bucket, combo.priority);
       bindRowActions(row);
       closeEditor();
-      updateDropZones();
-      applyFilters();
+      original?.remove();
+      listView.reveal(bucket, combo.priority === FOLDED_PRIORITY);
     }) as EventListener);
 
     // ── 詳細ページの「編集」導線（?edit=<id> で対象を開く） ──

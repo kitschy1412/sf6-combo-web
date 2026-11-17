@@ -1,6 +1,7 @@
 ---
 import Layout from '../../../../../layouts/Layout.astro';
 import Notation from '../../../../../components/Notation.astro';
+import StarterLabel from '../../../../../components/StarterLabel.astro';
 import {
   getComboNoteById,
   getComboNoteItems,
@@ -88,7 +89,7 @@ function visibilityStyle(v: Visibility): string {
           <!-- コンボ情報 -->
           <div style="flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:5px; flex-wrap:wrap;">
-              {combo.categoryMajor && <span class="tag" style="background:#e8f0fe; color:#1a56db;">{combo.categoryMajor}</span>}
+              <span class="tag" style="background:#e8f0fe; color:#1a56db;"><StarterLabel starter={combo.starter} />始動</span>
               {combo.sourceType === 'personal' && <span class="tag tag-personal">自分のメモ</span>}
               {combo.sourceType === 'shared' && <span class="tag tag-shared">共有 / {combo.ownerLabel}</span>}
               {branched && <span class="tag" style="background:#111; color:#fff;">{routes.length}ルート</span>}

@@ -24,7 +24,10 @@ Phase 3 移行後に目標とする URL 体系。現状稼働中の旧版との�
 | `/` | キャラ一覧 | 変更なし |
 | `/[character]` | キャラ別コンボ一覧（新版） | `src/pages/mock/character/[name].astro` を昇格 |
 | `/combo/[id]` | コンボ詳細 | 新版に差し替え |
+| `/okizeme` | 起き攻めの一覧（〆分類ごと） | `src/pages/mock/okizeme/index.astro` を昇格（2026-11-14。URL は未確定） |
 | `/okizeme/[id]` | 起き攻め詳細 | 新規（Phase 3） |
+| `/vs` | キャラ対策の一覧（キャラごとの強い技・連携） | `src/pages/mock/vs/index.astro` を昇格（2026-11-14。URL は未確定） |
+| `/vs/[character]` | 相手キャラ1人の対策（強い技・連携ごと） | `src/pages/mock/vs/[slug].astro` を昇格（2026-11-14。URL は未確定） |
 
 `/[character]` に表示されるのは `visibility = public` のコンボのみ。
 
@@ -95,11 +98,14 @@ visibility は `public` / `unlisted` / `private` の 3 値（コンボ・ノー�
 | `/mock/character/[name]` | `/[character]` |
 | `/mock/combo/[id]` | `/combo/[id]` |
 | `/mock/combo/new`（廃止。入力はキャラハブのインラインエディタ） | `/combo/new` |
+| `/mock/okizeme/` | `/okizeme`（未確定） |
 | `/mock/okizeme/new` | `/okizeme/new` |
 | `/mock/situation/[id]` | `/okizeme/[id]` （旧称 situation） |
 | `/mock/situation/new` | `/okizeme/new` |
 | `/mock/ender-class/list` | `/admin/ender-class/list`（未確定） |
 | `/mock/admin/broken-list` | `/admin/broken-list` |
+| `/mock/vs/` | `/vs`（未確定） |
+| `/mock/vs/[slug]` | `/vs/[character]`（未確定） |
 | `/mock/me/notes` | `/me/notes` |
 | `/mock/me/notes/combos/[id]` | `/me/notes/combos/[id]` |
 | `/mock/me/notes/okizeme/[id]` | `/me/notes/okizeme/[id]` |
