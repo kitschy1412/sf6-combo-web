@@ -1,5 +1,7 @@
 ---
 import '../styles/global.css';
+import SiteNav from '../components/SiteNav.astro';
+import { NOTATION_STORAGE_KEYS } from '../lib/notation';
 
 interface Props {
   title: string;
@@ -15,23 +17,20 @@ const { title, description = 'SF6コンボをタイムスタンプ付きで検�
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
+    <!-- 文字/チップは描画前に決める（文字が既定なので、チップを選んだときだけ属性を付ける） -->
+    <script is:inline define:vars={{ styleKey: NOTATION_STORAGE_KEYS.style }}>
+      if (localStorage.getItem(styleKey) === 'chip') document.documentElement.dataset.notationStyle = 'chip';
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
   </head>
   <body data-character={character}>
-    <header style="background:#111; color:#fff; position:sticky; top:0; z-index:100;">
-      <div style="max-width:1200px; margin:0 auto; padding:0 24px; height:52px; display:flex; align-items:center; gap:16px;">
-        <a href="/" style="display:flex; align-items:center; gap:10px; flex:1; text-decoration:none; color:#fff;">
-          <span style="font-weight:700; font-size:1.05rem; letter-spacing:0.02em;">SF6 Combo Archive</span>
-          <span style="background:rgba(255,255,255,0.1); font-size:0.65rem; padding:2px 6px; border-radius:3px; letter-spacing:0.08em; color:#aaa;">BETA</span>
-        </a>
-        <a href="/mock/" style="font-size:0.8rem; color:#aaa; text-decoration:none;">モック</a>
-      </div>
-    </header>
+    <SiteNav character={character} />
 
     <main style="max-width:1200px; margin:0 auto; padding:28px 24px 60px;">
       <slot />
@@ -45,12 +44,13 @@ const { title, description = 'SF6コンボをタイムスタンプ付きで検�
       import { getMoveTable } from '../lib/movenames';
       import { formatToken, readNotationPrefs, NOTATION_CHANGE_EVENT, NOTATION_STORAGE_KEYS } from '../lib/notation';
 
-      // 表記設定（数字/矢印・コマンド/技名）を、このページのコマンド表示すべてに反映する。
+      // 表記設定（文字/チップ・数字/矢印・コマンド/技名）を、このページのコマンド表示すべてに反映する。
       // トグル（NotationToggle / ComboEditor）は設定を保存して NOTATION_CHANGE_EVENT を流すだけ
       const moveTable = getMoveTable(document.body.dataset.character ?? '');
 
       function applyNotation(): void {
         const prefs = readNotationPrefs(localStorage);
+        document.documentElement.dataset.notationStyle = prefs.style;
 
         // (旧) .notation[data-original]: Phase 0 ページ。テキストとして一括変換
         document.querySelectorAll<HTMLElement>('.notation[data-original]').forEach((el) => {
@@ -71,7 +71,7 @@ const { title, description = 'SF6コンボをタイムスタンプ付きで検�
 
       // 別のタブで切り替えたときも、このタブのチップ・トグルを合わせる
       window.addEventListener('storage', (e) => {
-        if (e.key === NOTATION_STORAGE_KEYS.dir || e.key === NOTATION_STORAGE_KEYS.name) {
+        if ((Object.values(NOTATION_STORAGE_KEYS) as (string | null)[]).includes(e.key)) {
           document.dispatchEvent(new CustomEvent(NOTATION_CHANGE_EVENT));
         }
       });
