@@ -84,6 +84,12 @@ const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.ti
             {t}<span class="mu-chip-count">{topicCounts.get(t)}</span>
           </button>
         ))}
+        <span id="mu-high-filter-wrap" class="mu-high-filter" hidden>
+          <span class="filter-divider" aria-hidden="true"></span>
+          <button type="button" class="chip" data-filter-high aria-pressed="false" title="自分で「優先度 高」にした対策だけ出す">
+            優先度 高だけ<span class="mu-chip-count" id="mu-high-count"></span>
+          </button>
+        </span>
       </div>
 
       {hasRecipes && <NotationToggle styleToggle />}
@@ -130,6 +136,7 @@ const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.ti
                         <span class="tag mu-topic" data-topic-tag={p.topic}>{p.topic}</span>
                         {p.entry.perspective !== '共通' && <span class="tag tag-personal mu-perspective" title={`${p.entry.perspective}の技を使う対策`}>{p.entry.perspective}</span>}
                         <span class="mu-point-title">{p.title}</span>
+                        <span class="tag mu-mark-badge" hidden></span>
                         {p.caution && <span class="mu-caution-mark" title={p.caution}>注意</span>}
                         {isOldEra(p.entry.patchVersion) && <span class="tag tag-warn" title="Year 3 より前の動画。今のバージョンと違うことがある">{p.entry.patchVersion}</span>}
                         <button type="button" class="mu-time" data-video={p.entry.youtubeId} data-sec={p.startSec}
@@ -163,11 +170,18 @@ const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.ti
                             </span>
                           )}
                         </div>
+                        <div class="mu-mark" role="group" aria-label="自分用の印">
+                          <span class="mu-mark-label">自分用</span>
+                          <button type="button" class="chip mu-mark-btn" data-mark="high" aria-pressed="false">優先度 高</button>
+                          <button type="button" class="chip mu-mark-btn" data-mark="low" aria-pressed="false">優先度 低</button>
+                          <button type="button" class="chip mu-mark-btn" data-mark="hidden" aria-pressed="false">非表示</button>
+                        </div>
                       </div>
                     </details>
                   </li>
                 ))}
               </ol>
+              <button type="button" class="mu-hidden-toggle" data-hidden-toggle hidden></button>
             </section>
           ))}
           <p id="mu-empty" class="mu-empty" hidden>条件に合う対策はありません</p>
@@ -198,7 +212,7 @@ const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.ti
     .vs-head-links { display: flex; gap: 6px; flex-shrink: 0; }
     .vs-head-links .btn { white-space: nowrap; }
 
-    .mu-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 24px; align-items: start; }
+    .mu-layout { display: grid; grid-template-columns: minmax(0, 1fr) 480px; gap: 24px; align-items: start; }
     .mu-player { position: sticky; top: 64px; }
     .mu-player-card { padding: 10px; }
     .mu-video-frame { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
@@ -248,6 +262,23 @@ const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.ti
       color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 3px;
     }
     .mu-body { padding: 0 12px 10px; }
+
+    /* 自分用の印（優先度 高 / 低・非表示）。localStorage の sf6-vs-marks */
+    .mu-high-filter { display: contents; }
+    .mu-high-filter[hidden] { display: none; }
+    .mu-mark { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+    .mu-mark-label { font-size: 0.72rem; color: var(--muted); margin-right: 2px; }
+    .mu-mark-btn { padding: 2px 9px; font-size: 0.74rem; }
+    .mu-mark-badge { flex-shrink: 0; }
+    .mu-mark-badge[hidden] { display: none; }
+    .mu-point[data-mark='low'] .mu-point-head { opacity: 0.6; }
+    .mu-point[data-mark='hidden'] .mu-point-head { opacity: 0.45; }
+    .mu-hidden-toggle {
+      display: block; width: 100%; margin-top: 4px; padding: 5px; font-size: 0.76rem; color: var(--muted-strong);
+      background: none; border: 1px dashed var(--border-strong); border-radius: 4px; cursor: pointer;
+    }
+    .mu-hidden-toggle:hover { background: var(--surface); }
+    .mu-hidden-toggle[hidden] { display: none; }
     .mu-topic { min-width: 4.4em; text-align: center; flex-shrink: 0; }
     .mu-topic[data-topic-tag='攻め'] { background: var(--warn-bg); color: var(--warn-fg); }
     .mu-topic[data-topic-tag='守り'] { background: var(--info-bg); color: var(--info-fg); }
@@ -350,21 +381,96 @@ const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.ti
       btn.setAttribute('aria-pressed', String(on));
     };
 
+    // 自分用の印: 優先度 高（上に並べる）・低（下に薄く）・非表示（見出しの下の「非表示 N件を表示」で出す）
+    type Mark = 'high' | 'low' | 'hidden';
+    const MARKS_KEY = 'sf6-vs-marks';
+    let marks: Record<string, Mark> = {};
+    try { marks = JSON.parse(localStorage.getItem(MARKS_KEY) ?? '{}') ?? {}; } catch { marks = {}; }
+    const saveMarks = () => { try { localStorage.setItem(MARKS_KEY, JSON.stringify(marks)); } catch { /* 保存できなくても表示は続ける */ } };
+    const MARK_RANK: Record<string, number> = { high: 0, '': 1, low: 2, hidden: 3 };
+    const MARK_BADGE: Record<Mark, [string, string]> = { high: ['優先度 高', 'tag-priority-1'], low: ['優先度 低', 'tag-priority-3'], hidden: ['非表示', ''] };
+    const allPoints = Array.from(document.querySelectorAll<HTMLElement>('.mu-point'));
+    allPoints.forEach((li, i) => { li.dataset.order = String(i); });
+    const showHidden = new Set<string>();
+    let highOnly = false;
+    const highChip = document.querySelector<HTMLButtonElement>('[data-filter-high]');
+    const highWrap = document.getElementById('mu-high-filter-wrap');
+    const highCount = document.getElementById('mu-high-count');
+
+    function renderMarks() {
+      for (const li of allPoints) {
+        const mark = marks[li.dataset.pointId ?? ''] ?? '';
+        li.dataset.mark = mark;
+        const badge = li.querySelector<HTMLElement>('.mu-mark-badge');
+        if (badge) {
+          badge.hidden = !mark;
+          badge.className = `tag mu-mark-badge ${mark ? MARK_BADGE[mark][1] : ''}`;
+          badge.textContent = mark ? MARK_BADGE[mark][0] : '';
+        }
+        li.querySelectorAll<HTMLButtonElement>('[data-mark]').forEach(b => setPressed(b, b.dataset.mark === mark));
+      }
+      // 見出しの中を 高 → 普通 → 低 → 非表示 の順に並べ直す（同じ印の中は元の順）
+      document.querySelectorAll<HTMLElement>('.mu-points').forEach(ol => {
+        Array.from(ol.children as HTMLCollectionOf<HTMLElement>)
+          .sort((a, b) => (MARK_RANK[a.dataset.mark ?? ''] - MARK_RANK[b.dataset.mark ?? '']) || (Number(a.dataset.order) - Number(b.dataset.order)))
+          .forEach(li => ol.appendChild(li));
+      });
+      const highIds = new Set(allPoints.filter(li => li.dataset.mark === 'high').map(li => li.dataset.pointId));
+      if (highWrap) highWrap.hidden = highIds.size === 0;
+      if (highCount) highCount.textContent = String(highIds.size);
+      if (highIds.size === 0 && highOnly && highChip) { highOnly = false; setPressed(highChip, false); }
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.mu-mark-btn').forEach(btn => btn.addEventListener('click', () => {
+      const id = btn.closest<HTMLElement>('.mu-point')?.dataset.pointId;
+      const mark = btn.dataset.mark as Mark;
+      if (!id) return;
+      // もう一度押すと外す（普通に戻す）
+      if (marks[id] === mark) delete marks[id]; else marks[id] = mark;
+      saveMarks();
+      renderMarks();
+      apply();
+    }));
+    blocks.forEach(block => block.querySelector<HTMLButtonElement>('[data-hidden-toggle]')?.addEventListener('click', () => {
+      const a = block.dataset.block ?? '';
+      if (showHidden.has(a)) showHidden.delete(a); else showHidden.add(a);
+      apply();
+    }));
+    highChip?.addEventListener('click', () => {
+      highOnly = !highOnly;
+      setPressed(highChip, highOnly);
+      apply();
+    });
+
     function apply() {
       let visible = 0;
+      let anyHidden = false;
       for (const block of blocks) {
         let inBlock = 0;
+        let hiddenInBlock = 0;
+        const open = showHidden.has(block.dataset.block ?? '');
         block.querySelectorAll<HTMLElement>('.mu-point').forEach(point => {
-          const on = (!perspective || point.dataset.perspective === perspective)
-            && (topics.size === 0 || topics.has(point.dataset.topic ?? ''));
+          const match = (!perspective || point.dataset.perspective === perspective)
+            && (topics.size === 0 || topics.has(point.dataset.topic ?? ''))
+            && (!highOnly || point.dataset.mark === 'high');
+          const markedHidden = point.dataset.mark === 'hidden';
+          if (match && markedHidden) hiddenInBlock++;
+          const on = match && (!markedHidden || open);
           point.hidden = !on;
           if (on) inBlock++;
         });
-        block.hidden = inBlock === 0;
-        tocItems.filter(t => t.dataset.toc === block.dataset.block).forEach(t => { t.hidden = inBlock === 0; });
+        const toggle = block.querySelector<HTMLButtonElement>('[data-hidden-toggle]');
+        if (toggle) {
+          toggle.hidden = hiddenInBlock === 0;
+          toggle.textContent = open ? `非表示 ${hiddenInBlock}件を隠す` : `非表示 ${hiddenInBlock}件を表示`;
+        }
+        const shown = inBlock > 0 || hiddenInBlock > 0;
+        block.hidden = !shown;
+        tocItems.filter(t => t.dataset.toc === block.dataset.block).forEach(t => { t.hidden = !shown; });
         visible += inBlock;
+        if (hiddenInBlock > 0) anyHidden = true;
       }
-      if (empty) empty.hidden = visible > 0;
+      if (empty) empty.hidden = visible > 0 || anyHidden;
       // 今の動画のポイントが隠れたら、見えている最初のポイントの場面に頭出しする
       if (current?.closest<HTMLElement>('.mu-point')?.hidden) {
         const firstVisible = Array.from(document.querySelectorAll<HTMLButtonElement>('.mu-point .mu-time'))
@@ -384,5 +490,8 @@ const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.ti
       setPressed(btn, topics.has(t));
       apply();
     }));
+
+    renderMarks();
+    apply();
   </script>
 </Layout>
