@@ -1,0 +1,35 @@
+---
+// 一覧（キャラハブ・公開一覧）の分岐コンボの親行の ダメージ・〆分類・有利F の列。見た目は src/styles/combo-list.css
+// ルートを開かなくても分かるように、ダメージの幅と、ルートに出てくる〆（とその有利F）を並べる。
+// 有利F は起き攻めを開かない（どのルートの起き攻めかはルートの行で開く）
+// 保存で足す行はキャラハブの buildNewComboRow（parentStatsHtml）が同じ形を JS で組み立てるので、形を変えたらそちらも直す
+import { formatDamage } from '../lib/combo-list-view';
+import { getEnderClassById, type EnderClass, type RouteSummary } from '../mock-data/rashid';
+
+interface Props {
+  routes: RouteSummary[];
+}
+const { routes } = Astro.props;
+const damages = routes.map(r => r.leaf.damage ?? 0).filter(d => d > 0);
+const minDamage = damages.length > 0 ? Math.min(...damages) : 0;
+const maxDamage = damages.length > 0 ? Math.max(...damages) : 0;
+// 〆はルートの順に、重複を除いて出す（〆の無いルートは数えない）
+const enders = [...new Set(routes.map(r => r.leaf.enderClassId).filter((id): id is string => !!id))]
+  .map(id => getEnderClassById(id))
+  .filter((e): e is EnderClass => !!e);
+---
+
+<td class="col-num">
+  <span class:list={['dmg', !minDamage && 'dmg-empty']}>{formatDamage(minDamage)}</span>
+  {maxDamage > minDamage && <span class="dmg-range">〜{formatDamage(maxDamage)}</span>}
+</td>
+<td class="col-ender">
+  {enders.length > 0
+    ? enders.map(e => <span class="ender-line" title={e.displayName}>{e.displayName}</span>)
+    : <span>—</span>}
+</td>
+<td class="col-frame">
+  {enders.map(e => (
+    <span class="ender-line">{e.frameAdvantage && <span class="frame-adv-badge frame-adv-quiet">{e.frameAdvantage}</span>}</span>
+  ))}
+</td>

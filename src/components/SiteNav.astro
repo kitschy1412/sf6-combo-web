@@ -1,0 +1,153 @@
+---
+// 全ページ共通のヘッダー。キャラ選択・キャラ対策はいつでも、選んだキャラのコンボ・起き攻めにもいつでも飛べる（2026-11-16）。
+// 行き先・タブ・選んだキャラの決め方は src/lib/site-nav.ts。
+// キャラ選択の一覧（#char-picker-panel）はヘッダーの幅いっぱいに出す。スマホでナビが横スクロールになっても
+// 一覧が切れないよう、<details> やナビには position を付けない（一覧の基準はヘッダーの中の div）
+import { CHARACTERS } from '../lib/characters';
+import {
+  NAV_CHARACTER_COOKIE, VS_URL, characterPickUrl, hasCharacterData, navSectionOf, sectionUrl, selectedCharacterOf,
+} from '../lib/site-nav';
+
+interface Props {
+  /** ページのキャラ（Layout の character。英語名） */
+  character?: string;
+}
+
+const section = navSectionOf(Astro.url.pathname);
+const selected = selectedCharacterOf(section, Astro.props.character, Astro.cookies.get(NAV_CHARACTER_COOKIE)?.value);
+// 選択を外せるのは、キャラがページで決まらないところ（キャラ対策など）だけ。外すとキャラ対策は共通だけになる
+const canClear = !!selected && section !== 'combos' && section !== 'okizeme';
+
+const tabClass = (active: boolean) =>
+  `shrink-0 whitespace-nowrap rounded px-2 py-1 text-[0.82rem] no-underline sm:px-3 ${
+    active ? 'bg-white/15 font-bold text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+  }`;
+// 選んだキャラのページ。キャラを選ぶ前はボタンにして、押すとキャラ選択を開く
+const charTabs = [
+  { section: 'combos', label: 'コンボ' },
+  { section: 'okizeme', label: '起き攻め' },
+] as const;
+---
+
+<header class="sticky top-0 z-[100] bg-[#111] text-white" data-nav-character={selected?.slug} data-nav-cookie={NAV_CHARACTER_COOKIE}>
+  <div class="relative mx-auto flex h-[52px] max-w-[1200px] items-center gap-3 px-4 sm:gap-5 sm:px-6">
+    <a href="/" class="flex shrink-0 items-center gap-2.5 text-white no-underline">
+      <span class="text-[1.05rem] font-bold tracking-[0.02em]">SF6<span class="hidden sm:inline"> Combo Archive</span></span>
+      <span class="hidden rounded-[3px] bg-white/10 px-1.5 py-0.5 text-[0.65rem] tracking-[0.08em] text-[#aaa] lg:inline">BETA</span>
+    </a>
+
+    <nav aria-label="サイト" class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto sm:gap-3">
+      <!-- 選んだキャラと、そのキャラのページ -->
+      <div class="flex shrink-0 items-center gap-0.5 rounded-md border border-white/15 p-0.5">
+        <details id="char-picker" class="shrink-0">
+          <summary
+            class="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap rounded px-2 py-1 text-[0.82rem] font-bold text-white hover:bg-white/10 sm:px-2.5 [&::-webkit-details-marker]:hidden"
+            title="キャラを選ぶ">
+            {selected ? selected.ja : 'キャラを選ぶ'}
+            <span aria-hidden="true" class="text-[0.65rem] text-white/60">▾</span>
+          </summary>
+          <div id="char-picker-panel"
+            class="absolute inset-x-0 top-full max-h-[70vh] overflow-y-auto rounded-b-md border border-t-0 border-[var(--border)] bg-white p-4 text-[var(--text)] shadow-lg">
+            <div class="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span class="text-[0.9rem] font-bold">キャラを選ぶ</span>
+              <span class="text-[0.75rem] text-[var(--muted)]">コンボ・起き攻めは選んだキャラのページが開きます。キャラ対策は共通の対策に、選んだキャラ固有の対策を足して出します</span>
+              {canClear && (
+                <button type="button" data-char-clear
+                  class="ml-auto cursor-pointer rounded border border-[var(--border-strong)] bg-white px-2 py-0.5 text-[0.75rem] text-[var(--muted-strong)] hover:border-[#111] hover:text-[var(--text)]">
+                  選択を外す（共通だけ）
+                </button>
+              )}
+            </div>
+            <ul class="m-0 grid list-none grid-cols-3 gap-1.5 p-0 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+              {CHARACTERS.map((c) => (
+                <li>
+                  {hasCharacterData(c.slug) ? (
+                    <a href={characterPickUrl(section, c.slug, Astro.url.pathname)} data-char-pick={c.slug}
+                      aria-current={selected?.slug === c.slug ? 'true' : undefined}
+                      class={`block rounded border px-2 py-1.5 text-center text-[0.8rem] no-underline ${
+                        selected?.slug === c.slug
+                          ? 'border-[#111] bg-[#111] font-bold text-white'
+                          : 'border-[var(--border)] font-bold hover:border-[#111]'
+                      }`}>
+                      {c.ja}
+                    </a>
+                  ) : (
+                    <span data-char-unready={c.slug} title="まだデータがありません"
+                      class="block rounded border border-dashed border-[var(--border)] px-2 py-1.5 text-center text-[0.8rem] text-[var(--muted)]">
+                      {c.ja}<span class="block text-[0.62rem]">準備中</span>
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </details>
+
+        {charTabs.map((t) => selected ? (
+          <a href={sectionUrl(t.section, selected.slug)} data-nav-tab={t.section}
+            aria-current={section === t.section ? 'page' : undefined} class={tabClass(section === t.section)}>
+            {t.label}
+          </a>
+        ) : (
+          <button type="button" data-nav-tab={t.section} data-open-char-picker title="先にキャラを選んでください"
+            class={`${tabClass(false)} cursor-pointer border-0 bg-transparent`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <a href={VS_URL} data-nav-tab="vs" aria-current={section === 'vs' ? 'page' : undefined} class={tabClass(section === 'vs')}>
+        キャラ対策
+      </a>
+    </nav>
+
+    <a href="/mock/" class="hidden shrink-0 text-[0.8rem] text-[#aaa] no-underline hover:text-white sm:inline">モック</a>
+  </div>
+</header>
+
+<script>
+  const header = document.querySelector<HTMLElement>('header[data-nav-cookie]');
+  const picker = document.querySelector<HTMLDetailsElement>('#char-picker');
+
+  const cookieName = header?.dataset.navCookie;
+  const writeCookie = (slug: string | null) => {
+    if (!cookieName) return;
+    document.cookie = slug
+      ? `${cookieName}=${encodeURIComponent(slug)}; path=/; max-age=31536000; samesite=lax`
+      : `${cookieName}=; path=/; max-age=0; samesite=lax`;
+  };
+
+  // 選んだキャラを覚える（次に開くキャラ対策などのページでも、コンボ・起き攻めへ飛べるように）
+  const slug = header?.dataset.navCharacter;
+  if (slug) writeCookie(slug);
+
+  // キャラ選択で押したキャラは、行き先に関わらずここで覚える（キャラ対策は同じページを開き直して、そのキャラの対策を足す）
+  document.querySelectorAll<HTMLAnchorElement>('[data-char-pick]').forEach((a) => {
+    a.addEventListener('click', () => writeCookie(a.dataset.charPick ?? null));
+  });
+  document.querySelector('[data-char-clear]')?.addEventListener('click', () => {
+    writeCookie(null);
+    location.reload();
+  });
+
+  if (picker) {
+    // キャラを選ぶ前のコンボ・起き攻めは、キャラ選択を開く
+    document.querySelectorAll<HTMLElement>('[data-open-char-picker]').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        picker.open = true;
+        picker.querySelector('summary')?.focus();
+      });
+    });
+    // 外を押す / Esc で閉じる
+    document.addEventListener('click', (e) => {
+      if (picker.open && !picker.contains(e.target as Node)) picker.open = false;
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && picker.open) {
+        picker.open = false;
+        picker.querySelector('summary')?.focus();
+      }
+    });
+  }
+</script>

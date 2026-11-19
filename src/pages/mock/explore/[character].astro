@@ -1,0 +1,494 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import NotationToggle from '../../../components/NotationToggle.astro';
+import ComboColumnMenu from '../../../components/ComboColumnMenu.astro';
+import ComboListHead from '../../../components/ComboListHead.astro';
+import ComboLowRow from '../../../components/ComboLowRow.astro';
+import ComboRowCommand from '../../../components/ComboRowCommand.astro';
+import ComboRowStats from '../../../components/ComboRowStats.astro';
+import ComboParentStats from '../../../components/ComboParentStats.astro';
+import OkizemePanel from '../../../components/OkizemePanel.astro';
+import { wilsonScore, scoreLabel } from '../../../lib/wilson';
+import { getRecipeTable } from '../../../lib/movenames';
+import { recipeSteps } from '../../../lib/notation';
+import { GAUGE_CLASSES, GAUGE_CLASS_HINTS, gaugeClassFromSegs, gaugeClassesOf } from '../../../lib/gauges';
+import { comboSearchTexts } from '../../../lib/combo-search';
+import {
+  COMBOS, ENDER_CLASSES, FOLDED_PRIORITY, HIT_STATES, KNOCKDOWN_SITUATIONS, PRIORITIES, STARTERS,
+  getEnderClassById, getComboRoutes, hasBranches, getComboBrokenCount,
+  getOkizemeLinks, getEnderClassCounts, groupCombosForList,
+} from '../../../mock-data/rashid';
+import '../../../styles/combo-list.css';
+
+const { character } = Astro.params;
+const charName = character === 'rashid' ? 'Rashid' : (character ?? '');
+
+// 公開コンボのみ（private は除外）
+const publicCombos = COMBOS.filter(c => c.visibility !== 'private');
+
+// ソート用メタ情報（サーバー側で計算 → data 属性として埋め込む）
+const sortMeta: Record<string, { priority: number; score: number; damage: number; order: number }> = {};
+publicCombos.forEach((c, idx) => {
+  const routes = getComboRoutes(c);
+  const maxDamage = Math.max(0, ...routes.map(r => r.leaf.damage ?? 0));
+  const allVotes = routes.map(r => r.leaf.votes).filter(Boolean);
+  const bestScore = allVotes.length > 0
+    ? Math.max(...allVotes.map(v => wilsonScore(v!.good, v!.good + v!.bad)))
+    : 0;
+  sortMeta[c.id] = { priority: PRIORITIES.indexOf(c.priority), score: Math.round(bestScore * 1000), damage: maxDamage, order: idx };
+});
+
+// 見出しごとのグループ（公開コンボの無い見出しは出さない）
+const listSections = groupCombosForList(publicCombos)
+  .map(s => ({ ...s, buckets: s.buckets.filter(b => b.items.length > 0) }))
+  .filter(s => s.count > 0);
+const usedStarters = STARTERS.filter(st => publicCombos.some(c => c.starter === st));
+
+// 絞り込みの選択肢は文字/チップで切り替えられないので、呼び方とコマンドを両方出す
+const recipeTable = getRecipeTable(charName);
+const starterOption = (st: string) => {
+  const word = recipeSteps(st, recipeTable).join(' > ');
+  return word === st ? st : `${word}（${st}）`;
+};
+
+function getComboScoreLabel(c: (typeof publicCombos)[0]): string {
+  const routes = getComboRoutes(c);
+  const allVotes = routes.map(r => r.leaf.votes).filter(Boolean);
+  if (allVotes.length === 0) return '❓ 未検証';
+  const bestTotal = Math.max(...allVotes.map(v => v!.good + v!.bad));
+  if (bestTotal === 0) return '❓ 未検証';
+  const bestScore = Math.max(...allVotes.map(v => wilsonScore(v!.good, v!.good + v!.bad)));
+  return scoreLabel(bestScore, bestTotal);
+}
+---
+
+<Layout title={`${charName} — 公開コンボ一覧`} character={charName}>
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/explore/">公開コンボ</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">{charName}</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px 6px 0 0;">
+    <div style="display:flex; gap:14px; align-items:baseline;">
+      <h1>{charName.toUpperCase()}</h1>
+      <span class="meta">v1.25 ・ {publicCombos.length}コンボ ・ {ENDER_CLASSES.length}分類</span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span style="font-size:0.72rem; color:rgba(255,255,255,0.45);">読み取り専用</span>
+      <a href={`/mock/character/${character}`} class="btn btn-sm" style="background:transparent; color:#fff; border-color:#555;">
+        自分用ページへ →
+      </a>
+    </div>
+  </div>
+
+  <div class="filter-bar filter-bar-row" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:24px;">
+    <div class="filter-search">
+      <label class="filter-label" for="filter-text">検索</label>
+      <input type="search" id="filter-text" class="input input-inline" autocomplete="off"
+        placeholder="コマンド・技名・コンボ名（例: 236HK、スパイク）" />
+      <span id="filter-text-count" class="filter-text-count" aria-live="polite"></span>
+    </div>
+
+    <span class="filter-label">並び順</span>
+    <div class="sort-toggle-group" role="group">
+      <button type="button" class="sort-btn sort-btn-active" data-sort="priority">優先度順</button>
+      <button type="button" class="sort-btn" data-sort="score">投票スコア順</button>
+      <button type="button" class="sort-btn" data-sort="damage">ダメージ降順</button>
+      <button type="button" class="sort-btn" data-sort="new">新着順</button>
+    </div>
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">始動技</span>
+    <select id="filter-starter" class="select select-inline">
+      <option value="">すべて</option>
+      {usedStarters.map(st => <option value={st}>{starterOption(st)}</option>)}
+    </select>
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">優先度</span>
+    {PRIORITIES.map(p => <button type="button" class="chip" data-filter-priority={p} aria-pressed="false">{p}</button>)}
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">ヒット状態</span>
+    {HIT_STATES.filter(hs => hs !== '通常').map(hs => <button type="button" class="chip" data-filter-hit={hs} aria-pressed="false">{hs}</button>)}
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">ゲージ</span>
+    {GAUGE_CLASSES.map(g => <button type="button" class="chip" data-filter-gauge={g} aria-pressed="false" title={GAUGE_CLASS_HINTS[g]}>{g}</button>)}
+  </div>
+
+  <section style="margin-bottom:32px;">
+    <div class="section-head">
+      <h2>コンボ</h2>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <NotationToggle styleToggle />
+      <ComboColumnMenu />
+    </div>
+
+    <table class="data-table" id="combo-table">
+      <colgroup>
+        <col data-col="command" />
+        <col data-col="damage" style="width:64px;" />
+        <col data-col="ender" style="width:140px;" />
+        <col data-col="frame" style="width:56px;" />
+        <col data-col="score" style="width:80px;" />
+        <col data-col="actions" style="width:64px;" />
+      </colgroup>
+      <!-- ── 列名（表の上に1回だけ） ── -->
+      <thead class="combo-col-head">
+        <tr>
+          <th>コマンド</th>
+          <th class="col-num">ダメージ</th>
+          <th>〆分類</th>
+          <th>有利F</th>
+          <th>スコア</th>
+          <th></th>
+        </tr>
+      </thead>
+      {listSections.map(({ section, buckets, count }) => (
+        <>
+          <!-- ── 大見出し（小見出しの無いものは大見出しが見出しを兼ねる） ── -->
+          <ComboListHead section={section} bucket={buckets[0].scene ? undefined : buckets[0].key} count={count} colspan={6} />
+          {buckets.map(({ key, scene, items }) => (
+            <>
+              {scene && <ComboListHead section={section} scene={scene} bucket={key} count={items.length} colspan={6} />}
+              {items.map((c) => {
+                const routes = getComboRoutes(c);
+                const branched = hasBranches(c);
+                const broken = getComboBrokenCount(c);
+                const meta = sortMeta[c.id];
+                const search = comboSearchTexts(c, routes, recipeTable);
+                return (
+                  <tbody class="combo-group"
+                    data-combo-id={c.id}
+                    data-source={c.sourceType}
+                    data-starter={c.starter}
+                    data-section={section}
+                    data-bucket={key}
+                    data-priority={c.priority}
+                    data-hit-state={c.hitState}
+                    data-gauges={gaugeClassesOf(routes).join(' ')}
+                    data-search={search.group}
+                    data-sort-priority={meta.priority}
+                    data-sort-score={meta.score}
+                    data-sort-damage={meta.damage}
+                    data-sort-order={meta.order}
+                    style={c.priority === FOLDED_PRIORITY ? 'display:none;' : undefined}
+                  >
+                    {!branched && (() => {
+                      const r = routes[0];
+                      const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+                      const okizeme = getOkizemeLinks(r.leaf.enderClassId);
+                      const okizemeTotal = okizeme.main.length + okizeme.reference.length;
+                      return (
+                        <>
+                          <tr>
+                            <td><ComboRowCommand combo={c} /></td>
+                            <ComboRowStats leaf={r.leaf} ender={ender} okizeme={okizeme} />
+                            <td class="col-score">
+                              <span class="score-label-badge">{getComboScoreLabel(c)}</span>
+                              {broken > 0 && <span class="tag tag-warn score-warn">⚠ 不可{broken}</span>}
+                            </td>
+                            <td class="col-actions"><button type="button" class="btn-fork" data-combo-id={c.id}>⑂ fork</button></td>
+                          </tr>
+                          {okizemeTotal > 0 && (
+                            <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} style="display:none;">
+                              <td colspan="6" class="okizeme-panel-cell">
+                                <OkizemePanel links={okizeme} ender={ender} comboId={c.id} leafId={r.leaf.id} />
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {branched && (
+                      <>
+                        <tr class="combo-parent-row">
+                          <td><ComboRowCommand combo={c} /></td>
+                          <ComboParentStats routes={routes} />
+                          <td class="col-score">
+                            <span class="score-label-badge">{getComboScoreLabel(c)}</span>
+                          </td>
+                          <td class="col-actions"><button type="button" class="btn-fork" data-combo-id={c.id}>⑂ fork</button></td>
+                        </tr>
+                        {routes.map((r, ri) => {
+                          const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+                          const okizeme = getOkizemeLinks(r.leaf.enderClassId);
+                          const okizemeTotal = okizeme.main.length + okizeme.reference.length;
+                          const routeVotes = r.leaf.votes;
+                          const routeTotal = routeVotes ? routeVotes.good + routeVotes.bad : 0;
+                          const routeScore = routeVotes ? wilsonScore(routeVotes.good, routeTotal) : 0;
+                          return (
+                            <>
+                              <tr class="combo-child-row" data-branch-of={c.id} data-gauge={gaugeClassFromSegs(r.pathSegments)} data-search={search.routes[ri]} style="display:none;">
+                                <td><ComboRowCommand combo={c} route={r} lastRoute={ri === routes.length - 1} /></td>
+                                <ComboRowStats leaf={r.leaf} ender={ender} okizeme={okizeme} />
+                                <td class="col-score">
+                                  <span class="score-label-badge score-label-sm">{scoreLabel(routeScore, routeTotal)}</span>
+                                  {(r.leaf.votes?.brokenInCurrentVer ?? 0) > 0 && <span class="tag tag-warn score-warn">⚠ {r.leaf.votes!.brokenInCurrentVer}</span>}
+                                </td>
+                                <td></td>
+                              </tr>
+                              {okizemeTotal > 0 && (
+                                <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} data-okizeme-branch-of={c.id} style="display:none;">
+                                  <td colspan="6" class="okizeme-panel-cell">
+                                    <OkizemePanel links={okizeme} ender={ender} comboId={c.id} leafId={r.leaf.id} />
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          );
+                        })}
+                      </>
+                    )}
+                  </tbody>
+                );
+              })}
+              <ComboLowRow bucket={key} count={items.filter(c => c.priority === FOLDED_PRIORITY).length} colspan={6} />
+            </>
+          ))}
+        </>
+      ))}
+    </table>
+  </section>
+
+  <section style="margin-bottom:32px;">
+    <div class="section-head">
+      <h2>〆分類（起き攻めのカテゴリ）</h2>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px;">
+      {ENDER_CLASSES.map(ec => {
+        // 公開一覧なので、コンボは公開分だけ数える
+        const n = getEnderClassCounts(ec.id, publicCombos);
+        return (
+          <div class="card">
+            <div style="font-weight:700; margin-bottom:4px;">{ec.displayName}</div>
+            <div style="font-size:0.78rem; color:var(--muted);">
+              <span class="dmg" style="color:var(--text); font-size:0.85rem;">{ec.frameAdvantage}</span>
+              <span style="margin:0 6px; color:var(--border-strong);">|</span>
+              コンボ {n.combos} ・ 起き攻め {n.okizeme}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>ダウン状況</h2>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>状況</th>
+          <th>〆分類</th>
+          <th>備考</th>
+        </tr>
+      </thead>
+      <tbody>
+        {KNOCKDOWN_SITUATIONS.map(s => (
+          <tr>
+            <td><a href={`/mock/situation/${s.id}`} class="row-link col-title">{s.label}</a></td>
+            <td><span class="tag">{getEnderClassById(s.enderClassId)?.displayName}</span></td>
+            <td style="color:var(--muted); font-size:0.82rem;">{s.notes ?? ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+
+  <style>
+    /* ── フィルタバー ── */
+    .filter-bar-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      row-gap: 6px;
+    }
+    .filter-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--border-strong);
+      margin: 0 4px;
+    }
+    .select-inline {
+      height: 26px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      width: auto;
+      min-width: 132px;
+    }
+    /* 検索欄（チップの行を崩さないように1行目に単独で置く） */
+    .filter-search {
+      flex-basis: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .input-inline {
+      height: 26px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      width: 340px;
+      min-width: 0;
+    }
+    .filter-text-count {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    /* ── ソートトグル ── */
+    .sort-toggle-group {
+      display: inline-flex;
+      border: 1px solid var(--border-strong);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .sort-btn {
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border-strong);
+      padding: 3px 10px;
+      font-size: 0.76rem;
+      font-family: inherit;
+      color: var(--muted-strong);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+      white-space: nowrap;
+    }
+    .sort-btn:last-child { border-right: none; }
+    .sort-btn:hover { background: var(--surface3); color: var(--text); }
+    .sort-btn.sort-btn-active {
+      background: #111;
+      color: #fff;
+    }
+
+    /* ── ダウン状況の表のタイトル ── */
+    .col-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: inherit;
+      text-decoration: none;
+      word-break: break-word;
+    }
+    .col-title:hover { text-decoration: underline; }
+
+    /* ── fork ボタン ── */
+    .btn-fork {
+      display: inline-flex;
+      align-items: center;
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 0.65rem;
+      font-family: inherit;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+      line-height: 1.6;
+      flex-shrink: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .combo-group:hover .btn-fork {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .btn-fork:hover {
+      background: #111;
+      color: #fff;
+      border-color: #111;
+    }
+
+    /* ── スコア列 ── */
+    .col-score {
+      font-size: 0.7rem;
+      padding-right: 8px !important;
+      vertical-align: middle;
+    }
+    .score-label-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+    .score-label-sm { font-size: 0.62rem; }
+    .score-warn {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.62rem;
+    }
+
+  </style>
+
+  <script>
+    import { initComboListView } from '../../../lib/combo-list-view';
+
+    // ── fork ボタン（モック: アラート） ──
+    document.querySelectorAll<HTMLButtonElement>('.btn-fork').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const comboId = btn.dataset.comboId ?? '';
+        alert(`fork: ${comboId}\n\n（Phase 2 で実装予定。自分用ページにコピーされます）`);
+      });
+    });
+
+    // ── 始動技 フィルタ（検索欄、優先度・ヒット状態・ゲージのチップと見出しの折りたたみは combo-list-view） ──
+    const filters = { starter: '' };
+    const { apply: applyFilters } = initComboListView(grp => !filters.starter || grp.dataset.starter === filters.starter);
+
+    const starterSel = document.getElementById('filter-starter') as HTMLSelectElement | null;
+    starterSel?.addEventListener('change', () => {
+      filters.starter = starterSel.value;
+      applyFilters();
+    });
+
+    // ── ソートトグル ──
+    let sortOrder: 'priority' | 'score' | 'damage' | 'new' = 'priority';
+
+    function sortCombos() {
+      document.querySelectorAll<HTMLElement>('tbody[data-head-bucket]').forEach(head => {
+        const bucket = head.dataset.headBucket ?? '';
+        const groups = Array.from(document.querySelectorAll<HTMLElement>(
+          `tbody.combo-group[data-bucket="${CSS.escape(bucket)}"]`
+        ));
+        groups.sort((a, b) => {
+          if (sortOrder === 'damage') return Number(b.dataset.sortDamage) - Number(a.dataset.sortDamage);
+          if (sortOrder === 'new')    return Number(a.dataset.sortOrder)  - Number(b.dataset.sortOrder);
+          if (sortOrder === 'score')  return Number(b.dataset.sortScore)  - Number(a.dataset.sortScore);
+          /* priority */              return Number(a.dataset.sortPriority) - Number(b.dataset.sortPriority)
+                                        || Number(a.dataset.sortOrder) - Number(b.dataset.sortOrder);
+        });
+        // 見出しの直後に並び替えた順で再挿入（「あまり使わない N件」の行はその後ろに残る）
+        let anchor: Element = head;
+        groups.forEach(g => { anchor.after(g); anchor = g; });
+      });
+      applyFilters();
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.sort-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('sort-btn-active'));
+        btn.classList.add('sort-btn-active');
+        sortOrder = (btn.dataset.sort as typeof sortOrder) ?? 'priority';
+        sortCombos();
+      });
+    });
+
+    // 初期ソート（優先度順）
+    sortCombos();
+  </script>
+</Layout>

@@ -1,0 +1,77 @@
+---
+import { getRecipeTable } from '../lib/movenames';
+import { chipClassOf, recipeSteps } from '../lib/notation';
+
+// コマンド表記を、文字（既定。動画の字幕の書き方）とチップの両方で出す。
+// どちらを見せるかはルートの data-notation-style で切り替える（global.css）
+// inputs:  "DR > 5HP > 2MK > 214MK" のような ">" 区切り文字列
+// ghostInputs: (任意) inputs の前にゴースト(薄表示)で並べる共通プレフィックス
+//              一覧の分岐子行などで「枝の位置に視覚的に揃える」用途
+interface Props {
+  inputs: string;
+  ghostInputs?: string;
+  /** 分岐エルボ記号。最終子なら "└─›", 中間子なら "├─›" 等 */
+  branchElbow?: string;
+  size?: 'normal' | 'sm';
+  /** 文字表記の呼び方に使うキャラ（モックは Rashid 限定） */
+  character?: string;
+}
+const { inputs, ghostInputs, branchElbow = '└─›', size = 'normal', character = 'Rashid' } = Astro.props;
+const tokens = inputs.split('>').map(t => t.trim()).filter(Boolean);
+const ghostTokens = (ghostInputs ?? '').split('>').map(t => t.trim()).filter(Boolean);
+const recipeTable = getRecipeTable(character);
+const steps = recipeSteps(inputs, recipeTable);
+const ghostSteps = recipeSteps(ghostInputs ?? '', recipeTable);
+
+// チップのクラス（強度の色・特別チップ）は lib/notation.ts の chipClassOf
+---
+<span class={`notation-text${size === 'sm' ? ' notation-text-sm' : ''}`}>
+  {ghostSteps.map((step, i) => (
+    <>
+      {i > 0 && <span class="recipe-sep cmd-ghost">{' > '}</span>}
+      <span class="recipe-step cmd-ghost">{step}</span>
+    </>
+  ))}
+  {ghostSteps.length > 0 && steps.length > 0 && <span class="recipe-sep cmd-branch-elbow">{` ${branchElbow} `}</span>}
+  {steps.map((step, i) => (
+    <>
+      {i > 0 && <span class="recipe-sep">{' > '}</span>}
+      <span class="recipe-step">{step}</span>
+    </>
+  ))}
+</span>
+<span class={`notation notation-chips${size === 'sm' ? ' notation-sm' : ''}`}>
+  {ghostTokens.map((tok, i) => (
+    <>
+      {i > 0 && <span class="cmd-sep cmd-ghost">›</span>}
+      <span class={chipClassOf(tok, true)} data-token={tok}>{tok}</span>
+    </>
+  ))}
+  {ghostTokens.length > 0 && tokens.length > 0 && <span class="cmd-sep cmd-branch-elbow">{branchElbow}</span>}
+  {tokens.map((tok, i) => (
+    <>
+      {i > 0 && <span class="cmd-sep">›</span>}
+      <span class={chipClassOf(tok)} data-token={tok}>{tok}</span>
+    </>
+  ))}
+</span>
+
+<style is:global>
+  .cmd-ghost { opacity: 0.32; }
+  .cmd-branch-elbow {
+    color: var(--muted) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+  }
+
+  /* ── 技強度カラー（パレットと統一） ── */
+  .cmd-chip.cmd-chip-l  { background:#dbeafe; border-color:#60a5fa; color:#1e3a8a; }
+  .cmd-chip.cmd-chip-m  { background:#fef3c7; border-color:#eab308; color:#854d0e; }
+  .cmd-chip.cmd-chip-h  { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+  .cmd-chip.cmd-chip-od {
+    background: linear-gradient(135deg,#fde047 0%,#f59e0b 100%);
+    border-color: #b45309;
+    color: #451a03;
+  }
+</style>

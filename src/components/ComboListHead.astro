@@ -1,0 +1,140 @@
+---
+// コンボ一覧の見出し（キャラハブ・公開一覧で共通）。scene を渡すと中央・端の下の小見出しになる。
+// bucket は行の data-bucket と結びつくキー。小見出しを持たない大見出し（インパクトなど）は大見出しが持つ
+interface Props {
+  section: string;
+  scene?: string | null;
+  bucket?: string;
+  count: number;
+  colspan: number;
+  /** キャラハブのみ: マウスを乗せると「＋」を出す */
+  addable?: boolean;
+}
+const { section, scene = null, bucket, count, colspan, addable = false } = Astro.props;
+const label = scene ? `${section} ${scene}` : section;
+---
+
+<tbody
+  class={scene ? 'combo-scene-head' : 'combo-section-head'}
+  data-head-section={section}
+  data-head-bucket={bucket}
+  style={count === 0 ? 'display:none;' : undefined}
+>
+  <tr>
+    <td colspan={colspan} class="combo-head-cell">
+      <div class="combo-head-inner">
+        <button type="button" class="combo-head-toggle" data-collapse-key={bucket ?? section} aria-expanded="true" title="折りたたむ/開く">
+          <span class="combo-toggle-icon">▼</span>
+        </button>
+        <span class="combo-head-title">{scene ?? section}</span>
+        <span class="combo-head-count">{count}件</span>
+        {addable && bucket && (
+          <button type="button" class="btn-add-combo-bucket" data-bucket={bucket} title={`${label} のコンボを追加`} aria-label={`${label} のコンボを追加`}>＋</button>
+        )}
+      </div>
+    </td>
+  </tr>
+</tbody>
+
+<style>
+  .combo-head-cell {
+    padding: 0 !important;
+    border-bottom: none !important;
+    background: transparent !important;
+  }
+  .combo-head-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .combo-head-title {
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .combo-head-count {
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  /* ── 大見出し ── */
+  .combo-section-head .combo-head-inner {
+    padding: 8px 14px 8px 10px;
+    margin-top: 20px;
+    border-left: 4px solid #f59e0b;
+    border-top: 1px solid var(--border-strong);
+    border-bottom: 1px solid var(--border-strong);
+    background: var(--surface2);
+  }
+  .combo-section-head .combo-head-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── 小見出し（中央・端の下の場面） ── */
+  .combo-scene-head .combo-head-inner {
+    padding: 8px 14px 3px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .combo-scene-head .combo-head-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+  }
+
+  /* ── 折りたたみトグル ── */
+  .combo-head-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    flex-shrink: 0;
+    color: var(--muted-strong);
+    border-radius: 3px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .combo-head-toggle:hover {
+    background: var(--surface3);
+    color: var(--text);
+  }
+  .combo-toggle-icon {
+    font-size: 0.6rem;
+    line-height: 1;
+    display: inline-block;
+    transition: transform 0.15s;
+  }
+  .combo-head-toggle[aria-expanded="false"] .combo-toggle-icon {
+    transform: rotate(-90deg);
+  }
+
+  /* ── 見出しの「＋」（マウスを乗せたときだけ出す） ── */
+  .btn-add-combo-bucket {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: transparent;
+    border: 1px solid #f59e0b;
+    border-radius: 4px;
+    padding: 0;
+    font-size: 0.85rem;
+    font-family: inherit;
+    color: #b45309;
+    cursor: pointer;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease, background 0.1s;
+  }
+  .combo-head-inner:hover .btn-add-combo-bucket,
+  .btn-add-combo-bucket:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .btn-add-combo-bucket:hover { background: #fef3c7; color: #92400e; }
+</style>

@@ -1,6 +1,8 @@
 ---
+import Layout from '../../layouts/Layout.astro';
 import { supabase, type Combo } from '../../lib/supabase';
 import { wilsonScore, scoreLabel } from '../../lib/wilson';
+import NotationToggle from '../../components/NotationToggle.astro';
 
 export const prerender = false;
 
@@ -17,151 +19,224 @@ if (!combo) return Astro.redirect('/');
 
 const { data: votes } = await supabase
   .from('votes')
-  .select('is_working')
+  .select('is_working, has_error')
   .eq('combo_id', combo.id);
 
 const total = votes?.length ?? 0;
 const working = votes?.filter((v) => v.is_working).length ?? 0;
+const errors = votes?.filter((v) => v.has_error).length ?? 0;
 const score = wilsonScore(working, total);
-const label = scoreLabel(score);
+const label = scoreLabel(score, total);
 const workingPct = total > 0 ? Math.round((working / total) * 100) : 0;
 
+const situations = combo.situation as string[];
+const category = situations[0] ?? 'コンボ';
 const embedUrl = `https://www.youtube.com/embed/${combo.youtube_id}?start=${combo.start_sec}&autoplay=0`;
+const youtubeUrl = `https://www.youtube.com/watch?v=${combo.youtube_id}&t=${combo.start_sec}s`;
+
+// 信頼ラベルの色
+const confidenceColor = total === 0 ? '#6b6b7a' : score >= 0.8 ? '#34d399' : score >= 0.6 ? '#f59e0b' : '#f87171';
 ---
 
-<html lang="ja">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>{combo.title} | SF6 Combo Archive</title>
-    <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: sans-serif; background: #0f0f0f; color: #eee; }
-      header { padding: 1.5rem 2rem; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 1rem; }
-      header a { color: #f5a623; text-decoration: none; font-size: 0.9rem; }
-      main { max-width: 800px; margin: 0 auto; padding: 2rem; }
-      .video-wrap { position: relative; padding-bottom: 56.25%; height: 0; margin-bottom: 2rem; border-radius: 8px; overflow: hidden; }
-      .video-wrap iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
-      h1 { font-size: 1.4rem; margin-bottom: 1rem; }
-      .inputs {
-        font-family: monospace; font-size: 1rem; padding: 1rem;
-        background: #1a1a1a; border-radius: 8px; margin-bottom: 1.5rem;
-        border-left: 3px solid #f5a623; word-break: break-all;
-      }
-      .meta { display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1.5rem; }
-      .meta-item { padding: 0.4rem 0.8rem; background: #1a1a1a; border-radius: 6px; font-size: 0.85rem; }
-      .meta-item span { color: #888; margin-right: 0.3rem; }
-      .tag { padding: 0.3rem 0.6rem; background: #2a2a2a; border-radius: 4px; font-size: 0.8rem; color: #ccc; }
-      .tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 2rem; }
+<Layout title={`${combo.title} | SF6 Combo Archive`} character={combo.character}>
+  <!-- パンくず -->
+  <div class="breadcrumb">
+    <a href="/">一覧</a>
+    <span style="color:var(--border);">/</span>
+    <a href={`/${combo.character}`}>{combo.character}</a>
+    <span style="color:var(--border);">/</span>
+    <span style="color:#aaa;">{combo.title}</span>
+  </div>
 
-      /* 投票セクション */
-      .vote-section {
-        margin-top: 2rem; padding: 1.5rem;
-        background: #1a1a1a; border-radius: 12px; border: 1px solid #333;
-      }
-      .vote-section h2 { font-size: 1rem; margin-bottom: 1rem; color: #ccc; }
-      .vote-label { font-size: 1.2rem; margin-bottom: 0.8rem; }
-      .vote-bar-wrap { background: #2a2a2a; border-radius: 6px; height: 8px; margin-bottom: 0.5rem; overflow: hidden; }
-      .vote-bar { height: 100%; background: #4caf50; border-radius: 6px; transition: width 0.4s; }
-      .vote-count { font-size: 0.8rem; color: #888; margin-bottom: 1.2rem; }
-      .vote-buttons { display: flex; gap: 1rem; }
-      .btn-vote {
-        flex: 1; padding: 0.8rem; border: none; border-radius: 8px;
-        font-size: 1rem; cursor: pointer; font-weight: bold;
-        transition: opacity 0.2s;
-      }
-      .btn-vote:disabled { opacity: 0.4; cursor: not-allowed; }
-      .btn-working { background: #4caf50; color: #fff; }
-      .btn-broken  { background: #f44336; color: #fff; }
-      .vote-msg { margin-top: 0.8rem; font-size: 0.85rem; color: #aaa; min-height: 1.2em; }
-    </style>
-  </head>
-  <body>
-    <header>
-      <a href={`/${combo.character}`}>← {combo.character} 一覧に戻る</a>
-    </header>
-    <main>
-      <div class="video-wrap">
-        <iframe src={embedUrl} title={combo.title} allowfullscreen />
+  <!-- 表記トグル -->
+  <NotationToggle />
+
+  <!-- ① コンボサマリー行（選択コンボの概要） -->
+  <div class="combo-summary-row">
+    <div style="flex:1; min-width:0;">
+      <div class="section-label" style="margin-bottom:4px;">{category}</div>
+      <div class="notation" data-original={combo.inputs} style="font-size:0.85rem; margin-bottom:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+        {combo.inputs}
+      </div>
+      <div style="display:flex; gap:5px; flex-wrap:wrap;">
+        <span class="tag tag-ghost">ver {combo.patch_version}</span>
+        {combo.gauge > 0 && <span class="tag tag-red">ゲージ {combo.gauge}</span>}
+        {situations.slice(1).map((s: string) => (
+          <span class="tag tag-gold">{s}</span>
+        ))}
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+      <span class="dmg-label" style="font-size:1.9rem;">
+        {combo.damage > 0 ? combo.damage.toLocaleString() : '—'}
+      </span>
+      <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" class="btn btn-yt" style="padding:8px 14px; font-size:0.85rem;">
+        ▶ 動画
+      </a>
+    </div>
+  </div>
+
+  <!-- ② YouTube動画（max 640px） -->
+  <div style="max-width:640px; margin-bottom:28px;">
+    <div style="position:relative; width:100%; padding-bottom:56.25%; border-radius:10px; overflow:hidden; background:#000;">
+      <iframe
+        style="position:absolute; inset:0; width:100%; height:100%;"
+        src={embedUrl}
+        title={combo.title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+      />
+    </div>
+  </div>
+
+  <!-- ③ 情報グリッド＋投票カード -->
+  <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px; align-items:start;">
+
+    <!-- 左: コンボ情報 -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- コンボ情報グリッド -->
+      <div>
+        <div class="section-label">コンボ情報</div>
+        <div class="info-grid">
+          <div style="display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--border);">
+            <div class="info-cell" style="border-right:1px solid var(--border);">
+              <div class="info-cell-label">ダメージ</div>
+              <div class="info-cell-value" style="color:var(--gold);">
+                {combo.damage > 0 ? combo.damage.toLocaleString() : '—'}
+              </div>
+            </div>
+            <div class="info-cell">
+              <div class="info-cell-label">ゲージ消費</div>
+              <div class="info-cell-value" style="color:#94a3b8;">
+                {combo.gauge > 0 ? combo.gauge : '0'}
+              </div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr;">
+            <div class="info-cell" style="border-right:1px solid var(--border);">
+              <div class="info-cell-label">シチュエーション</div>
+              <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+                {situations.length > 0
+                  ? situations.map((s: string) => <span class="tag tag-gold">{s}</span>)
+                  : <span style="font-size:0.85rem; color:var(--muted);">—</span>
+                }
+              </div>
+            </div>
+            <div class="info-cell">
+              <div class="info-cell-label">バージョン</div>
+              <div style="font-family:'Rajdhani',sans-serif; font-size:0.95rem; color:#aaa; margin-top:4px;">
+                ver {combo.patch_version}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <h1>{combo.title}</h1>
-      <div class="inputs">{combo.inputs}</div>
-
-      <div class="meta">
-        <div class="meta-item"><span>ダメージ</span>{combo.damage}</div>
-        <div class="meta-item"><span>ゲージ消費</span>{combo.gauge}</div>
-        <div class="meta-item"><span>バージョン</span>{combo.patch_version}</div>
+      <!-- コマンド詳細 -->
+      <div>
+        <div class="section-label">コンボルート</div>
+        <div class="notation" data-original={combo.inputs} style="font-size:0.92rem; padding:14px 18px; border-radius:4px; border-left:3px solid var(--gold); word-break:break-all; line-height:1.6; background:var(--surface);">
+          {combo.inputs}
+        </div>
       </div>
 
-      {combo.situation.length > 0 && (
-        <div class="tags">
-          {combo.situation.map((s: string) => <span class="tag">{s}</span>)}
-        </div>
-      )}
+    </div>
 
-      <!-- 投票セクション -->
-      <div class="vote-section">
-        <h2>このコンボ、今のバージョンで繋がりますか？</h2>
-        <div class="vote-label" id="vote-label">{label}</div>
-        <div class="vote-bar-wrap">
-          <div class="vote-bar" id="vote-bar" style={`width: ${workingPct}%`}></div>
-        </div>
-        <div class="vote-count" id="vote-count">
-          {total > 0
-            ? `できる ${working} / ${total} 票`
-            : 'まだ投票がありません'}
-        </div>
-        <div class="vote-buttons">
-          <button class="btn-vote btn-working" id="btn-yes">✅ 今もできる</button>
-          <button class="btn-vote btn-broken"  id="btn-no" >❌ できない</button>
-        </div>
-        <div class="vote-msg" id="vote-msg"></div>
+    <!-- 右: 投票カード -->
+    <div class="vote-card">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+        <div class="section-label" style="margin-bottom:0; white-space:nowrap;">今も繋がる？</div>
+        <div style="flex:1; height:1px; background:var(--border);"></div>
       </div>
-    </main>
 
-    <script define:vars={{ comboId: combo.id }}>
-      const btnYes  = document.getElementById('btn-yes');
-      const btnNo   = document.getElementById('btn-no');
-      const bar     = document.getElementById('vote-bar');
-      const count   = document.getElementById('vote-count');
-      const label   = document.getElementById('vote-label');
-      const msg     = document.getElementById('vote-msg');
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+        <span id="vote-label" style={`font-family:'Rajdhani',sans-serif; font-weight:700; font-size:1.05rem; color:${confidenceColor};`}>
+          {label}
+        </span>
+        <span id="vote-count" style="font-size:0.82rem; color:var(--muted);">
+          {total > 0 ? `${working} / ${total} 票` : '未投票'}
+        </span>
+      </div>
 
-      async function vote(isWorking) {
-        btnYes.disabled = true;
-        btnNo.disabled  = true;
-        msg.textContent = '送信中...';
+      <div class="vote-bar" style="margin-bottom:20px;">
+        <div
+          id="vote-bar"
+          class="vote-bar-fill"
+          style={`width:${workingPct}%;`}
+        ></div>
+      </div>
 
-        const res = await fetch('/api/vote', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ combo_id: comboId, is_working: isWorking }),
-        });
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px;">
+        <button id="btn-yes" class="btn-vote-yes">✅ できる</button>
+        <button id="btn-no"  class="btn-vote-no">❌ できない</button>
+      </div>
+      <button id="btn-warn" class="btn-vote-warn" style="margin-bottom:12px;">⚠️ できるが誤りがある</button>
 
-        const data = await res.json();
+      <p id="vote-msg" style="font-size:0.8rem; color:var(--muted); text-align:center; min-height:1.2em;"></p>
+      <p id="error-count" style={`font-size:0.78rem; color:#fbbf24; text-align:center; min-height:1.2em; ${errors === 0 ? 'display:none;' : ''}`}>
+        ⚠️ {errors}件の誤り報告
+      </p>
+    </div>
 
-        if (res.status === 429) {
-          msg.textContent = data.error;
-          btnYes.disabled = false;
-          btnNo.disabled  = false;
-          return;
-        }
+  </div>
+</Layout>
 
-        const pct = data.total > 0 ? Math.round((data.working / data.total) * 100) : 0;
-        bar.style.width   = pct + '%';
-        count.textContent = `できる ${data.working} / ${data.total} 票`;
-        msg.textContent   = '投票ありがとうございました！';
+<script define:vars={{ comboId: combo.id }}>
+  const btnYes  = document.getElementById('btn-yes');
+  const btnNo   = document.getElementById('btn-no');
+  const btnWarn = document.getElementById('btn-warn');
+  const bar     = document.getElementById('vote-bar');
+  const count   = document.getElementById('vote-count');
+  const label   = document.getElementById('vote-label');
+  const msg     = document.getElementById('vote-msg');
+  const errEl   = document.getElementById('error-count');
 
-        const s = data.score;
-        label.textContent =
-          s >= 0.8 ? '✅ 高信頼' :
-          s >= 0.6 ? '🟡 確認中' :
-          s >= 0.3 ? '🔴 要注意' : '❓ 未検証';
-      }
+  function setAllDisabled(disabled) {
+    btnYes.disabled  = disabled;
+    btnNo.disabled   = disabled;
+    btnWarn.disabled = disabled;
+  }
 
-      btnYes.addEventListener('click', () => vote(true));
-      btnNo.addEventListener ('click', () => vote(false));
-    </script>
-  </body>
-</html>
+  async function vote(isWorking, hasError) {
+    setAllDisabled(true);
+    msg.textContent = '送信中...';
+
+    const res = await fetch('/api/vote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ combo_id: comboId, is_working: isWorking, has_error: hasError }),
+    });
+
+    const data = await res.json();
+
+    if (res.status === 429) {
+      msg.textContent = data.error;
+      setAllDisabled(false);
+      return;
+    }
+
+    const pct = data.total > 0 ? Math.round((data.working / data.total) * 100) : 0;
+    bar.style.width   = pct + '%';
+    count.textContent = `${data.working} / ${data.total} 票`;
+    msg.textContent   = '投票ありがとうございました！';
+
+    if (data.errors > 0) {
+      errEl.textContent  = `⚠️ ${data.errors}件の誤り報告`;
+      errEl.style.display = '';
+    }
+
+    const s = data.score;
+    const t = data.total;
+    label.textContent = t === 0 ? '❓ 未検証'
+      : s >= 0.8 ? '✅ 高信頼'
+      : s >= 0.6 ? '🟡 確認中'
+      : s >= 0.3 ? '🔴 要注意'
+      : '⚠️ データ少';
+    label.style.color = t === 0 ? '#6b6b7a' : s >= 0.8 ? '#34d399' : s >= 0.6 ? '#f59e0b' : '#f87171';
+  }
+
+  btnYes.addEventListener ('click', () => vote(true,  false));
+  btnNo.addEventListener  ('click', () => vote(false, false));
+  btnWarn.addEventListener('click', () => vote(true,  true));
+</script>

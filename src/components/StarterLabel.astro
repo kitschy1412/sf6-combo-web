@@ -1,0 +1,14 @@
+---
+// 始動技の名前。文字表記では動画の呼び方（2MP → 2中P）、チップ表示ではコマンドのまま出す
+import { getRecipeTable } from '../lib/movenames';
+import { recipeSteps } from '../lib/notation';
+
+interface Props {
+  starter: string;
+  /** 呼び方に使うキャラ（モックは Rashid 限定） */
+  character?: string;
+}
+const { starter, character = 'Rashid' } = Astro.props;
+const word = recipeSteps(starter, getRecipeTable(character)).join(' > ');
+---
+<span class="only-text-style">{word}</span><span class="only-chip-style">{starter}</span>

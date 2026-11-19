@@ -14,9 +14,10 @@ export function wilsonScore(positive: number, total: number): number {
 }
 
 /** Wilson Scoreをラベルに変換 */
-export function scoreLabel(score: number): string {
+export function scoreLabel(score: number, total: number = 0): string {
+  if (total === 0) return '❓ 未検証';
   if (score >= 0.8) return '✅ 高信頼';
   if (score >= 0.6) return '🟡 確認中';
   if (score >= 0.3) return '🔴 要注意';
-  return '❓ 未検証';
+  return '⚠️ データ少';
 }

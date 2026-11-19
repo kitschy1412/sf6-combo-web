@@ -1,0 +1,157 @@
+---
+// 一覧（キャラハブ・公開一覧）の行で開く起き攻めパネル
+// 〆分類が同じ起き攻めを主に、〆は違うが有利フレームが同じものを「参考」として薄く出す（getOkizemeLinks）
+// 開いても周りの行が大きく動かないように、1件1行（タイトル・コマンド・中段/下段/投げ/詐欺）の小さなリストにする。
+// 起き上がりへの対応（GD・暴れ・無敵）は行の title に入れ、詳しくはコンボ詳細へ回す
+import Notation from './Notation.astro';
+import { getEnderClassById, type EnderClass, type OkizemeLinks, type OkizemeSetup } from '../mock-data/rashid';
+
+interface Props {
+  links: OkizemeLinks;
+  /** そのルートの〆分類（見出しに出す） */
+  ender?: EnderClass | null;
+  /** 詳しくは のリンク先のコンボ */
+  comboId: string;
+  /** そのルートの葉ID。詳細ページでこのルートを選んだ状態で開く */
+  leafId: string;
+}
+const { links, ender, comboId, leafId } = Astro.props;
+const groups = [
+  { rel: 'main', items: links.main },
+  { rel: 'ref', items: links.reference },
+].filter(g => g.items.length > 0);
+const wakeupTitle = (o: OkizemeSetup) => [
+  o.pattern ? `${o.title}（${o.pattern}）` : o.title,
+  o.vsWakeup.guard && `GD: ${o.vsWakeup.guard}`,
+  o.vsWakeup.mash && `暴れ: ${o.vsWakeup.mash}`,
+  o.vsWakeup.invincible && `無敵: ${o.vsWakeup.invincible}`,
+  o.alsoIn && `ほかの出典 ${o.alsoIn.length}件`,
+].filter(Boolean).join('\n');
+---
+
+<div class="okizeme-panel">
+  <div class="okizeme-panel-hd">
+    <span class="okizeme-panel-count">
+      {links.main.length > 0 ? `起き攻め ${links.main.length}件` : 'この〆の起き攻めは未登録'}
+    </span>
+    {ender && <span class="okizeme-panel-ender">{ender.displayName}{ender.frameAdvantage ? ` / ${ender.frameAdvantage}` : ''}</span>}
+    <a href={`/mock/combo/${comboId}#${leafId}`} class="okizeme-panel-more">詳しくはコンボ詳細 →</a>
+    {ender && <a href={`/mock/okizeme/#${ender.id}`} class="okizeme-panel-more okizeme-panel-all">この〆の起き攻め一覧 →</a>}
+  </div>
+  <ul class="okizeme-list">
+    {groups.map(g => (
+      <>
+        {g.rel === 'ref' && (
+          <li class="okizeme-ref-hd">
+            参考（同じ {links.frameAdvantage}）
+            <span class="okizeme-ref-note">〆が違うため、距離が合わないことがあります</span>
+          </li>
+        )}
+        {g.items.map(o => (
+          <li class:list={['okizeme-item', g.rel === 'ref' && 'okizeme-item-ref']}
+            data-okizeme-id={o.id} data-okizeme-rel={g.rel} title={wakeupTitle(o)}>
+            <span class="okizeme-item-title">{o.title}</span>
+            <span class="okizeme-item-inputs"><Notation inputs={o.inputs} size="sm" /></span>
+            {o.pattern && <span class="okizeme-item-ender">{o.pattern}</span>}
+            {g.rel === 'ref' && <span class="okizeme-item-ender">{getEnderClassById(o.enderClassId)?.displayName}</span>}
+            <span class="okizeme-item-flags">
+              {o.flags.mid && <span class="okizeme-flag">中段</span>}
+              {o.flags.low && <span class="okizeme-flag">下段</span>}
+              {o.flags.throw && <span class="okizeme-flag">投げ</span>}
+              {o.flags.safeJump && <span class="okizeme-flag okizeme-flag-safe">詐欺</span>}
+            </span>
+          </li>
+        ))}
+      </>
+    ))}
+  </ul>
+</div>
+
+<style is:global>
+  .okizeme-panel { padding: 6px 16px 8px 24px; }
+  .okizeme-panel-hd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .okizeme-panel-count {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--muted-strong);
+    letter-spacing: 0.04em;
+  }
+  .okizeme-panel-ender {
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: var(--surface3);
+    padding: 1px 7px;
+    border-radius: 3px;
+  }
+  .okizeme-panel-more {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .okizeme-panel-more:hover { color: var(--text); text-decoration: underline; }
+  .okizeme-panel-all { margin-left: 0; }
+
+  /* ── 1件1行: タイトルは幅をそろえ、コマンドは1行で切る ── */
+  .okizeme-list { list-style: none; margin: 0; padding: 0; }
+  .okizeme-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 2px 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.74rem;
+    white-space: nowrap;
+  }
+  .okizeme-item-title {
+    flex: 0 0 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .okizeme-item-inputs {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .okizeme-item-inputs .notation-text-sm { font-size: 0.76rem; }
+  .okizeme-item-inputs .notation-chips { flex-wrap: nowrap; }
+  .okizeme-item-ender {
+    flex-shrink: 0;
+    font-size: 0.66rem;
+    color: var(--muted);
+    background: var(--surface3);
+    padding: 0 6px;
+    border-radius: 3px;
+  }
+  .okizeme-item-flags { display: flex; flex-shrink: 0; gap: 3px; margin-left: auto; }
+  .okizeme-flag {
+    font-size: 0.62rem;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: var(--surface3);
+    color: var(--muted-strong);
+    font-weight: 600;
+  }
+  .okizeme-flag-safe { background: #fef3c7; color: #b45309; }
+
+  /* ── 参考（〆は違うが有利フレームが同じ）: 薄く出し、マウスを乗せた行だけ濃くする ── */
+  .okizeme-ref-hd {
+    padding: 4px 0 1px;
+    border-top: 1px solid var(--border);
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .okizeme-ref-note { font-weight: 400; margin-left: 6px; }
+  .okizeme-item-ref { opacity: 0.55; transition: opacity 0.12s; }
+  .okizeme-item-ref:hover { opacity: 1; }
+</style>

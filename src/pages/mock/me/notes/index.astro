@@ -1,0 +1,110 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import { NOTES, COMBO_NOTES, OKIZEME_NOTES, type Visibility } from '../../../../mock-data/notes';
+
+function visibilityLabel(v: Visibility): string {
+  return v === 'public' ? '公開' : v === 'unlisted' ? '限定公開' : '非公開';
+}
+function visibilityStyle(v: Visibility): string {
+  if (v === 'public') return 'background:rgba(16,185,129,0.15); color:#34d399;';
+  if (v === 'unlisted') return 'background:rgba(251,191,36,0.15); color:#fbbf24;';
+  return 'background:rgba(113,113,122,0.3); color:#a1a1aa;';
+}
+---
+
+<Layout title="マイノート — モック">
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">マイノート</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px; margin-bottom:20px;">
+    <div style="flex:1;">
+      <h1>マイノート</h1>
+      <p style="color:var(--muted-strong); font-size:0.85rem; margin:4px 0 0;">
+        コンボ・起き攻めをまとめて並び順を管理できるノート機能（モック）
+      </p>
+    </div>
+    <button class="btn btn-primary">＋ 新規ノート</button>
+  </div>
+
+  <!-- コンボノート -->
+  <section style="margin-bottom:28px;">
+    <div class="section-head">
+      <h2>コンボノート</h2>
+      <span style="font-size:0.78rem; color:var(--muted);">{COMBO_NOTES.length}件</span>
+    </div>
+    {COMBO_NOTES.length === 0 ? (
+      <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; padding:32px;">
+        コンボノートがありません
+      </div>
+    ) : (
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        {COMBO_NOTES.map(note => (
+          <a href={`/mock/me/notes/combos/${note.id}`} class="card" style="text-decoration:none; display:flex; align-items:center; gap:12px; transition:border-color 0.15s;">
+            <div style="font-size:1.5rem; line-height:1;">📋</div>
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap;">
+                <strong style="font-size:0.95rem;">{note.title}</strong>
+                <span class="tag" style={visibilityStyle(note.visibility)}>{visibilityLabel(note.visibility)}</span>
+                <span class="tag" style="background:rgba(59,130,246,0.15); color:#60a5fa;">コンボ</span>
+              </div>
+              {note.description && (
+                <div style="font-size:0.8rem; color:var(--muted-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  {note.description}
+                </div>
+              )}
+            </div>
+            <div style="text-align:right; flex-shrink:0;">
+              <div style="font-size:1.1rem; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted);">{note.itemIds.length}</div>
+              <div style="font-size:0.7rem; color:var(--muted); letter-spacing:0.06em;">件</div>
+            </div>
+          </a>
+        ))}
+      </div>
+    )}
+  </section>
+
+  <!-- 起き攻めノート -->
+  <section style="margin-bottom:28px;">
+    <div class="section-head">
+      <h2>起き攻めノート</h2>
+      <span style="font-size:0.78rem; color:var(--muted);">{OKIZEME_NOTES.length}件</span>
+    </div>
+    {OKIZEME_NOTES.length === 0 ? (
+      <div class="card" style="text-align:center; color:var(--muted); border-style:dashed; padding:32px;">
+        起き攻めノートがありません
+      </div>
+    ) : (
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        {OKIZEME_NOTES.map(note => (
+          <a href={`/mock/me/notes/okizeme/${note.id}`} class="card" style="text-decoration:none; display:flex; align-items:center; gap:12px; transition:border-color 0.15s;">
+            <div style="font-size:1.5rem; line-height:1;">🥊</div>
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap;">
+                <strong style="font-size:0.95rem;">{note.title}</strong>
+                <span class="tag" style={visibilityStyle(note.visibility)}>{visibilityLabel(note.visibility)}</span>
+                <span class="tag" style="background:rgba(245,158,11,0.15); color:#fbbf24;">起き攻め</span>
+              </div>
+              {note.description && (
+                <div style="font-size:0.8rem; color:var(--muted-strong); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  {note.description}
+                </div>
+              )}
+            </div>
+            <div style="text-align:right; flex-shrink:0;">
+              <div style="font-size:1.1rem; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--muted);">{note.itemIds.length}</div>
+              <div style="font-size:0.7rem; color:var(--muted); letter-spacing:0.06em;">件</div>
+            </div>
+          </a>
+        ))}
+      </div>
+    )}
+  </section>
+
+  <div class="card" style="background:var(--surface); border-style:dashed; font-size:0.82rem; color:var(--muted);">
+    <strong style="color:var(--muted-strong);">モック注:</strong>
+    ノートの種類は「コンボ」か「起き攻め」の一方のみ（異種混在なし）。並び順は詳細ページで ↑↓ ボタンにより編集。
+  </div>
+</Layout>

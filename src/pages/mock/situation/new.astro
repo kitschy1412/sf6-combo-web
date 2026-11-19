@@ -1,0 +1,76 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { ENDER_CLASSES, getEnderClassById, getOkizemeLinks } from '../../../mock-data/rashid';
+
+const okizeme = getOkizemeLinks('ec_throw');
+---
+
+<Layout title="ダウン状況入力 — モック">
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/character/rashid">Rashid</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">新規ダウン状況</span>
+  </nav>
+
+  <div class="page-head" style="border-radius:6px;">
+    <h1>ダウン状況を追加</h1>
+    <span class="meta">Rashid</span>
+  </div>
+
+  <p style="color:var(--muted-strong); margin:14px 0 6px; font-size:0.88rem;">
+    「投げ後」「J.HK始動の崩しからのダウン」など、起き攻めが発生する状況を記録します。
+  </p>
+  <p style="color:var(--muted); margin:0 0 20px; font-size:0.82rem;">
+    💡 状況に〆分類を割り当てると、その分類に属する起き攻めが自動で紐づきます。
+  </p>
+
+  <form style="display:grid; gap:16px;" onsubmit="event.preventDefault(); alert('（モック）保存しました');">
+
+    <div>
+      <label class="field-label">状況ラベル *</label>
+      <input type="text" class="input" value="投げ後" placeholder="投げ後 / 2MK > 弱イーグル〆 / SA2〆 など" />
+    </div>
+
+    <div class="card card-emph">
+      <label class="field-label" style="font-size:0.82rem; color:var(--text); margin-bottom:6px;">この状況の〆分類</label>
+      <select class="select" style="margin-bottom:10px;">
+        <option value="">（選択してください）</option>
+        {ENDER_CLASSES.map(ec => (
+          <option value={ec.id} selected={ec.id==='ec_throw'}>{ec.displayName} ({ec.frameAdvantage})</option>
+        ))}
+        <option value="__new__">＋ 新しい〆分類を作る…</option>
+      </select>
+      <div style="font-size:0.82rem;">
+        <strong>この分類に紐づく起き攻め（自動表示されます）:</strong>
+        <ul style="margin:6px 0 0; padding-left:20px; color:var(--muted-strong);">
+          {okizeme.main.map(o => <li>{o.title}</li>)}
+          {okizeme.reference.map(o => (
+            <li style="opacity:0.55;">参考（同じ {okizeme.frameAdvantage}・{getEnderClassById(o.enderClassId)?.displayName}）: {o.title}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">由来コンボ（任意）</label>
+      <select class="select">
+        <option>（なし — 投げ後など単独で発生する状況）</option>
+        <option>c_001: 画面中央 2MK始動 基本コンボ</option>
+        <option>c_002: 画面端 DR始動 高火力</option>
+      </select>
+      <div class="field-help">コンボから派生する状況の場合に指定。コンボ詳細から「この〆の状況を作る」導線で自動補完されます。</div>
+    </div>
+
+    <div>
+      <label class="field-label">補足メモ（任意）</label>
+      <textarea class="textarea" rows="3">前投げ後の状況。距離が遠いため一部の重ねは不可。</textarea>
+    </div>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      <a href="/mock/character/rashid" class="btn">キャンセル</a>
+      <button type="submit" class="btn btn-primary">保存</button>
+    </div>
+  </form>
+</Layout>

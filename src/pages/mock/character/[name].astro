@@ -1,0 +1,1091 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import NotationToggle from '../../../components/NotationToggle.astro';
+import ComboColumnMenu from '../../../components/ComboColumnMenu.astro';
+import ComboListHead from '../../../components/ComboListHead.astro';
+import ComboLowRow from '../../../components/ComboLowRow.astro';
+import ComboRowCommand from '../../../components/ComboRowCommand.astro';
+import ComboRowStats from '../../../components/ComboRowStats.astro';
+import ComboParentStats from '../../../components/ComboParentStats.astro';
+import ComboEditor from '../../../components/ComboEditor.astro';
+import OkizemePanel from '../../../components/OkizemePanel.astro';
+import { getRecipeTable } from '../../../lib/movenames';
+import { recipeSteps } from '../../../lib/notation';
+import { GAUGE_CLASSES, GAUGE_CLASS_HINTS, gaugeClassFromSegs, gaugeClassesOf } from '../../../lib/gauges';
+import { comboSearchTexts } from '../../../lib/combo-search';
+import {
+  COMBOS, ENDER_CLASSES, FOLDED_PRIORITY, HIT_STATES, KNOCKDOWN_SITUATIONS, PRIORITIES, STARTERS,
+  getEnderClassById, getComboRoutes, hasBranches, getComboBrokenCount,
+  getOkizemeLinks, getEnderClassCounts, groupCombosForList,
+} from '../../../mock-data/rashid';
+import { ARCHIVER_UNRESOLVED } from '../../../mock-data/rashid-archiver';
+import '../../../styles/combo-list.css';
+
+const { name } = Astro.params;
+// モックデータは Rashid のみ。未知のキャラ名は他のモックページと同様 /mock/ へ戻す
+if (name !== 'rashid') return Astro.redirect('/mock/');
+const charName = 'Rashid';
+
+const counts = {
+  combos: COMBOS.length,
+  personal: COMBOS.filter(c => c.sourceType === 'personal').length,
+  shared: COMBOS.filter(c => c.sourceType === 'shared').length,
+  forked: COMBOS.filter(c => c.sourceType === 'forked').length,
+};
+const selfMadeCount = counts.personal + counts.shared;
+
+// 見出しごとのグループ。コンボの無い見出しも出しておき、件数0のあいだは隠す（新規保存で足されたときの受け皿）
+const listSections = groupCombosForList(COMBOS);
+const usedStarters = STARTERS.filter(st => COMBOS.some(c => c.starter === st));
+
+// 絞り込みの選択肢は文字/チップで切り替えられないので、呼び方とコマンドを両方出す
+const recipeTable = getRecipeTable(charName);
+const starterOption = (st: string) => {
+  const word = recipeSteps(st, recipeTable).join(' > ');
+  return word === st ? st : `${word}（${st}）`;
+};
+---
+
+<Layout title={`${charName} — モック`} character={charName}>
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">{charName}</span>
+  </nav>
+
+  <div class="personal-page-notice">
+    <span class="notice-icon">👤</span>
+    <div>
+      <strong>これはあなたの個人ページです</strong>
+      <span class="notice-sub">コンボを整理して、準備ができたら「アップロード」で公開できます</span>
+    </div>
+  </div>
+
+  <div class="page-head" style="border-radius:6px 6px 0 0;">
+    <div style="display:flex; gap:14px; align-items:baseline;">
+      <h1>{charName.toUpperCase()}</h1>
+      <span class="meta">v1.25 ・ {counts.combos}コンボ群 ・ {ENDER_CLASSES.length}分類 ・ {KNOCKDOWN_SITUATIONS.length}状況</span>
+    </div>
+    <div style="display:flex; gap:6px;">
+      <button type="button" id="btn-add-combo-top" class="btn btn-sm btn-primary" style="background:#fff; color:#111; border-color:#fff;">＋ コンボ</button>
+      <a href="/mock/okizeme/new" class="btn btn-sm" style="background:transparent; color:#fff; border-color:#444;">＋ 起き攻め</a>
+      <a href="/mock/situation/new" class="btn btn-sm" style="background:transparent; color:#fff; border-color:#444;">＋ ダウン状況</a>
+    </div>
+  </div>
+
+  <div class="filter-bar filter-bar-row" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:24px;">
+    <div class="filter-search">
+      <label class="filter-label" for="filter-text">検索</label>
+      <input type="search" id="filter-text" class="input input-inline" autocomplete="off"
+        placeholder="コマンド・技名・コンボ名（例: 236HK、スパイク）" />
+      <span id="filter-text-count" class="filter-text-count" aria-live="polite"></span>
+    </div>
+
+    <button type="button" id="filter-self-only" class="chip chip-toggle" aria-pressed="false">
+      <span class="chip-toggle-mark" aria-hidden="true"></span>
+      自身作成のみ
+      <span class="chip-toggle-count">{selfMadeCount}/{counts.combos}</span>
+    </button>
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">始動技</span>
+    <select id="filter-starter" class="select select-inline">
+      <option value="">すべて</option>
+      {usedStarters.map(st => <option value={st}>{starterOption(st)}</option>)}
+    </select>
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">優先度</span>
+    {PRIORITIES.map(p => <button type="button" class="chip" data-filter-priority={p} aria-pressed="false">{p}</button>)}
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">ヒット状態</span>
+    {HIT_STATES.filter(hs => hs !== '通常').map(hs => <button type="button" class="chip" data-filter-hit={hs} aria-pressed="false">{hs}</button>)}
+
+    <span class="filter-divider" aria-hidden="true"></span>
+
+    <span class="filter-label">ゲージ</span>
+    {GAUGE_CLASSES.map(g => <button type="button" class="chip" data-filter-gauge={g} aria-pressed="false" title={GAUGE_CLASS_HINTS[g]}>{g}</button>)}
+  </div>
+
+  <section style="margin-bottom:32px;">
+    <div class="section-head">
+      <h2>コンボ</h2>
+      <span style="font-size:0.76rem; color:var(--muted);">マウスを乗せた行の ≡ をドラッグで並び替え（同じ見出し・同じ優先度の中）／行間ホバーで挿入</span>
+    </div>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+      <NotationToggle styleToggle />
+      <ComboColumnMenu />
+    </div>
+
+    <div class="combo-table-scroll">
+    <table class="data-table" id="combo-table">
+      <colgroup>
+        <col data-col="handle" style="width:24px;" />
+        <col data-col="command" />
+        <col data-col="damage" style="width:64px;" />
+        <col data-col="ender" style="width:140px;" />
+        <col data-col="frame" style="width:56px;" />
+        <col data-col="actions" style="width:96px;" />
+      </colgroup>
+      <!-- ── 列名（表の上に1回だけ） ── -->
+      <thead class="combo-col-head">
+        <tr>
+          <th></th>
+          <th>コマンド</th>
+          <th class="col-num">ダメージ</th>
+          <th>〆分類</th>
+          <th>有利F</th>
+          <th></th>
+        </tr>
+      </thead>
+      {listSections.map(({ section, buckets, count }) => (
+        <>
+          <!-- ── 大見出し（小見出しの無いものは大見出しが見出しを兼ねる） ── -->
+          <ComboListHead section={section} bucket={buckets[0].scene ? undefined : buckets[0].key} count={count} colspan={6} addable />
+          {buckets.map(({ key, scene, items }) => (
+            <>
+              {scene && <ComboListHead section={section} scene={scene} bucket={key} count={items.length} colspan={6} addable />}
+              {items.map((c) => {
+        const routes = getComboRoutes(c);
+        const branched = hasBranches(c);
+        const broken = getComboBrokenCount(c);
+        const search = comboSearchTexts(c, routes, recipeTable);
+        return (
+          <tbody class="combo-group" data-combo-id={c.id} data-source={c.sourceType} data-starter={c.starter}
+            data-section={section} data-bucket={key} data-priority={c.priority}
+            data-hit-state={c.hitState} data-gauges={gaugeClassesOf(routes).join(' ')} data-search={search.group}
+            style={c.priority === FOLDED_PRIORITY ? 'display:none;' : undefined}>
+            <tr class="insert-here-row">
+              <td colspan="6"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
+            </tr>
+            {!branched && (() => {
+              const r = routes[0];
+              const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+              const okizeme = getOkizemeLinks(r.leaf.enderClassId);
+              const okizemeTotal = okizeme.main.length + okizeme.reference.length;
+              return (
+                <>
+                  <tr>
+                    <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
+                    <td><ComboRowCommand combo={c} /></td>
+                    <ComboRowStats leaf={r.leaf} ender={ender} okizeme={okizeme} />
+                    <td class="col-actions">
+                      {broken > 0 && <span class="tag tag-warn broken-flag">⚠{broken}</span>}
+                      <div class="row-actions">
+                        <button type="button" class="btn-edit" data-edit-combo-id={c.id} title="編集" aria-label="編集">✎</button>
+                        {c.visibility !== 'public' && (
+                          <button type="button" class="btn-upload" data-combo-id={c.id} title="アップロード" aria-label="アップロード">⤴</button>
+                        )}
+                        <button type="button" class="btn-delete" data-delete-combo-id={c.id} title="このコンボを削除" aria-label="削除">🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                  {okizemeTotal > 0 && (
+                    <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} style="display:none;">
+                      <td colspan="6" class="okizeme-panel-cell">
+                        <OkizemePanel links={okizeme} ender={ender} comboId={c.id} leafId={r.leaf.id} />
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })()}
+
+            {branched && (
+              <>
+                <tr class="combo-parent-row">
+                  <td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>
+                  <td><ComboRowCommand combo={c} /></td>
+                  <ComboParentStats routes={routes} />
+                  <td class="col-actions">
+                    {broken > 0 && <span class="tag tag-warn broken-flag">⚠{broken}</span>}
+                    <div class="row-actions">
+                      <button type="button" class="btn-edit" data-edit-combo-id={c.id} title="編集" aria-label="編集">✎</button>
+                      {c.visibility !== 'public' && (
+                        <button type="button" class="btn-upload" data-combo-id={c.id} title="アップロード" aria-label="アップロード">⤴</button>
+                      )}
+                      <button type="button" class="btn-delete" data-delete-combo-id={c.id} title="このコンボを削除" aria-label="削除">🗑</button>
+                    </div>
+                  </td>
+                </tr>
+                {routes.map((r, ri) => {
+                  const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : null;
+                  const okizeme = getOkizemeLinks(r.leaf.enderClassId);
+                  const okizemeTotal = okizeme.main.length + okizeme.reference.length;
+                  return (
+                    <>
+                      <tr class="combo-child-row" data-branch-of={c.id} data-gauge={gaugeClassFromSegs(r.pathSegments)} data-search={search.routes[ri]} style="display:none;">
+                        <td class="cell-handle"></td>
+                        <td><ComboRowCommand combo={c} route={r} lastRoute={ri === routes.length - 1} /></td>
+                        <ComboRowStats leaf={r.leaf} ender={ender} okizeme={okizeme} />
+                        <td>{(r.leaf.votes?.brokenInCurrentVer ?? 0) > 0 && <span class="tag tag-warn">⚠ {r.leaf.votes!.brokenInCurrentVer}</span>}</td>
+                      </tr>
+                      {okizemeTotal > 0 && (
+                        <tr class="okizeme-panel-row" data-okizeme-panel={r.leaf.id} data-okizeme-branch-of={c.id} style="display:none;">
+                          <td colspan="6" class="okizeme-panel-cell">
+                            <OkizemePanel links={okizeme} ender={ender} comboId={c.id} leafId={r.leaf.id} />
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </>
+            )}
+          </tbody>
+        );
+      })}
+              <ComboLowRow bucket={key} count={items.filter(c => c.priority === FOLDED_PRIORITY).length} colspan={6} />
+            </>
+          ))}
+        </>
+      ))}
+
+      <!-- インラインエディタ（初期は非表示、＋クリックで表示。tbodyとしてテーブル内を移動できる） -->
+      <tbody id="inline-editor-host" class="inline-editor-tbody" style="display:none;">
+        <tr class="editor-drag-chip-row">
+          <td colspan="6" style="padding:4px 8px;">
+            <div class="editor-drag-chip">
+              <button type="button" id="editor-drag-handle" class="editor-drag-btn" title="ドラッグして挿入位置を変更">≡</button>
+              <strong id="editor-mode-label">新規コンボを追加</strong>
+              <span id="insert-pos-label"></span>
+            </div>
+          </td>
+        </tr>
+        <tr class="editor-card-row">
+          <td colspan="6" style="padding:0;">
+            <div class="card card-emph" style="padding:14px 16px; margin:8px 0; background:var(--surface);">
+              <ComboEditor mode="inline" character={charName} />
+            </div>
+          </td>
+        </tr>
+      </tbody>
+
+      <!-- 末尾の挿入ポイント（最後のコンボの後に挿入するための領域） -->
+      <tbody class="combo-tail">
+        <tr class="insert-here-row">
+          <td colspan="6"><button type="button" class="insert-here-btn" data-insert-pos="end">＋ ここに挿入</button></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  {ARCHIVER_UNRESOLVED.length > 0 && (
+    <section style="margin-bottom:32px;">
+      <div class="section-head">
+        <h2>archiver取り込み: 推定できなかった項目</h2>
+        <span style="font-size:0.76rem; color:var(--muted);">{ARCHIVER_UNRESOLVED.length}件 ／ npm run import:archiver で再生成</span>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>種別</th>
+            <th>タイトル</th>
+            <th>元レシピ</th>
+            <th>未変換の語</th>
+            <th>〆分類</th>
+            <th>始動技</th>
+            <th>位置</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ARCHIVER_UNRESOLVED.map(u => (
+            <tr>
+              <td><span class="tag">{u.kind === 'combo' ? 'コンボ' : u.kind === 'matchup' ? 'キャラ対策' : 'セットプレイ'}</span></td>
+              <td>{u.kind === 'combo' ? <a href={`/mock/combo/${u.id}`} class="row-link">{u.title}</a>
+                : u.kind === 'matchup' && u.href ? <a href={u.href} class="row-link">{u.title}</a> : u.title}</td>
+              <td>{u.recipeJa}</td>
+              <td>{u.unresolvedTerms.length > 0 ? u.unresolvedTerms.map(t => <span class="tag tag-warn" style="margin-right:3px;">{t}</span>) : '—'}</td>
+              <td>{u.enderUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
+              <td>{u.starterUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
+              <td>{u.positionUnknown ? <span class="tag tag-warn">推定不可</span> : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )}
+
+  <section style="margin-bottom:32px;">
+    <div class="section-head">
+      <h2>〆分類（起き攻めのカテゴリ）</h2>
+      <a href="/mock/ender-class/list" class="btn btn-sm">分類を管理</a>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px;">
+      {ENDER_CLASSES.map(ec => {
+        const n = getEnderClassCounts(ec.id);
+        return (
+          <div class="card">
+            <div style="font-weight:700; margin-bottom:4px;">{ec.displayName}</div>
+            <div style="font-size:0.78rem; color:var(--muted);">
+              <span class="dmg" style="color:var(--text); font-size:0.85rem;">{ec.frameAdvantage}</span>
+              <span style="margin:0 6px; color:var(--border-strong);">|</span>
+              コンボ {n.combos} ・ 起き攻め {n.okizeme}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>ダウン状況</h2>
+      <a href="/mock/situation/new" class="btn btn-sm">＋ 追加</a>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>状況</th>
+          <th>〆分類</th>
+          <th>備考</th>
+        </tr>
+      </thead>
+      <tbody>
+        {KNOCKDOWN_SITUATIONS.map(s => (
+          <tr>
+            <td><a href={`/mock/situation/${s.id}`} class="row-link col-title">{s.label}</a></td>
+            <td><span class="tag">{getEnderClassById(s.enderClassId)?.displayName}</span></td>
+            <td style="color:var(--muted); font-size:0.82rem;">{s.notes ?? ''}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+
+  <style>
+    /* ── 個人ページ通知バナー ── */
+    .personal-page-notice {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--info-bg);
+      color: var(--info-fg);
+      border: 1px solid rgba(29,78,216,0.2);
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+    }
+    .personal-page-notice strong { font-size: 0.88rem; }
+    .notice-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .notice-sub {
+      margin-left: 8px;
+      font-size: 0.78rem;
+      color: #3b6fd4;
+    }
+
+    /* ── テーブルの横スクロール（ボタンが多い行でも画面外に切れないように） ── */
+    .combo-table-scroll {
+      overflow-x: auto;
+    }
+
+    /* ── フィルタバー（1行統合レイアウト） ── */
+    .filter-bar-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      row-gap: 6px;
+    }
+    .filter-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--border-strong);
+      margin: 0 4px;
+    }
+    .select-inline {
+      height: 26px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      width: auto;
+      min-width: 132px;
+    }
+    /* 検索欄（チップの行を崩さないように1行目に単独で置く） */
+    .filter-search {
+      flex-basis: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .input-inline {
+      height: 26px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      width: 340px;
+      min-width: 0;
+    }
+    .filter-text-count {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    /* チップ・トグル（チェック付きピル） */
+    .chip-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chip-toggle-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 3px;
+      background: #fff;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .chip-toggle[aria-pressed="true"] .chip-toggle-mark {
+      background: #111;
+      border-color: #111;
+    }
+    .chip-toggle[aria-pressed="true"] .chip-toggle-mark::after {
+      content: '';
+      width: 7px;
+      height: 4px;
+      border-left: 2px solid #fff;
+      border-bottom: 2px solid #fff;
+      transform: rotate(-45deg) translate(1px, -1px);
+    }
+    .chip-toggle-count {
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .chip-toggle[aria-pressed="true"] .chip-toggle-count {
+      color: var(--text);
+    }
+
+    /* ── テーブル: 全体的に行の縦幅をコンパクトに ── */
+    .data-table th,
+    .data-table td { padding-top: 5px; padding-bottom: 5px; }
+    .data-table td { font-size: 0.82rem; }
+
+    /* ── インラインエディタ（テーブル内 tbody として配置） ── */
+    .inline-editor-tbody > tr > td { background: transparent !important; border: none !important; }
+
+    /* チップ＝ヘッダ。通常時は地味な見た目、ドラッグ中は黒いピル */
+    .editor-drag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 14px 4px 6px;
+      font-size: 0.85rem;
+      max-width: 100%;
+      transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+    }
+    .editor-drag-chip strong { font-size: 0.9rem; }
+    .editor-drag-chip #insert-pos-label {
+      color: var(--muted);
+      font-size: 0.72rem;
+      margin-left: 6px;
+    }
+
+    /* ドラッグ中：カードを隠して、チップを黒ピル化 */
+    .inline-editor-tbody.is-being-dragged .editor-card-row { display: none; }
+    .inline-editor-tbody.is-being-dragged .editor-drag-chip {
+      background: #111;
+      color: #fff;
+      border-radius: 999px;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.28);
+    }
+    .inline-editor-tbody.is-being-dragged .editor-drag-chip .editor-drag-btn {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.25);
+      color: #fff;
+      height: 22px;
+      padding: 0 8px;
+      font-size: 0.9rem;
+    }
+    .inline-editor-tbody.is-being-dragged .editor-drag-chip #insert-pos-label {
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* ── エディタ自体のドラッグハンドル ── */
+    .editor-drag-btn {
+      background: transparent;
+      border: 1px solid var(--border-strong);
+      color: var(--muted-strong);
+      font-size: 1.05rem;
+      padding: 2px 10px;
+      border-radius: 4px;
+      cursor: grab;
+      user-select: none;
+      font-family: inherit;
+      line-height: 1;
+      height: 26px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .editor-drag-btn:hover { background: var(--surface3); color: var(--text); }
+    .editor-drag-btn:active { cursor: grabbing; }
+
+    body.editor-dragging {
+      cursor: grabbing !important;
+      user-select: none !important;
+    }
+    body.editor-dragging * { user-select: none !important; }
+  </style>
+
+  <script>
+    import Sortable from 'sortablejs';
+    import { COMBOS, getComboRoutes, getEnderClassById } from '../../../mock-data/rashid';
+    import type { Combo, RouteSummary } from '../../../mock-data/rashid';
+    import { gaugeClassesOf, gaugeClassFromSegs } from '../../../lib/gauges';
+    import { comboSearchTexts } from '../../../lib/combo-search';
+    import {
+      FOLDED_PRIORITY, PRIORITIES, bucketOf, bucketPreset, hitTagClass, positionTagOf, priorityTagClass, sectionOf,
+    } from '../../../mock-data/rashid-starters';
+    import type { BucketPreset, Priority } from '../../../mock-data/rashid-starters';
+    import { bindBranchToggle, formatDamage, initComboListView } from '../../../lib/combo-list-view';
+    import { getMoveTable, getRecipeTable } from '../../../lib/movenames';
+    import { chipClassOf, formatToken, readNotationPrefs, recipeSteps } from '../../../lib/notation';
+
+    // ── 自身作成のみ / 始動技 フィルタ（検索欄、優先度・ヒット状態・ゲージのチップと見出しの折りたたみは combo-list-view） ──
+    const filters = { selfOnly: false, starter: '' };
+    const listView = initComboListView(grp => {
+      const src = grp.dataset.source ?? '';
+      const okSource = !filters.selfOnly || src === 'personal' || src === 'shared';
+      const okStarter = !filters.starter || grp.dataset.starter === filters.starter;
+      return okSource && okStarter;
+    });
+    const applyFilters = listView.apply;
+
+    const selfOnlyBtn = document.getElementById('filter-self-only') as HTMLButtonElement | null;
+    selfOnlyBtn?.addEventListener('click', () => {
+      const next = selfOnlyBtn.getAttribute('aria-pressed') !== 'true';
+      selfOnlyBtn.setAttribute('aria-pressed', String(next));
+      selfOnlyBtn.classList.toggle('chip-on', next);
+      filters.selfOnly = next;
+      applyFilters();
+    });
+
+    const starterSel = document.getElementById('filter-starter') as HTMLSelectElement | null;
+    starterSel?.addEventListener('change', () => {
+      filters.starter = starterSel.value;
+      applyFilters();
+    });
+
+    // ── インラインエディタ展開（エディタ自体がテーブル内を移動する） ──
+    const editorHost = document.getElementById('inline-editor-host') as HTMLTableSectionElement;
+    const comboTableEl = document.getElementById('combo-table')!;
+    let activeBtn: HTMLElement | null = null;
+    let editorOpen = false;
+    // 既存コンボを編集中のときの元の行（編集中だけ隠し、閉じたら戻す）
+    let editingGroup: HTMLElement | null = null;
+    let editingTitle = '';
+
+    function setEditingGroup(group: HTMLElement | null) {
+      if (editingGroup) delete editingGroup.dataset.editing;
+      editingGroup = group;
+      if (group) group.dataset.editing = '1';
+      applyFilters();
+    }
+
+    function updatePosLabel() {
+      if (!editorOpen) return;
+      const labelEl = document.getElementById('insert-pos-label')!;
+      if (editingGroup) {
+        labelEl.textContent = `「${editingTitle}」を編集中`;
+        return;
+      }
+      const realGroups = Array.from(document.querySelectorAll<HTMLElement>('tbody.combo-group'));
+      const beforeCount = realGroups.filter(g => {
+        const pos = editorHost.compareDocumentPosition(g);
+        return (pos & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
+      }).length;
+      let label: string;
+      if (beforeCount === 0) label = '先頭に挿入';
+      else if (beforeCount === realGroups.length) label = '末尾に挿入';
+      else label = `${beforeCount} 番目の後に挿入`;
+      labelEl.textContent = label;
+    }
+
+    const editorModeLabel = document.getElementById('editor-mode-label');
+    // deno-lint-ignore no-explicit-any
+    const editorAPI = () => (window as any).comboEditorAPI as
+      | { loadCombo: (c: unknown) => void; reset: (preset?: BucketPreset) => void; comboId: string | null }
+      | undefined;
+
+    function setEditorNewMode(preset?: BucketPreset) {
+      if (editorModeLabel) editorModeLabel.textContent = '新規コンボを追加';
+      editorAPI()?.reset(preset);
+    }
+
+    // 行間の「＋ ここに挿入」は、その行の見出しに入る値と優先度を入れた状態で開く（usePreset=false なら空で開く）
+    function openEditorAt(btn: HTMLElement, usePreset = true) {
+      activeBtn?.classList.remove('is-active');
+      activeBtn = btn;
+      btn.classList.add('is-active');
+      setEditingGroup(null);
+      const pos = btn.dataset.insertPos;
+      const owner = pos === 'end' ? null : btn.closest<HTMLElement>('tbody.combo-group');
+      setEditorNewMode(usePreset && owner
+        ? { ...bucketPreset(owner.dataset.bucket ?? ''), priority: owner.dataset.priority as Priority }
+        : undefined);
+
+      if (pos === 'end') {
+        const tail = comboTableEl.querySelector('tbody.combo-tail');
+        if (tail) tail.before(editorHost);
+        else comboTableEl.appendChild(editorHost);
+      } else {
+        const ownerGroup = btn.closest<HTMLElement>('tbody.combo-group');
+        if (ownerGroup) ownerGroup.before(editorHost);
+      }
+      editorHost.style.display = '';
+      editorOpen = true;
+      updatePosLabel();
+      editorHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function closeEditor() {
+      editorHost.style.display = 'none';
+      editorOpen = false;
+      activeBtn?.classList.remove('is-active');
+      activeBtn = null;
+      setEditingGroup(null);
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.insert-here-btn').forEach(btn => {
+      btn.addEventListener('click', () => openEditorAt(btn));
+    });
+
+    document.getElementById('btn-add-combo-top')?.addEventListener('click', () => {
+      const firstBtn = document.querySelector<HTMLElement>('tbody.combo-group .insert-here-btn');
+      if (firstBtn) openEditorAt(firstBtn, false);
+    });
+
+    editorHost.addEventListener('combo-editor:cancel', () => closeEditor());
+
+    // ── エディタ自体（tbody）をテーブル内で移動させる ──
+    const editorDragBtn = document.getElementById('editor-drag-handle');
+    editorDragBtn?.addEventListener('pointerdown', (downEv: PointerEvent) => {
+      downEv.preventDefault();
+      if (!editorOpen) return;
+
+      document.body.classList.add('editor-dragging');
+      editorHost.classList.add('is-being-dragged');
+
+      const onMove = (ev: PointerEvent) => {
+        // エディタ自体の上にカーソルがある場合は無視（自分を検出してしまうため）
+        editorHost.style.pointerEvents = 'none';
+        const elBelow = document.elementFromPoint(ev.clientX, ev.clientY);
+        editorHost.style.pointerEvents = '';
+
+        if (!elBelow) return;
+        const target = elBelow as HTMLElement;
+        if (editorHost.contains(target)) return;
+
+        const tail = target.closest<HTMLElement>('tbody.combo-tail');
+        const targetGroup = target.closest<HTMLElement>('tbody.combo-group');
+
+        if (tail) {
+          if (tail.previousElementSibling !== editorHost) {
+            tail.before(editorHost);
+            updatePosLabel();
+          }
+        } else if (targetGroup && targetGroup !== editorHost) {
+          const rect = targetGroup.getBoundingClientRect();
+          const above = ev.clientY < rect.top + rect.height / 2;
+          if (above && targetGroup.previousElementSibling !== editorHost) {
+            targetGroup.before(editorHost);
+            updatePosLabel();
+          } else if (!above && targetGroup.nextElementSibling !== editorHost) {
+            targetGroup.after(editorHost);
+            updatePosLabel();
+          }
+        }
+      };
+
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.body.classList.remove('editor-dragging');
+        editorHost.classList.remove('is-being-dragged');
+      };
+
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
+
+    // ── 見出しの中のコンボ行と見出しの行 ──
+    function bucketGroups(bucket: string): HTMLElement[] {
+      return Array.from(document.querySelectorAll<HTMLElement>(`tbody.combo-group[data-bucket="${CSS.escape(bucket)}"]`));
+    }
+    function bucketHead(bucket: string): HTMLElement | null {
+      return document.querySelector<HTMLElement>(`tbody[data-head-bucket="${CSS.escape(bucket)}"]`);
+    }
+
+    // ── SortableJS で並び替え（同じ見出し・同じ優先度の中だけ） ──
+    const comboTable = document.getElementById('combo-table');
+    if (comboTable) {
+      Sortable.create(comboTable, {
+        handle: '.row-drag-handle',
+        draggable: 'tbody.combo-group',
+        animation: 180,
+        easing: 'cubic-bezier(0.2, 0, 0.2, 1)',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
+        forceFallback: true,
+        fallbackTolerance: 3,
+        onStart: () => {
+          document.body.classList.add('is-dragging-combo');
+        },
+        // 挿入先は related の隣なので、related が同じ見出し・同じ優先度のときだけ動かす
+        onMove: (evt) => evt.related.dataset.bucket === evt.dragged.dataset.bucket
+          && evt.related.dataset.priority === evt.dragged.dataset.priority,
+        onEnd: () => {
+          document.body.classList.remove('is-dragging-combo');
+          updatePosLabel();
+          applyFilters();
+        },
+      });
+    }
+
+    // ── 見出しの「＋」: その見出しに入る値を入れた状態で、見出しの末尾にエディタを開く ──
+    function handleAddComboToBucket(btn: HTMLButtonElement) {
+      const bucket = btn.dataset.bucket ?? '';
+      activeBtn?.classList.remove('is-active');
+      activeBtn = null;
+      setEditingGroup(null);
+      setEditorNewMode(bucketPreset(bucket));
+      listView.reveal(bucket);
+      (bucketGroups(bucket).at(-1) ?? bucketHead(bucket))?.after(editorHost);
+      editorHost.style.display = '';
+      editorOpen = true;
+      updatePosLabel();
+      editorHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    document.querySelectorAll<HTMLButtonElement>('.btn-add-combo-bucket').forEach(btn => {
+      btn.addEventListener('click', () => handleAddComboToBucket(btn));
+    });
+
+    // ── アップロードボタン（visibility を public に切替） ──
+    function handleUploadClick(btn: HTMLButtonElement) {
+      const comboId = btn.dataset.comboId;
+      const tbody = comboId
+        ? document.querySelector<HTMLElement>(`tbody.combo-group[data-combo-id="${CSS.escape(comboId)}"]`)
+        : btn.closest<HTMLElement>('tbody.combo-group');
+      if (!tbody) return;
+
+      const sub = tbody.querySelector<HTMLElement>('.combo-sub');
+      if (sub) {
+        sub.querySelector<HTMLElement>('.tag-unlisted')?.remove();
+        const badge = document.createElement('span');
+        badge.className = 'tag tag-public';
+        badge.textContent = '🌐 公開';
+        sub.appendChild(badge);
+      }
+      btn.remove();
+    }
+    document.querySelectorAll<HTMLButtonElement>('.btn-upload').forEach(btn => {
+      btn.addEventListener('click', () => handleUploadClick(btn));
+    });
+
+    // ── コンボ編集（既存コンボをエディタへ読み込む） ──
+    function openEditorForCombo(comboId: string, anchorGroup: HTMLElement | null) {
+      const combo = COMBOS.find(c => c.id === comboId);
+      if (!combo) return;
+
+      activeBtn?.classList.remove('is-active');
+      activeBtn = null;
+
+      // 対象コンボの直前にエディタを配置し、元の行は編集中だけ隠す
+      if (anchorGroup) anchorGroup.before(editorHost);
+      editingTitle = combo.title || '(無題コンボ)';
+      setEditingGroup(anchorGroup);
+      editorHost.style.display = '';
+      editorOpen = true;
+      if (editorModeLabel) editorModeLabel.textContent = 'コンボを編集';
+      editorAPI()?.loadCombo(combo);
+      updatePosLabel();
+      editorHost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function handleEditClick(btn: HTMLButtonElement) {
+      const comboId = btn.dataset.editComboId;
+      if (!comboId) return;
+      const group = btn.closest<HTMLElement>('tbody.combo-group');
+      openEditorForCombo(comboId, group);
+    }
+    document.querySelectorAll<HTMLButtonElement>('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', () => handleEditClick(btn));
+    });
+
+    // ── コンボ単位の削除（モック挙動: DOM から除去） ──
+    function handleDeleteClick(btn: HTMLButtonElement) {
+      const comboId = btn.dataset.deleteComboId;
+      if (!comboId) return;
+      const tbody = document.querySelector<HTMLElement>(`tbody.combo-group[data-combo-id="${CSS.escape(comboId)}"]`);
+      if (!tbody) return;
+      const titleEl = tbody.querySelector<HTMLElement>('.col-title');
+      const label = titleEl?.textContent?.trim() ?? 'このコンボ';
+      if (!confirm(`「${label}」を削除しますか？`)) return;
+
+      // 削除対象がエディタで開かれていた場合は編集状態をリセットして閉じる
+      if (editorOpen && editorAPI()?.comboId === comboId) {
+        closeEditor();
+      }
+      tbody.remove();
+      applyFilters();
+    }
+    document.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', () => handleDeleteClick(btn));
+    });
+
+    // 動的に挿入された行のボタンにハンドラを付け直す
+    function bindRowActions(tbody: HTMLElement) {
+      tbody.querySelectorAll<HTMLButtonElement>('.insert-here-btn').forEach(btn => {
+        btn.addEventListener('click', () => openEditorAt(btn));
+      });
+      tbody.querySelectorAll<HTMLButtonElement>('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', () => handleEditClick(btn));
+      });
+      tbody.querySelectorAll<HTMLButtonElement>('.btn-upload').forEach(btn => {
+        btn.addEventListener('click', () => handleUploadClick(btn));
+      });
+      tbody.querySelectorAll<HTMLButtonElement>('.btn-delete').forEach(btn => {
+        btn.addEventListener('click', () => handleDeleteClick(btn));
+      });
+    }
+
+    // ── 新規コンボ「自分のメモとして保存」→ 一覧に行を挿入（モック挙動） ──
+    function escapeHtml(s: string): string {
+      return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+    }
+
+    interface ComboSaveDetail {
+      id: string;
+      sourceId: string | null;   // ✎ で開いた元のコンボ（新規は null）
+      title: string;
+      starter: Combo['starter'];
+      hitState: Combo['hitState'];
+      position: Combo['position'];
+      priority: Combo['priority'];
+      root: Combo['root'];
+      fullInputs: string;
+      fullInputsDisplay: string;   // 保存した時点のエディタの表記（行のチップは fullInputs から作るので使わない）
+      damage: number;
+      enderDisplayName: string | null;
+      situationTags: string[];
+      routeCount: number;
+      youtubeId: string | null;
+      startSec: number | null;
+    }
+
+    // コマンド表記（文字とチップ）。形は Notation.astro に合わせる（チップは data-token を Layout.astro が表記設定に合わせて書き換える。最初の表記もここで合わせる）
+    function notationHtml(inputs: string, ghostInputs = '', elbow = '└─›'): string {
+      const character = document.body.dataset.character ?? '';
+      const recipeTable = getRecipeTable(character);
+      const prefs = readNotationPrefs(localStorage);
+      const moveTable = getMoveTable(character);
+      const toks = (str: string) => str.split('>').map(t => t.trim()).filter(Boolean);
+      const steps = recipeSteps(inputs, recipeTable).map(st => `<span class="recipe-step">${escapeHtml(st)}</span>`);
+      const ghostSteps = recipeSteps(ghostInputs, recipeTable).map(st => `<span class="recipe-step cmd-ghost">${escapeHtml(st)}</span>`);
+      const chip = (tok: string, ghost: boolean) =>
+        `<span class="${chipClassOf(tok, ghost)}" data-token="${escapeHtml(tok)}">${escapeHtml(formatToken(tok, prefs, moveTable))}</span>`;
+      const chips = toks(inputs).map(t => chip(t, false));
+      const ghostChips = toks(ghostInputs).map(t => chip(t, true));
+      const text = ghostSteps.join('<span class="recipe-sep cmd-ghost"> &gt; </span>')
+        + (ghostSteps.length && steps.length ? `<span class="recipe-sep cmd-branch-elbow"> ${elbow} </span>` : '')
+        + steps.join('<span class="recipe-sep"> &gt; </span>');
+      const chipsHtml = ghostChips.join('<span class="cmd-sep cmd-ghost">›</span>')
+        + (ghostChips.length && chips.length ? `<span class="cmd-sep cmd-branch-elbow">${elbow}</span>` : '')
+        + chips.join('<span class="cmd-sep">›</span>');
+      return `<span class="notation-text notation-text-sm">${text}</span><span class="notation notation-chips notation-sm">${chipsHtml}</span>`;
+    }
+
+    // ダメージ・〆分類・有利F の列（ComboRowStats.astro。起き攻めパネルは作らないので、有利F は開閉しないバッジ）
+    function statsHtml(r: RouteSummary): string {
+      const ender = r.leaf.enderClassId ? getEnderClassById(r.leaf.enderClassId) : undefined;
+      return `<td class="col-num"><span class="dmg${r.leaf.damage ? '' : ' dmg-empty'}">${formatDamage(r.leaf.damage)}</span></td>
+          <td class="col-ender"><span${ender ? ` title="${escapeHtml(ender.displayName)}"` : ''}>${ender ? escapeHtml(ender.displayName) : '—'}</span></td>
+          <td class="col-frame">${ender?.frameAdvantage ? `<span class="frame-adv-badge">${escapeHtml(ender.frameAdvantage)}</span>` : ''}</td>`;
+    }
+
+    // 分岐コンボの親行の列（ComboParentStats.astro）: ダメージの幅と、ルートに出てくる〆
+    function parentStatsHtml(routes: RouteSummary[]): string {
+      const damages = routes.map(r => r.leaf.damage ?? 0).filter(d => d > 0);
+      const min = damages.length ? Math.min(...damages) : 0;
+      const max = damages.length ? Math.max(...damages) : 0;
+      const enders = [...new Set(routes.map(r => r.leaf.enderClassId).filter((id): id is string => !!id))]
+        .map(id => getEnderClassById(id))
+        .filter((e): e is NonNullable<typeof e> => !!e);
+      const enderHtml = enders.length
+        ? enders.map(e => `<span class="ender-line" title="${escapeHtml(e.displayName)}">${escapeHtml(e.displayName)}</span>`).join('')
+        : '<span>—</span>';
+      const frameHtml = enders
+        .map(e => `<span class="ender-line">${e.frameAdvantage ? `<span class="frame-adv-badge frame-adv-quiet">${escapeHtml(e.frameAdvantage)}</span>` : ''}</span>`)
+        .join('');
+      return `<td class="col-num"><span class="dmg${min ? '' : ' dmg-empty'}">${formatDamage(min)}</span>${max > min ? `<span class="dmg-range">〜${formatDamage(max)}</span>` : ''}</td>
+          <td class="col-ender">${enderHtml}</td>
+          <td class="col-frame">${frameHtml}</td>`;
+    }
+
+    // 保存で足す行。形はサーバー側（ComboRowCommand.astro / ComboRowStats.astro / ComboParentStats.astro）に合わせる。
+    // 分岐コンボは親行（共通部分と ▶ ルートボタン）とルートの行を作る。モックの保存行には詳細ページが無いのでリンクにしない
+    function buildNewComboRow(combo: Combo): HTMLElement {
+      const routes = getComboRoutes(combo);
+      const recipeTable = getRecipeTable(document.body.dataset.character ?? '');
+      const search = comboSearchTexts(combo, routes, recipeTable);
+      const tbody = document.createElement('tbody');
+      tbody.className = 'combo-group';
+      tbody.dataset.comboId = combo.id;
+      tbody.dataset.source = combo.sourceType;
+      tbody.dataset.starter = combo.starter;
+      tbody.dataset.section = sectionOf(combo);
+      tbody.dataset.bucket = bucketOf(combo);
+      tbody.dataset.priority = combo.priority;
+      tbody.dataset.hitState = combo.hitState;
+      tbody.dataset.gauges = gaugeClassesOf(routes).join(' ');
+      tbody.dataset.search = search.group;
+      const positionTag = positionTagOf(combo);
+      const tagHtml = (t: string) => `<span class="tag combo-tag">${escapeHtml(t)}</span>`;
+      const hitClass = hitTagClass(combo.hitState);
+      const hitHtml = (ghost: boolean) => (hitClass ? `<span class="${hitClass}${ghost ? ' cmd-ghost' : ''}">${combo.hitState}</span>` : '');
+      // fork は「fork」と元の投稿者を添える
+      const forkHtml = combo.sourceType === 'forked'
+        ? `<span class="tag combo-name">fork</span>${combo.ownerLabel ? `<span class="combo-name">${escapeHtml(combo.ownerLabel)}</span>` : ''}`
+        : '';
+      const comboSub = `<span class="${priorityTagClass(combo.priority)}">${escapeHtml(combo.priority)}</span>${forkHtml}`
+        + `<span class="col-title combo-name">${escapeHtml(combo.title)}</span>${positionTag ? tagHtml(positionTag) : ''}`;
+      const actionsHtml = `<td class="col-actions">
+            <div class="row-actions">
+              <button type="button" class="btn-edit" data-edit-combo-id="${combo.id}" title="編集" aria-label="編集">✎</button>
+              <button type="button" class="btn-upload" data-combo-id="${combo.id}" title="アップロード" aria-label="アップロード">⤴</button>
+              <button type="button" class="btn-delete" data-delete-combo-id="${combo.id}" title="このコンボを削除" aria-label="削除">🗑</button>
+            </div>
+          </td>`;
+      const insertRow = `<tr class="insert-here-row">
+          <td colspan="6"><button type="button" class="insert-here-btn" data-insert-pos="before">＋ ここに挿入</button></td>
+        </tr>`;
+      const handle = '<td class="cell-handle"><span class="row-drag-handle" title="ドラッグで並び替え">≡</span></td>';
+
+      if (routes.length === 1) {
+        const r = routes[0];
+        tbody.innerHTML = `${insertRow}
+        <tr>
+          ${handle}
+          <td>
+            <div class="combo-line">
+              <div class="combo-cmd">${hitHtml(false)}<span class="combo-cmd-link">${notationHtml(r.fullInputs)}</span></div>
+              <div class="combo-sub">${comboSub}${(r.leaf.situationTags ?? []).map(tagHtml).join('')}</div>
+            </div>
+          </td>
+          ${statsHtml(r)}
+          ${actionsHtml}
+        </tr>`;
+        return tbody;
+      }
+
+      const routeRows = routes.map((r, i) => {
+        const elbow = i === routes.length - 1 ? '└─›' : '├─›';
+        const inputs = r.pathSegments[r.pathSegments.length - 1];
+        const ghost = r.pathSegments.slice(0, -1).filter(seg => seg.trim()).join(' > ');
+        const label = `<span class="combo-route-label">${escapeHtml(r.leaf.routeLabel ?? '(無名ルート)')}</span>`;
+        const cond = r.leaf.condition ? `<span class="tag">${escapeHtml(r.leaf.condition)}</span>` : '';
+        return `<tr class="combo-child-row" data-branch-of="${combo.id}" data-gauge="${gaugeClassFromSegs(r.pathSegments)}" data-search="${escapeHtml(search.routes[i] ?? '')}" style="display:none;">
+          <td class="cell-handle"></td>
+          <td>
+            <div class="combo-line">
+              <div class="combo-cmd">${hitHtml(true)}<span class="combo-cmd-link">${notationHtml(inputs, ghost, elbow)}</span></div>
+              <div class="combo-sub">${label}${cond}${(r.leaf.situationTags ?? []).map(tagHtml).join('')}</div>
+            </div>
+          </td>
+          ${statsHtml(r)}
+          <td></td>
+        </tr>`;
+      }).join('');
+      tbody.innerHTML = `${insertRow}
+        <tr class="combo-parent-row">
+          ${handle}
+          <td>
+            <div class="combo-line">
+              <div class="combo-cmd">
+                ${hitHtml(false)}<span class="combo-cmd-link">${notationHtml(combo.root.segment)}</span>
+                <span class="combo-branch-note">…の後に分岐</span>
+                <button type="button" class="branch-toggle" data-combo-id="${combo.id}" title="分岐ルートを展開/折り畳み">
+                  <span class="branch-toggle-icon">▶</span>
+                  <span class="tag branch-toggle-count">${routes.length}ルート</span>
+                </button>
+              </div>
+              <div class="combo-sub">${comboSub}</div>
+            </div>
+          </td>
+          ${parentStatsHtml(routes)}
+          ${actionsHtml}
+        </tr>
+        ${routeRows}`;
+      tbody.querySelectorAll<HTMLButtonElement>('.branch-toggle').forEach(bindBranchToggle);
+      return tbody;
+    }
+
+    // 保存した行の置き場所: エディタが同じ見出し・同じ優先度の行の隣にあればその位置、違えば見出しの中の同じ優先度の末尾
+    function placeNewRow(row: HTMLElement, bucket: string, priority: Priority) {
+      const neighbors = [editorHost.previousElementSibling, editorHost.nextElementSibling] as (HTMLElement | null)[];
+      if (neighbors.some(el => el?.dataset.bucket === bucket && el?.dataset.priority === priority)) {
+        editorHost.before(row);
+        return;
+      }
+      const rank = (p: string | undefined) => PRIORITIES.indexOf(p as Priority);
+      const upper = bucketGroups(bucket).filter(g => rank(g.dataset.priority) <= rank(priority));
+      (upper.at(-1) ?? bucketHead(bucket))?.after(row);
+    }
+
+    // 保存: 新規は行を足す。✎ で開いた自分のメモは元の行（と COMBOS の要素）を置き換え、
+    // 共有・他人のコンボは fork として新しい行を足して元の行は残す
+    editorHost.addEventListener('combo-editor:save', ((e: CustomEvent<ComboSaveDetail>) => {
+      const detail = e.detail;
+      const source = detail.sourceId ? COMBOS.find(c => c.id === detail.sourceId) : undefined;
+      const replace = source?.sourceType === 'personal';
+      const fields = {
+        title: detail.title,
+        starter: detail.starter,
+        hitState: detail.hitState,
+        position: detail.position,
+        priority: detail.priority,
+        root: detail.root,
+        youtubeId: detail.youtubeId ?? undefined,
+        startSec: detail.youtubeId ? (detail.startSec ?? 0) : undefined,
+      };
+      const combo: Combo = replace && source
+        ? { ...source, ...fields }
+        : {
+            ...fields,
+            id: detail.id,
+            sourceType: source ? 'forked' : 'personal',
+            ...(source ? { forkedFrom: source.id, ownerLabel: source.ownerLabel } : {}),
+            visibility: 'private',
+            patchVersion: COMBOS[0]?.patchVersion ?? '1.25',
+          };
+      if (replace && source) COMBOS[COMBOS.indexOf(source)] = combo;
+      else COMBOS.push(combo);
+
+      const row = buildNewComboRow(combo);
+      const bucket = bucketOf(combo);
+      // 置き換えのときは、隠していた元の行の隣（見出し・優先度が同じなら同じ位置）に置いてから元の行を消す
+      const original = replace ? editingGroup : null;
+      placeNewRow(row, bucket, combo.priority);
+      bindRowActions(row);
+      closeEditor();
+      original?.remove();
+      listView.reveal(bucket, combo.priority === FOLDED_PRIORITY);
+    }) as EventListener);
+
+    // ── 詳細ページの「編集」導線（?edit=<id> で対象を開く） ──
+    const editParam = new URLSearchParams(location.search).get('edit');
+    if (editParam) {
+      const group = document.querySelector<HTMLElement>(
+        `tbody.combo-group[data-combo-id="${CSS.escape(editParam)}"]`
+      );
+      openEditorForCombo(editParam, group);
+    }
+  </script>
+</Layout>

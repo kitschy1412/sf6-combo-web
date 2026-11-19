@@ -1,0 +1,80 @@
+---
+import '../styles/global.css';
+import SiteNav from '../components/SiteNav.astro';
+import { NOTATION_STORAGE_KEYS } from '../lib/notation';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** このページで表示するコマンドのキャラ。技名表記の変換テーブルに使う（コマンドを出すページで指定） */
+  character?: string;
+}
+
+const { title, description = 'SF6コンボをタイムスタンプ付きで検索・閲覧できるサイト', character } = Astro.props;
+---
+
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <!-- 文字/チップは描画前に決める（文字が既定なので、チップを選んだときだけ属性を付ける） -->
+    <script is:inline define:vars={{ styleKey: NOTATION_STORAGE_KEYS.style }}>
+      if (localStorage.getItem(styleKey) === 'chip') document.documentElement.dataset.notationStyle = 'chip';
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body data-character={character}>
+    <SiteNav character={character} />
+
+    <main style="max-width:1200px; margin:0 auto; padding:28px 24px 60px;">
+      <slot />
+    </main>
+
+    <footer style="border-top:1px solid var(--border); padding:20px 24px; text-align:center; color:var(--muted); font-size:0.78rem;">
+      SF6 Combo Archive — コミュニティによる動作確認型コンボデータベース
+    </footer>
+
+    <script>
+      import { getMoveTable } from '../lib/movenames';
+      import { formatToken, readNotationPrefs, NOTATION_CHANGE_EVENT, NOTATION_STORAGE_KEYS } from '../lib/notation';
+
+      // 表記設定（文字/チップ・数字/矢印・コマンド/技名）を、このページのコマンド表示すべてに反映する。
+      // トグル（NotationToggle / ComboEditor）は設定を保存して NOTATION_CHANGE_EVENT を流すだけ
+      const moveTable = getMoveTable(document.body.dataset.character ?? '');
+
+      function applyNotation(): void {
+        const prefs = readNotationPrefs(localStorage);
+        document.documentElement.dataset.notationStyle = prefs.style;
+
+        // (旧) .notation[data-original]: Phase 0 ページ。テキストとして一括変換
+        document.querySelectorAll<HTMLElement>('.notation[data-original]').forEach((el) => {
+          el.textContent = (el.dataset.original ?? '')
+            .split(' > ')
+            .map((seg) => formatToken(seg, prefs, moveTable))
+            .join(' > ');
+        });
+
+        // (新) .cmd-chip[data-token]: Notation.astro のチップ単位で置換
+        document.querySelectorAll<HTMLElement>('.cmd-chip[data-token]').forEach((el) => {
+          el.textContent = formatToken(el.dataset.token ?? '', prefs, moveTable);
+        });
+      }
+
+      applyNotation();
+      document.addEventListener(NOTATION_CHANGE_EVENT, applyNotation);
+
+      // 別のタブで切り替えたときも、このタブのチップ・トグルを合わせる
+      window.addEventListener('storage', (e) => {
+        if ((Object.values(NOTATION_STORAGE_KEYS) as (string | null)[]).includes(e.key)) {
+          document.dispatchEvent(new CustomEvent(NOTATION_CHANGE_EVENT));
+        }
+      });
+    </script>
+  </body>
+</html>

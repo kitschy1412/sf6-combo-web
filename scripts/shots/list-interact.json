@@ -1,0 +1,173 @@
+[
+  {
+    "name": "hub-filters",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "localStorage.removeItem('sf6-style'); localStorage.removeItem('sf6-combo-col-vis'); window.__vis = el => !!el && getComputedStyle(el).display !== 'none'; window.__s = (label) => { const groups = [...document.querySelectorAll('tbody.combo-group')]; const shown = groups.filter(__vis).length; const heads = [...document.querySelectorAll('tbody.combo-section-head, tbody.combo-scene-head')].filter(__vis).map(h => h.querySelector('.combo-head-title').textContent + h.querySelector('.combo-head-count').textContent); const low = [...document.querySelectorAll('tbody.combo-low-row')].filter(__vis).map(r => r.dataset.lowBucket + '=' + r.querySelector('button').textContent); return JSON.stringify({ label, shown, total: groups.length, heads, low }); }; window.__chip = p => document.querySelector(`[data-filter-priority=\"${p}\"]`).click(); window.__low = b => document.querySelector(`tbody.combo-low-row[data-low-bucket=\"${b}\"] button`).click(); window.__head = k => document.querySelector(`.combo-head-toggle[data-collapse-key=\"${k}\"]`).click(); __s('初期')",
+      "__chip('あまり使わない'); __s('チップ: あまり使わない')",
+      "__chip('よく使う'); __s('チップ: あまり使わない+よく使う (OR)')",
+      "__chip('あまり使わない'); __chip('よく使う'); __s('チップ全部オフ（初期に戻る）')",
+      "__low('端/通常'); __s('端/通常 を開く')",
+      "__low('端/通常'); __s('端/通常 を閉じる')",
+      "__head('中央/通常'); __s('小見出し 中央/通常 を畳む')",
+      "__head('中央'); __s('大見出し 中央 も畳む')",
+      "__head('中央'); __head('中央/通常'); __s('両方開く')",
+      "__head('インパクト'); __s('インパクトを畳む')",
+      "__head('インパクト'); const sel = document.getElementById('filter-starter'); sel.value = 'DR'; sel.dispatchEvent(new Event('change')); __chip('ときどき'); __s('始動技DR AND ときどき')",
+      "__chip('ときどき'); const sel2 = document.getElementById('filter-starter'); sel2.value = ''; sel2.dispatchEvent(new Event('change')); document.getElementById('filter-self-only').click(); __s('自身作成のみ')",
+      "document.getElementById('filter-self-only').click(); __s('全部解除')",
+      "window.__hit = v => document.querySelector('[data-filter-hit=' + CSS.escape(v) + ']').click(); window.__gauge = v => document.querySelector('[data-filter-gauge=' + CSS.escape(v) + ']').click(); window.__routes = id => [...document.querySelectorAll('tr[data-branch-of=' + id + ']')].map(r => r.dataset.gauge + (r.classList.contains('route-unmatched') ? '(薄)' : '')).join(' '); __hit('CH'); __s('チップ: CH')",
+      "__hit('PC'); __s('チップ: CH+PC (OR)')",
+      "__gauge('SA'); __s('CH+PC AND SA')",
+      "__hit('CH'); __hit('PC'); __s('SA だけ')",
+      "JSON.stringify({ step: 'SA で絞って c_006 を開く（SA 以外のルートは薄い）', c_006: __routes('c_006'), opacity: getComputedStyle(document.querySelector('tr.route-unmatched td')).opacity })",
+      "__gauge('ノーゲージ'); JSON.stringify({ step: 'SA+ノーゲージ (OR)', ...JSON.parse(__s('')), c_005: __routes('c_005'), c_006: __routes('c_006') })",
+      "__gauge('SA'); __gauge('ノーゲージ'); __gauge('OD'); JSON.stringify({ step: 'OD（DR を含む c_004 が入る）', ...JSON.parse(__s('')), c_004: getComputedStyle(document.querySelector('tbody.combo-group[data-combo-id=c_004]')).display })",
+      "__gauge('OD'); JSON.stringify({ step: 'ゲージ全部オフ（薄いルートが残らない）', ...JSON.parse(__s('')), unmatched: document.querySelectorAll('tr.route-unmatched').length })"
+    ]
+  },
+  {
+    "name": "hub-editor",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "window.__v = id => document.getElementById(id).value; window.__form = () => ({ starter: __v('combo-starter'), hit: __v('combo-hit-state'), position: __v('combo-position'), priority: __v('combo-priority') }); window.__plus = b => document.querySelector(`.btn-add-combo-bucket[data-bucket=\"${b}\"]`).click(); window.__around = () => { const h = document.getElementById('inline-editor-host'); return { prev: h.previousElementSibling?.dataset.comboId ?? h.previousElementSibling?.className, next: h.nextElementSibling?.dataset.comboId ?? h.nextElementSibling?.className }; }; window.__save = () => document.getElementById('combo-form').requestSubmit(); window.__rows = b => [...document.querySelectorAll(`tbody.combo-group[data-bucket=\"${b}\"]`)].map(g => `${g.dataset.comboId.startsWith('c_local') ? 'NEW' : g.dataset.comboId}:${g.dataset.priority[0]}`).join(' '); 'ready'",
+      "__plus('端/ラッシュ'); JSON.stringify({ step: '＋ 端/ラッシュ', ...__form(), ...__around() })",
+      "document.getElementById('combo-editor-cancel').click(); __plus('中央/飛び'); JSON.stringify({ step: '＋ 中央/飛び', ...__form() })",
+      "document.getElementById('combo-editor-cancel').click(); __plus('端/カウンター・確反'); JSON.stringify({ step: '＋ 端/カウンター・確反', ...__form() })",
+      "document.getElementById('combo-editor-cancel').click(); __plus('スタン'); JSON.stringify({ step: '＋ スタン', ...__form() })",
+      "document.getElementById('combo-editor-cancel').click(); document.querySelector('tbody.combo-group[data-bucket=\"インパクト\"] .insert-here-btn').click(); JSON.stringify({ step: '行間 インパクト', ...__form() })",
+      "document.getElementById('combo-editor-cancel').click(); document.getElementById('btn-add-combo-top').click(); JSON.stringify({ step: '上の＋コンボ（空で開く）', ...__form() })",
+      "document.getElementById('combo-editor-cancel').click(); const before = __rows('端/通常'); __plus('端/通常'); document.getElementById('combo-priority').value = 'よく使う'; __save(); JSON.stringify({ step: '端/通常 に よく使う を保存（よく使うの末尾に入る）', before, after: __rows('端/通常') })",
+      "__plus('端/通常'); document.getElementById('combo-priority').value = 'あまり使わない'; __save(); const low = document.querySelector('tbody.combo-low-row[data-low-bucket=\"端/通常\"] button').textContent; const last = [...document.querySelectorAll('tbody.combo-group[data-bucket=\"端/通常\"]')].at(-1); JSON.stringify({ step: '端/通常 に あまり使わない を保存（畳みが開いて見える）', rows: __rows('端/通常'), low, lastVisible: getComputedStyle(last).display !== 'none' })",
+      "const hb = document.querySelector('tbody.combo-group[data-combo-id=\"ax_eXUug9kjcVQ_02\"] .insert-here-btn'); hb.click(); const f = __form(); __save(); JSON.stringify({ step: '中央/通常 のときどきの行の間に ときどき を保存（その位置に入る）', form: f, rows: __rows('中央/通常') })",
+      "const hb2 = document.querySelector('tbody.combo-group[data-combo-id=\"ax_eXUug9kjcVQ_02\"] .insert-here-btn'); hb2.click(); document.getElementById('combo-position').value = '端'; __save(); JSON.stringify({ step: '中央の行間で位置を端に変えて保存（端/通常 のときどきの末尾）', rows: __rows('端/通常') })",
+      "__plus('スタン'); __save(); const n = document.querySelector('tbody.combo-group[data-bucket=\"スタン\"]:last-of-type'); const rowsS = [...document.querySelectorAll('tbody.combo-group[data-bucket=\"スタン\"]')]; const newRow = rowsS.find(g => g.dataset.comboId.startsWith('c_local')); JSON.stringify({ step: 'スタン に保存', rows: __rows('スタン'), section: newRow?.dataset.section, sub: newRow?.querySelector('.combo-sub')?.textContent })",
+      "document.querySelector('.combo-head-toggle[data-collapse-key=\"端/ラッシュ\"]').click(); __plus('端/ラッシュ'); const r = JSON.stringify({ step: '畳んだ見出しの＋で開く', expanded: document.querySelector('.combo-head-toggle[data-collapse-key=\"端/ラッシュ\"]').getAttribute('aria-expanded'), ...__around() }); document.getElementById('combo-editor-cancel').click(); r"
+    ]
+  },
+  {
+    "name": "hub-edit-low",
+    "url": "http://localhost:4321/mock/character/rashid?edit=c_100",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "JSON.stringify({ step: '?edit=c_100（畳まれた行の編集）', priority: document.getElementById('combo-priority').value, position: document.getElementById('combo-position').value, starter: document.getElementById('combo-starter').value, editorShown: getComputedStyle(document.getElementById('inline-editor-host')).display !== 'none', label: document.getElementById('insert-pos-label').textContent })",
+      "const b = document.querySelector('tbody.combo-group[data-combo-id=\"c_004\"] .btn-edit'); b.click(); JSON.stringify({ step: '✎ c_004', position: document.getElementById('combo-position').value, priority: document.getElementById('combo-priority').value, hit: document.getElementById('combo-hit-state').value })"
+    ]
+  },
+  {
+    "name": "hub-dnd",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "window.__order = b => [...document.querySelectorAll(`tbody.combo-group[data-bucket=\"${b}\"]`)].map(g => g.dataset.comboId).slice(0, 12).join(' '); window.__drag = async (fromId, toId) => { const sleep = ms => new Promise(r => setTimeout(r, ms)); const from = document.querySelector(`tbody.combo-group[data-combo-id=\"${fromId}\"]`); const handle = from.querySelector('.row-drag-handle'); const target = document.querySelector(`tbody.combo-group[data-combo-id=\"${toId}\"]`); handle.scrollIntoView({ block: 'center' }); await sleep(150); const a = handle.getBoundingClientRect(); const t = target.getBoundingClientRect(); const fire = (el, type, x, y) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerType: 'mouse', button: 0, buttons: 1, pointerId: 1, isPrimary: true })); const sx = a.left + a.width / 2, sy = a.top + a.height / 2; const tx = sx, ty = t.top + t.height * 0.75; fire(handle, 'pointerdown', sx, sy); await sleep(60); for (let i = 1; i <= 14; i++) { const y = sy + (ty - sy) * i / 14; fire(document, 'pointermove', sx, y); await sleep(70); } await sleep(300); fire(document, 'pointerup', tx, ty); await sleep(350); return 'dragged'; }; 'ready'",
+      "(async () => { const b = '中央/通常'; const before = __order(b); await __drag('c_001', 'c_005'); return JSON.stringify({ step: '同じ見出し・同じ優先度 → 動く', before, after: __order(b) }); })()",
+      "(async () => { const b = '中央/通常'; const rows = [...document.querySelectorAll(`tbody.combo-group[data-bucket=\"${b}\"]`)]; const lastOften = rows.filter(r => r.dataset.priority === 'よく使う').at(-1).dataset.comboId; const firstSome = rows.find(r => r.dataset.priority === 'ときどき').dataset.comboId; const before = __order(b); await __drag(lastOften, firstSome); return JSON.stringify({ step: '同じ見出しで優先度が違う → 動かない', lastOften, firstSome, before, after: __order(b) }); })()",
+      "(async () => { const rows = [...document.querySelectorAll('tbody.combo-group[data-bucket=\"中央/ラッシュ\"]')]; const lastRush = rows.filter(r => r.dataset.priority === 'ときどき').at(-1).dataset.comboId; const fly = document.querySelector('tbody.combo-group[data-bucket=\"中央/飛び\"]').dataset.comboId; const b1 = __order('中央/ラッシュ'), b2 = __order('中央/飛び'); await __drag(lastRush, fly); return JSON.stringify({ step: '別の見出し → 動かない', lastRush, fly, sameRush: b1 === __order('中央/ラッシュ'), sameFly: b2 === __order('中央/飛び') }); })()"
+    ]
+  },
+  {
+    "name": "hub-saved-row",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "document.querySelector('.btn-add-combo-bucket[data-bucket=\"端/カウンター・確反\"]').click(); document.getElementById('combo-form').requestSubmit(); const g = [...document.querySelectorAll('tbody.combo-group')].find(g => g.dataset.comboId.startsWith('c_local')); const css = (sel, prop) => getComputedStyle(g.querySelector(sel))[prop]; JSON.stringify({ step: '保存した行も同じ見た目（ボタンと ≡ は隠れ、コマンドの後ろの項目は flex。CSS がページの scoped だと効かない）', hit: g.querySelector('.combo-cmd .tag-hit')?.textContent, filterAttrs: [g.dataset.hitState, g.dataset.gauges], damage: g.querySelector('.dmg').textContent, sub: css('.combo-sub', 'display'), actions: css('.row-actions', 'opacity'), handle: css('.row-drag-handle', 'opacity'), insert: css('.insert-here-btn', 'color') })"
+    ]
+  },
+  {
+    "name": "hub-colvis",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "localStorage.removeItem('sf6-combo-col-vis'); window.__set = (k, on) => { const cb = document.querySelector(`[data-col-vis=\"${k}\"]`); if (cb.checked !== on) cb.click(); }; window.__row = id => { const g = document.querySelector(`tbody.combo-group[data-combo-id=\"${id}\"]`); const link = g.querySelector('a.combo-cmd-link'); const tag = g.querySelector('.combo-sub [class*=\"tag-priority-\"]'); return { row: Math.round(g.querySelector('tr:not(.insert-here-row)').getBoundingClientRect().height), sub: Math.round(g.querySelector('.combo-sub').getBoundingClientRect().height), name: getComputedStyle(g.querySelector('.col-title')).display !== 'none', priority: getComputedStyle(tag).display !== 'none', link: link.getBoundingClientRect().width > 0 ? link.getAttribute('href') : null }; }; JSON.stringify({ step: '初期', hover: { handle: getComputedStyle(document.querySelector('.row-drag-handle')).opacity, actions: getComputedStyle(document.querySelector('.row-actions')).opacity }, c_001: __row('c_001'), c_005: __row('c_005') })",
+      "__set('title', false); JSON.stringify({ step: 'コンボ名オフ（優先度とタグは残る。リンクは使える）', c_012: __row('c_012'), c_005: __row('c_005') })",
+      "__set('situation', false); __set('priority', false); JSON.stringify({ step: 'コンボ名・状況・優先度を全部オフ（コマンドの後ろの項目が消える）', c_012: __row('c_012'), c_005: __row('c_005') })",
+      "const b = document.querySelector('tbody.combo-group[data-combo-id=\"c_005\"] .branch-toggle'); b.click(); const kids = [...document.querySelectorAll('tr[data-branch-of=\"c_005\"]')]; JSON.stringify({ step: '全部オフでも ▶ でルートが開く', toggleShown: b.getBoundingClientRect().width > 0, shown: kids.filter(k => getComputedStyle(k).display !== 'none').length, total: kids.length, routeLinks: kids.map(k => k.querySelector('a.combo-cmd-link').getAttribute('href')) })",
+      "document.querySelector('tbody.combo-group[data-combo-id=\"c_005\"] .branch-toggle').click(); __set('damage', false); JSON.stringify({ step: 'ダメージの列を切る', col: document.querySelector('#combo-table col[data-col=\"damage\"]').style.visibility, saved: localStorage.getItem('sf6-combo-col-vis') })"
+    ]
+  },
+  {
+    "name": "hub-hover",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "maxChunks": 0,
+    "hover": "tbody.combo-group[data-combo-id=\"c_001\"] tr:not(.insert-here-row)",
+    "evals": [
+      "(() => { const o = (id, sel) => getComputedStyle(document.querySelector(`tbody.combo-group[data-combo-id=\"${id}\"] ${sel}`)).opacity; return JSON.stringify({ step: 'マウスを乗せた行だけ ≡ と操作のボタンが出る', hovered: [o('c_001', '.row-drag-handle'), o('c_001', '.row-actions')], other: [o('c_011', '.row-drag-handle'), o('c_011', '.row-actions')] }); })()"
+    ]
+  },
+  {
+    "name": "explore-hover",
+    "url": "http://localhost:4321/mock/explore/rashid",
+    "width": 1400, "height": 1000, "maxChunks": 0,
+    "hover": "tbody.combo-group[data-combo-id=\"ax_eXUug9kjcVQ_01\"] tr",
+    "evals": [
+      "(() => { const o = id => getComputedStyle(document.querySelector(`tbody.combo-group[data-combo-id=\"${id}\"] .btn-fork`)).opacity; return JSON.stringify({ step: '公開一覧もマウスを乗せた行だけ fork が出る', hovered: o('ax_eXUug9kjcVQ_01'), other: o('ax_eXUug9kjcVQ_04') }); })()"
+    ]
+  },
+  {
+    "name": "explore-colvis",
+    "url": "http://localhost:4321/mock/explore/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "const t = document.getElementById('combo-table'); const checks = [...document.querySelectorAll('[data-col-vis]')].filter(c => !c.checked).map(c => c.dataset.colVis); const g = document.querySelector('tbody.combo-group[data-combo-id=\"c_005\"]'); JSON.stringify({ step: 'キャラハブの設定が公開一覧にも効く', classes: t.className, unchecked: checks, sub: Math.round(g.querySelector('.combo-sub').getBoundingClientRect().height), link: g.querySelector('a.combo-cmd-link').getAttribute('href'), fork: !!g.querySelector('.col-actions .btn-fork'), toggleShown: g.querySelector('.branch-toggle').getBoundingClientRect().width > 0 })",
+      "document.querySelector('tbody.combo-group[data-combo-id=\"c_005\"] .branch-toggle').click(); const shown = [...document.querySelectorAll('tr[data-branch-of=\"c_005\"]')].filter(k => getComputedStyle(k).display !== 'none').length; localStorage.removeItem('sf6-combo-col-vis'); JSON.stringify({ step: '全部オフでも ▶ でルートが開く', shown })"
+    ]
+  },
+  {
+    "name": "explore-okizeme",
+    "url": "http://localhost:4321/mock/explore/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "const b = document.querySelector('tbody.combo-group[data-combo-id=\"ax_eXUug9kjcVQ_01\"] .frame-adv-toggle'); b.click(); const panel = document.querySelector(`[data-okizeme-panel=\"${b.dataset.okizemeToggle}\"]`); const open = getComputedStyle(panel).display !== 'none'; b.click(); JSON.stringify({ step: '公開一覧も有利F のバッジで起き攻めを開閉', label: b.textContent.trim(), open, closed: getComputedStyle(panel).display === 'none' })"
+    ]
+  },
+  {
+    "name": "explore-ops",
+    "url": "http://localhost:4321/mock/explore/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "window.__vis = el => !!el && getComputedStyle(el).display !== 'none'; window.__s = (label) => { const groups = [...document.querySelectorAll('tbody.combo-group')]; const shown = groups.filter(__vis).length; const heads = [...document.querySelectorAll('tbody.combo-section-head, tbody.combo-scene-head')].filter(__vis).map(h => h.querySelector('.combo-head-title').textContent + h.querySelector('.combo-head-count').textContent); const low = [...document.querySelectorAll('tbody.combo-low-row')].filter(__vis).map(r => r.dataset.lowBucket + '=' + r.querySelector('button').textContent); return JSON.stringify({ label, shown, total: groups.length, heads, low }); }; window.__chip = p => document.querySelector(`[data-filter-priority=\"${p}\"]`).click(); window.__sort = s => document.querySelector(`.sort-btn[data-sort=\"${s}\"]`).click(); window.__lowLast = () => [...document.querySelectorAll('tbody.combo-low-row')].every(r => { const prev = r.previousElementSibling; return !prev || !prev.classList.contains('combo-group') || prev.dataset.bucket === r.dataset.lowBucket; }); window.__first = b => [...document.querySelectorAll(`tbody.combo-group[data-bucket=\"${b}\"]`)].slice(0, 4).map(g => `${g.dataset.comboId.replace('ax_', '')}:${g.dataset.priority[0]}:${g.dataset.sortDamage}`).join(' '); __s('初期')",
+      "JSON.stringify({ step: '優先度順', rows: __first('中央/通常') })",
+      "__sort('damage'); JSON.stringify({ step: 'ダメージ降順', rows: __first('中央/通常'), lowLast: __lowLast() })",
+      "__sort('new'); JSON.stringify({ step: '新着順', rows: __first('中央/通常'), lowLast: __lowLast() })",
+      "__sort('priority'); JSON.stringify({ step: '優先度順に戻す', rows: __first('中央/通常'), lowLast: __lowLast() })",
+      "__chip('あまり使わない'); __s('チップ: あまり使わない')",
+      "__chip('あまり使わない'); document.querySelector('tbody.combo-low-row[data-low-bucket=\"イウサール\"] button').click(); __s('イウサールを開く')",
+      "document.querySelector('.combo-head-toggle[data-collapse-key=\"端\"]').click(); __s('端を畳む')",
+      "document.querySelector('.combo-head-toggle[data-collapse-key=\"端\"]').click(); const sel = document.getElementById('filter-starter'); sel.value = 'DR'; sel.dispatchEvent(new Event('change')); __s('始動技DR')",
+      "const sel3 = document.getElementById('filter-starter'); sel3.value = ''; sel3.dispatchEvent(new Event('change')); document.querySelector('[data-filter-hit=CH]').click(); document.querySelector('[data-filter-gauge=SA]').click(); __s('公開一覧も CH AND SA')"
+    ]
+  },
+  {
+    "name": "hub-search",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "window.__vis = el => !!el && getComputedStyle(el).display !== 'none'; window.__s = (label) => { const groups = [...document.querySelectorAll('tbody.combo-group')]; const shown = groups.filter(__vis); const heads = [...document.querySelectorAll('tbody.combo-section-head, tbody.combo-scene-head')].filter(__vis).map(h => h.querySelector('.combo-head-title').textContent + h.querySelector('.combo-head-count').textContent); return JSON.stringify({ label, count: document.getElementById('filter-text-count').textContent, shown: shown.length, total: groups.length, ids: shown.length <= 8 ? shown.map(g => g.dataset.comboId.startsWith('c_local') ? 'NEW' : g.dataset.comboId) : undefined, heads }); }; window.__q = t => { const el = document.getElementById('filter-text'); el.value = t; el.dispatchEvent(new Event('input', { bubbles: true })); }; window.__routes = id => [...document.querySelectorAll('tr[data-branch-of=' + id + ']')].map(r => r.querySelector('.combo-route-label').textContent + (r.classList.contains('route-unmatched') ? '(薄)' : '')).join(' / '); __s('初期')",
+      "const el = document.getElementById('filter-text'); el.focus(); const steps = []; for (const ch of 'ミキサー') { document.execCommand('insertText', false, ch); steps.push(el.value + ':' + document.getElementById('filter-text-count').textContent); } JSON.stringify({ step: '1文字ずつ入力（入力のたびに絞り込む）', steps })",
+      "__q('すぱいく'); __s('すぱいく（ひらがなでもスパイクに当たる）')",
+      "__q('２３６ＨＫ'); __s('２３６ＨＫ（全角）')",
+      "__q('ミキサー'); document.querySelector('[data-filter-priority=\"よく使う\"]').click(); __s('ミキサー AND よく使う')",
+      "document.querySelector('[data-filter-priority=\"よく使う\"]').click(); const sel = document.getElementById('filter-starter'); sel.value = '2MK'; sel.dispatchEvent(new Event('change')); __s('ミキサー AND 始動技2MK')",
+      "const sel2 = document.getElementById('filter-starter'); sel2.value = ''; sel2.dispatchEvent(new Event('change')); __q('SA2'); document.querySelector('.branch-toggle[data-combo-id=c_006]').click(); JSON.stringify({ step: 'SA2 で c_006 を開く（合わないルートは薄い）', ...JSON.parse(__s('')), c_006: __routes('c_006') })",
+      "document.querySelector('[data-filter-gauge=OD]').click(); __q('大スパイク'); JSON.stringify({ step: '大スパイク AND OD（ゲージと検索語は同じルートで見る）', ...JSON.parse(__s('')), c_006: __routes('c_006') })",
+      "document.querySelector('[data-filter-gauge=OD]').click(); __q('zzz'); __s('zzz（0件。見出しも消える）')",
+      "__q(''); JSON.stringify({ step: '空に戻す（薄いルートが残らない）', ...JSON.parse(__s('')), unmatched: document.querySelectorAll('tr.route-unmatched').length })",
+      "document.getElementById('btn-add-combo-top').click(); const seg = document.getElementById('focus-segment-input'); seg.value = '2LK > 236KK > 214HP'; seg.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('combo-title').value = '検索テスト'; document.getElementById('combo-form').requestSubmit(); __q('ODワール 小足'); __s('保存して足した行も技名で当たる')"
+    ]
+  },
+  {
+    "name": "explore-search",
+    "url": "http://localhost:4321/mock/explore/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "window.__vis = el => !!el && getComputedStyle(el).display !== 'none'; window.__s = (label) => { const groups = [...document.querySelectorAll('tbody.combo-group')]; const shown = groups.filter(__vis); return JSON.stringify({ label, count: document.getElementById('filter-text-count').textContent, shown: shown.length, total: groups.length, ids: shown.length <= 8 ? shown.map(g => g.dataset.comboId) : undefined }); }; window.__q = t => { const el = document.getElementById('filter-text'); el.value = t; el.dispatchEvent(new Event('input', { bubbles: true })); }; __s('初期')",
+      "__q('スパイク'); __s('スパイク')",
+      "__q('236HK'); __s('236HK（非公開の c_074 だけが持つので0件）')",
+      "__q('ミキサー'); document.querySelector('[data-filter-hit=CH]').click(); __s('ミキサー AND CH')",
+      "document.querySelector('[data-filter-hit=CH]').click(); document.querySelector('.sort-btn[data-sort=damage]').click(); __s('ミキサー + ダメージ降順（並べ替えても絞り込みは残る）')",
+      "document.querySelector('.sort-btn[data-sort=priority]').click(); __q(''); __s('空に戻す')"
+    ]
+  }
+]

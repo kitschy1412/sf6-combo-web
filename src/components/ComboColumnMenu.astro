@@ -1,0 +1,52 @@
+---
+// 一覧の列表示メニュー（キャラハブ・公開一覧で共通）。動きは src/lib/combo-list-view.ts、設定は localStorage に残す。
+// title / situation / priority はコマンドの下の行の項目、それ以外は <col data-col> の列
+const items = [
+  { key: 'title', label: 'コンボ名' },
+  { key: 'situation', label: '状況' },
+  { key: 'priority', label: '優先度' },
+  { key: 'damage', label: 'ダメージ' },
+  { key: 'ender', label: '〆分類' },
+  { key: 'frame', label: '有利F' },
+];
+---
+
+<div class="col-vis-wrap">
+  <button type="button" id="col-vis-toggle" class="btn btn-sm">列表示 ▾</button>
+  <div id="col-vis-menu" class="col-vis-menu" style="display:none;">
+    {items.map(({ key, label }) => (
+      <label class="col-vis-item"><input type="checkbox" data-col-vis={key} checked />{label}</label>
+    ))}
+  </div>
+</div>
+
+<style>
+  .col-vis-wrap { position: relative; flex-shrink: 0; }
+  .col-vis-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 50;
+    min-width: 140px;
+  }
+  .col-vis-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.8rem;
+    padding: 5px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .col-vis-item:hover { background: var(--surface2); }
+  .col-vis-item input { cursor: pointer; }
+</style>

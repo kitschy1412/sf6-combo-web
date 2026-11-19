@@ -9,11 +9,17 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test:scenarios": "node tests/scenarios.mjs",
+    "import:archiver": "node scripts/import-archiver.ts"
   },
   "dependencies": {
     "@astrojs/vercel": "^10.0.2",
     "@supabase/supabase-js": "^2.99.3",
-    "astro": "^6.0.8"
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/sortablejs": "^1.15.9",
+    "astro": "^6.0.8",
+    "sortablejs": "^1.15.7",
+    "tailwindcss": "^4.2.2"
   }
 }

@@ -1,0 +1,497 @@
+---
+// 相手キャラ1人の対策。強い技・連携ごとに対策を並べ、どれにも当たらないものは「立ち回り全般」に回す。
+// ▶ / 時刻を押すと、右の動画がその場面から再生される。まとめ方は src/lib/matchups.ts
+import Layout from '../../../layouts/Layout.astro';
+import Notation from '../../../components/Notation.astro';
+import NotationToggle from '../../../components/NotationToggle.astro';
+import { acquaSoukenUrl, characterBySlug } from '../../../lib/characters';
+import { groupOpponent, isOldEra, visibleMatchups, type SourcedPoint } from '../../../lib/matchups';
+import { NAV_CHARACTER_COOKIE, selectedCharacterFromCookie } from '../../../lib/site-nav';
+import { formatMmSs } from '../../../lib/youtube';
+import { MATCHUPS, MATCHUP_PERSPECTIVES, MATCHUP_TOPICS } from '../../../mock-data/rashid';
+
+const { slug } = Astro.params;
+const info = characterBySlug(slug ?? '');
+if (!info) return new Response(null, { status: 404 });
+
+// 共通の対策が既定。キャラを選んでいれば（ヘッダーのキャラ選択）、そのキャラ目線の対策を足す
+const selected = selectedCharacterFromCookie(Astro.cookies.get(NAV_CHARACTER_COOKIE)?.value);
+const o = groupOpponent(info, visibleMatchups(MATCHUPS, selected));
+const acqua = acquaSoukenUrl(info);
+const allPoints = o.entries.flatMap(e => e.points);
+const hasRecipes = allPoints.some(p => p.recipes.length > 0);
+const topicCounts = new Map(MATCHUP_TOPICS.map(t => [t, allPoints.filter(p => p.topic === t).length]));
+const perspectiveCounts = new Map(MATCHUP_PERSPECTIVES.map(v => [v, o.entries.filter(e => e.perspective === v).reduce((n, e) => n + e.points.length, 0)]));
+// 目線の絞り込みは、共通と選んだキャラの目線の両方があるときだけ出す
+const perspectives = MATCHUP_PERSPECTIVES.filter(v => (perspectiveCounts.get(v) ?? 0) > 0);
+
+// 1つのポイントが複数の技・連携に出ることがあるので、id は最初に出たところにだけ付ける
+const placed = new Set<string>();
+const domId = (p: SourcedPoint) => (placed.has(p.id) ? undefined : (placed.add(p.id), p.id));
+
+const blocks = [
+  ...o.threats.map(t => ({ anchor: t.anchor, name: t.name, about: t.about, points: t.points })),
+  ...(o.general.length ? [{ anchor: 'general', name: '立ち回り全般', about: '特定の技・連携に結びつかない対策', points: o.general }] : []),
+];
+const first = blocks[0]?.points[0];
+const initialSrc = first ? `https://www.youtube.com/embed/${first.entry.youtubeId}?start=${first.startSec}` : '';
+const labelOf = (blockName: string, p: SourcedPoint) => `${blockName} ・ ${p.title}`;
+---
+
+<Layout title={`${info.ja}対策 — モック`} character="Rashid">
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/vs/">キャラ対策</a>
+    <span class="sep">/</span>
+    <span style="color:var(--text);">{info.ja}</span>
+  </nav>
+
+  <div class="page-head vs-head" style="border-radius:6px 6px 0 0;">
+    <div style="display:flex; gap:14px; align-items:baseline; flex-wrap:wrap;">
+      <h1>{info.ja}対策</h1>
+      <span class="meta">強い技・連携 {o.threats.length} ・ {o.pointCount}ポイント ・ 動画{o.videoCount}本</span>
+    </div>
+    <div class="vs-head-links">
+      {acqua && <a href={acqua} target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:transparent; color:#fff; border-color:#444;">あくあ総研の{info.ja}</a>}
+      <a href="/mock/vs/" class="btn btn-sm" style="background:transparent; color:#fff; border-color:#444;">一覧へ</a>
+    </div>
+  </div>
+
+  {o.pointCount === 0 ? (
+    <p class="mu-empty" style="padding:24px 0;">
+      {info.ja}の対策はまだありません{!selected && MATCHUPS.some(e => e.opponent === info.en) && '（ヘッダーでキャラを選ぶと、そのキャラの技を使う対策が出ることがあります）'}
+    </p>
+  ) : (
+    <>
+      <div class="filter-bar" style="border-radius:0 0 6px 6px; border-top:none; margin-bottom:16px;">
+        {perspectives.length > 1 && (
+          <>
+            <span class="filter-label">目線</span>
+            <button type="button" class="chip chip-on" data-filter-perspective="" aria-pressed="true">すべて</button>
+            {perspectives.map(v => (
+              <button type="button" class="chip" data-filter-perspective={v} aria-pressed="false"
+                title={v === '共通' ? 'どのキャラでも使える対策' : `${v}の技を使う対策`}>
+                {v}<span class="mu-chip-count">{perspectiveCounts.get(v)}</span>
+              </button>
+            ))}
+            <span class="filter-divider" aria-hidden="true"></span>
+          </>
+        )}
+        <span class="filter-label">種類</span>
+        {MATCHUP_TOPICS.filter(t => (topicCounts.get(t) ?? 0) > 0).map(t => (
+          <button type="button" class="chip" data-filter-topic={t} aria-pressed="false">
+            {t}<span class="mu-chip-count">{topicCounts.get(t)}</span>
+          </button>
+        ))}
+        <span id="mu-high-filter-wrap" class="mu-high-filter" hidden>
+          <span class="filter-divider" aria-hidden="true"></span>
+          <button type="button" class="chip" data-filter-high aria-pressed="false" title="自分で「優先度 高」にした対策だけ出す">
+            優先度 高だけ<span class="mu-chip-count" id="mu-high-count"></span>
+          </button>
+        </span>
+      </div>
+
+      {hasRecipes && <NotationToggle styleToggle />}
+
+      <div class="mu-layout">
+        <div class="mu-list">
+          <nav class="vs-toc" aria-label="強い技・連携">
+            {blocks.map(b => (
+              <a href={`#${b.anchor}`} class:list={['vs-toc-item', b.anchor === 'general' && 'vs-toc-general']} data-toc={b.anchor}>
+                {b.name}<span class="mu-chip-count">{b.points.length}</span>
+              </a>
+            ))}
+          </nav>
+
+          {o.entries.some(e => e.summary) && (
+            <details class="vs-summaries">
+              <summary>動画ごとの要点（{o.entries.filter(e => e.summary).length}本）</summary>
+              <ul>
+                {o.entries.filter(e => e.summary).map(e => (
+                  <li>
+                    <span class:list={['tag', isOldEra(e.patchVersion) && 'tag-warn']}>{e.patchVersion}</span>
+                    {e.perspective !== '共通' && <span class="tag tag-personal">{e.perspective}</span>}
+                    <a href={`https://www.youtube.com/watch?v=${e.youtubeId}`} target="_blank" rel="noopener noreferrer">{e.sourceTitle}</a>
+                    <span class="mu-source-meta">{e.ownerLabel}</span>
+                    <p>{e.summary}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {blocks.map(b => (
+            <section class="vs-block" id={b.anchor} data-block={b.anchor}>
+              <div class="section-head">
+                <h2>{b.name}</h2>
+                <span class="mu-section-meta">{b.points.length}ポイント</span>
+              </div>
+              {b.about && <p class="vs-about">{b.about}</p>}
+              <ol class="mu-points">
+                {b.points.map(p => (
+                  <li class="mu-point" id={domId(p)} data-point-id={p.id} data-topic={p.topic} data-perspective={p.entry.perspective}>
+                    <details class="mu-detail">
+                      <summary class="mu-point-head">
+                        <span class="tag mu-topic" data-topic-tag={p.topic}>{p.topic}</span>
+                        {p.entry.perspective !== '共通' && <span class="tag tag-personal mu-perspective" title={`${p.entry.perspective}の技を使う対策`}>{p.entry.perspective}</span>}
+                        <span class="mu-point-title">{p.title}</span>
+                        <span class="tag mu-mark-badge" hidden></span>
+                        {p.caution && <span class="mu-caution-mark" title={p.caution}>注意</span>}
+                        {isOldEra(p.entry.patchVersion) && <span class="tag tag-warn" title="Year 3 より前の動画。今のバージョンと違うことがある">{p.entry.patchVersion}</span>}
+                        <button type="button" class="mu-time" data-video={p.entry.youtubeId} data-sec={p.startSec}
+                          data-label={labelOf(b.name, p)} title="この場面から再生">▶ {formatMmSs(p.startSec)}</button>
+                      </summary>
+                      <div class="mu-body">
+                        <p class="mu-text">{p.text}</p>
+                        {p.caution && <p class="vs-caution">{p.caution}</p>}
+                        {p.recipes.length > 0 && (
+                          <div class="mu-recipes">
+                            {p.recipes.map(r => (
+                              <div class="mu-recipe">
+                                {r.label && <span class="mu-recipe-label">{r.label}</span>}
+                                <Notation inputs={r.inputs} character="Rashid" size="sm" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div class="mu-foot">
+                          <span class:list={['tag', isOldEra(p.entry.patchVersion) && 'tag-warn']}
+                            title={isOldEra(p.entry.patchVersion) ? 'Year 3 より前の動画。今のバージョンと違うことがある' : undefined}>{p.entry.patchVersion}</span>
+                          <a href={`https://www.youtube.com/watch?v=${p.entry.youtubeId}`} target="_blank" rel="noopener noreferrer" class="mu-source-title">{p.entry.sourceTitle}</a>
+                          <span class="mu-source-meta">{p.entry.publishedAt} ・ {p.entry.ownerLabel}</span>
+                          {p.scenes.length > 0 && (
+                            <span class="mu-scenes">
+                              <span class="mu-scenes-label">ほかの場面</span>
+                              {p.scenes.map(s => (
+                                <button type="button" class="mu-time mu-time-sm" data-video={p.entry.youtubeId} data-sec={s}
+                                  data-label={labelOf(b.name, p)} title="この場面から再生">{formatMmSs(s)}</button>
+                              ))}
+                            </span>
+                          )}
+                        </div>
+                        <div class="mu-mark" role="group" aria-label="自分用の印">
+                          <span class="mu-mark-label">自分用</span>
+                          <button type="button" class="chip mu-mark-btn" data-mark="high" aria-pressed="false">優先度 高</button>
+                          <button type="button" class="chip mu-mark-btn" data-mark="low" aria-pressed="false">優先度 低</button>
+                          <button type="button" class="chip mu-mark-btn" data-mark="hidden" aria-pressed="false">非表示</button>
+                        </div>
+                      </div>
+                    </details>
+                  </li>
+                ))}
+              </ol>
+              <button type="button" class="mu-hidden-toggle" data-hidden-toggle hidden></button>
+            </section>
+          ))}
+          <p id="mu-empty" class="mu-empty" hidden>条件に合う対策はありません</p>
+        </div>
+
+        <aside class="mu-player" id="mu-player">
+          <div class="card mu-player-card">
+            <div class="mu-video-frame">
+              <iframe id="mu-video" src={initialSrc} title="対策動画"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen></iframe>
+            </div>
+            <div class="mu-now">
+              <span id="mu-now-title">{first ? labelOf(blocks[0].name, first) : ''}</span>
+              <span id="mu-now-time" class="mu-now-time">{first ? formatMmSs(first.startSec) : ''}</span>
+              <button type="button" id="mu-close" class="mu-close" aria-label="動画を閉じる">✕</button>
+            </div>
+            <p class="mu-player-help">各ポイントの ▶ と時刻で、その場面から再生します</p>
+          </div>
+        </aside>
+      </div>
+    </>
+  )}
+
+  <style>
+    /* 幅が狭いときは、リンクのボタンを折り返さずに題の下の行へ送る */
+    .vs-head { flex-wrap: wrap; gap: 8px 14px; }
+    .vs-head-links { display: flex; gap: 6px; flex-shrink: 0; }
+    .vs-head-links .btn { white-space: nowrap; }
+
+    .mu-layout { display: grid; grid-template-columns: minmax(0, 1fr) 480px; gap: 24px; align-items: start; }
+    .mu-player { position: sticky; top: 64px; }
+    .mu-player-card { padding: 10px; }
+    .mu-video-frame { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 4px; overflow: hidden; }
+    .mu-video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .mu-now { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 0.8rem; font-weight: 600; }
+    .mu-now-time { font-family: 'JetBrains Mono', monospace; color: var(--muted-strong); white-space: nowrap; }
+    .mu-player-help { margin: 4px 0 0; font-size: 0.72rem; color: var(--muted); }
+    .mu-close { display: none; padding: 0 6px; font-size: 0.8rem; color: var(--muted-strong); background: none; border: 0; cursor: pointer; }
+
+    .mu-chip-count { margin-left: 5px; font-size: 0.7rem; color: var(--muted); }
+    :global(.chip-on) .mu-chip-count { color: #bbb; }
+
+    .vs-toc { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+    .vs-toc-item {
+      padding: 3px 9px; font-size: 0.8rem; color: var(--text-soft); text-decoration: none;
+      background: #fff; border: 1px solid var(--border-strong); border-radius: 4px;
+    }
+    .vs-toc-item:hover { background: #111; color: #fff; border-color: #111; }
+    .vs-toc-item[hidden] { display: none; }
+    .vs-toc-general { border-style: dashed; color: var(--muted-strong); }
+
+    .vs-summaries { margin-bottom: 18px; font-size: 0.82rem; }
+    .vs-summaries summary { cursor: pointer; color: var(--muted-strong); font-weight: 600; }
+    .vs-summaries ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .vs-summaries li { padding: 8px 10px; background: var(--surface); border-left: 3px solid #111; }
+    .vs-summaries li a { margin: 0 6px; color: var(--text); font-weight: 600; }
+    .vs-summaries li p { margin: 4px 0 0; line-height: 1.6; color: var(--text-soft); }
+
+    .vs-block { margin-bottom: 26px; scroll-margin-top: 64px; }
+    .vs-block[hidden] { display: none; }
+    .vs-about { margin: -6px 0 6px; font-size: 0.8rem; color: var(--muted-strong); line-height: 1.6; }
+    .mu-section-meta { font-size: 0.76rem; color: var(--muted); }
+    .mu-points { list-style: none; margin: 0; padding: 0; }
+    .mu-point { border-bottom: 1px solid var(--border); scroll-margin-top: 64px; }
+    .mu-point[hidden] { display: none; }
+    .mu-point-active { background: var(--accent-soft); }
+    .mu-point:target { background: var(--info-bg); }
+    /* 1件は「種類・結論・▶ 時刻」の1行。説明・注意・レシピ・出典は押すと開く */
+    .mu-point-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; list-style: none; }
+    .mu-point-head::-webkit-details-marker { display: none; }
+    .mu-point-head::after { content: '▸'; flex-shrink: 0; order: 9; font-size: 0.7rem; color: var(--muted); }
+    .mu-detail[open] > .mu-point-head::after { content: '▾'; }
+    .mu-point-head:hover { background: var(--surface); }
+    .mu-point-title { flex: 1; min-width: 0; font-weight: 700; font-size: 0.88rem; line-height: 1.45; }
+    .mu-caution-mark {
+      flex-shrink: 0; padding: 0 5px; font-size: 0.68rem; font-weight: 600;
+      color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 3px;
+    }
+    .mu-body { padding: 0 12px 10px; }
+
+    /* 自分用の印（優先度 高 / 低・非表示）。localStorage の sf6-vs-marks */
+    .mu-high-filter { display: contents; }
+    .mu-high-filter[hidden] { display: none; }
+    .mu-mark { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+    .mu-mark-label { font-size: 0.72rem; color: var(--muted); margin-right: 2px; }
+    .mu-mark-btn { padding: 2px 9px; font-size: 0.74rem; }
+    .mu-mark-badge { flex-shrink: 0; }
+    .mu-mark-badge[hidden] { display: none; }
+    .mu-point[data-mark='low'] .mu-point-head { opacity: 0.6; }
+    .mu-point[data-mark='hidden'] .mu-point-head { opacity: 0.45; }
+    .mu-hidden-toggle {
+      display: block; width: 100%; margin-top: 4px; padding: 5px; font-size: 0.76rem; color: var(--muted-strong);
+      background: none; border: 1px dashed var(--border-strong); border-radius: 4px; cursor: pointer;
+    }
+    .mu-hidden-toggle:hover { background: var(--surface); }
+    .mu-hidden-toggle[hidden] { display: none; }
+    .mu-topic { min-width: 4.4em; text-align: center; flex-shrink: 0; }
+    .mu-topic[data-topic-tag='攻め'] { background: var(--warn-bg); color: var(--warn-fg); }
+    .mu-topic[data-topic-tag='守り'] { background: var(--info-bg); color: var(--info-fg); }
+    .mu-topic[data-topic-tag='対空'] { background: var(--good-bg); color: var(--good-fg); }
+    .mu-topic[data-topic-tag='反撃'] { background: #f3eee3; color: #8a6a00; }
+    .mu-perspective { flex-shrink: 0; }
+    .mu-text { margin: 0; font-size: 0.86rem; line-height: 1.65; color: var(--text-soft); }
+    .vs-caution {
+      margin: 6px 0 0; padding: 5px 9px; font-size: 0.8rem; line-height: 1.55;
+      color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 4px;
+    }
+    .mu-recipes { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 6px; }
+    .mu-recipe { display: flex; align-items: baseline; gap: 6px; }
+    .mu-recipe-label { padding: 0 5px; font-size: 0.68rem; color: var(--muted-strong); border: 1px solid var(--border-strong); border-radius: 3px; }
+    .mu-foot { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-top: 6px; font-size: 0.74rem; }
+    .mu-source-title { color: var(--muted-strong); }
+    .mu-source-meta { color: var(--muted); }
+    .mu-scenes { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-left: 4px; }
+    .mu-scenes-label { color: var(--muted); }
+    .mu-time {
+      flex-shrink: 0; padding: 2px 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; color: var(--text);
+      white-space: nowrap; background: #fff; border: 1px solid var(--border-strong); border-radius: 4px; cursor: pointer;
+    }
+    .mu-time:hover { background: #111; color: #fff; border-color: #111; }
+    .mu-time-sm { padding: 1px 6px; font-size: 0.7rem; color: var(--muted-strong); }
+    .mu-empty { color: var(--muted); font-size: 0.86rem; }
+
+    @media (max-width: 960px) {
+      .mu-layout { grid-template-columns: minmax(0, 1fr); }
+      /* スマホ: 動画は最初は出さず、▶ を押したら画面の下に固定して出す（対策の一覧を先に見せる） */
+      .mu-player { position: fixed; top: auto; left: 0; right: 0; bottom: 0; z-index: 30; display: none; }
+      .mu-topic { min-width: 3.4em; }
+      .mu-point-head { padding: 6px 4px; gap: 6px; }
+      .mu-player.mu-player-open { display: block; }
+      .mu-player-card { margin: 0 auto; max-width: 480px; border-radius: 8px 8px 0 0; box-shadow: 0 -4px 16px rgba(0,0,0,0.18); }
+      .mu-player-help { display: none; }
+      .mu-close { display: block; }
+      .mu-list.mu-list-pad { padding-bottom: min(62vw, 330px); }
+      /* 目次は横スクロールの1行にする */
+      .vs-toc { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+      .vs-toc-item { flex-shrink: 0; white-space: nowrap; }
+    }
+  </style>
+
+  <script>
+    const frame = document.getElementById('mu-video') as HTMLIFrameElement | null;
+    const nowTitle = document.getElementById('mu-now-title');
+    const nowTime = document.getElementById('mu-now-time');
+    const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+    // 右の動画をそのボタンの場面に切り替える（▶ / 時刻は再生まで、絞り込みは頭出しだけ）
+    let current: HTMLButtonElement | null = document.querySelector<HTMLButtonElement>('.mu-point .mu-time');
+    function show(btn: HTMLButtonElement, autoplay: boolean) {
+      const { video, sec, label } = btn.dataset;
+      if (!frame || !video) return;
+      frame.src = `https://www.youtube.com/embed/${video}?start=${sec ?? 0}${autoplay ? '&autoplay=1' : ''}`;
+      if (nowTitle) nowTitle.textContent = label ?? '';
+      if (nowTime) nowTime.textContent = mmss(Number(sec ?? 0));
+      document.querySelectorAll('.mu-point-active').forEach(el => el.classList.remove('mu-point-active'));
+      if (autoplay) btn.closest('.mu-point')?.classList.add('mu-point-active');
+      current = btn;
+    }
+    const player = document.getElementById('mu-player');
+    const list = document.querySelector('.mu-list');
+    document.querySelectorAll<HTMLButtonElement>('.mu-time').forEach(btn => {
+      btn.addEventListener('click', e => {
+        // 行の見出し（summary）の中の ▶ は、開閉させずに再生だけする
+        e.preventDefault();
+        show(btn, true);
+        player?.classList.add('mu-player-open');
+        list?.classList.add('mu-list-pad');
+      });
+    });
+    document.getElementById('mu-close')?.addEventListener('click', () => {
+      player?.classList.remove('mu-player-open');
+      list?.classList.remove('mu-list-pad');
+      if (frame) frame.src = 'about:blank';
+    });
+
+    // #ポイントID で来たら、その対策を開いておく
+    function openTarget() {
+      const id = decodeURIComponent(location.hash.slice(1));
+      const li = id ? document.getElementById(id) : null;
+      if (li?.classList.contains('mu-point')) li.querySelector('details')?.setAttribute('open', '');
+    }
+    openTarget();
+    window.addEventListener('hashchange', openTarget);
+
+    // 絞り込み: 目線は1つ（または すべて）、種類は複数選べて OR
+    const blocks = Array.from(document.querySelectorAll<HTMLElement>('.vs-block'));
+    const tocItems = Array.from(document.querySelectorAll<HTMLElement>('[data-toc]'));
+    const empty = document.getElementById('mu-empty');
+    const perspectiveChips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-filter-perspective]'));
+    const topicChips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-filter-topic]'));
+    let perspective = '';
+    const topics = new Set<string>();
+
+    const setPressed = (btn: HTMLButtonElement, on: boolean) => {
+      btn.classList.toggle('chip-on', on);
+      btn.setAttribute('aria-pressed', String(on));
+    };
+
+    // 自分用の印: 優先度 高（上に並べる）・低（下に薄く）・非表示（見出しの下の「非表示 N件を表示」で出す）
+    type Mark = 'high' | 'low' | 'hidden';
+    const MARKS_KEY = 'sf6-vs-marks';
+    let marks: Record<string, Mark> = {};
+    try { marks = JSON.parse(localStorage.getItem(MARKS_KEY) ?? '{}') ?? {}; } catch { marks = {}; }
+    const saveMarks = () => { try { localStorage.setItem(MARKS_KEY, JSON.stringify(marks)); } catch { /* 保存できなくても表示は続ける */ } };
+    const MARK_RANK: Record<string, number> = { high: 0, '': 1, low: 2, hidden: 3 };
+    const MARK_BADGE: Record<Mark, [string, string]> = { high: ['優先度 高', 'tag-priority-1'], low: ['優先度 低', 'tag-priority-3'], hidden: ['非表示', ''] };
+    const allPoints = Array.from(document.querySelectorAll<HTMLElement>('.mu-point'));
+    allPoints.forEach((li, i) => { li.dataset.order = String(i); });
+    const showHidden = new Set<string>();
+    let highOnly = false;
+    const highChip = document.querySelector<HTMLButtonElement>('[data-filter-high]');
+    const highWrap = document.getElementById('mu-high-filter-wrap');
+    const highCount = document.getElementById('mu-high-count');
+
+    function renderMarks() {
+      for (const li of allPoints) {
+        const mark = marks[li.dataset.pointId ?? ''] ?? '';
+        li.dataset.mark = mark;
+        const badge = li.querySelector<HTMLElement>('.mu-mark-badge');
+        if (badge) {
+          badge.hidden = !mark;
+          badge.className = `tag mu-mark-badge ${mark ? MARK_BADGE[mark][1] : ''}`;
+          badge.textContent = mark ? MARK_BADGE[mark][0] : '';
+        }
+        li.querySelectorAll<HTMLButtonElement>('[data-mark]').forEach(b => setPressed(b, b.dataset.mark === mark));
+      }
+      // 見出しの中を 高 → 普通 → 低 → 非表示 の順に並べ直す（同じ印の中は元の順）
+      document.querySelectorAll<HTMLElement>('.mu-points').forEach(ol => {
+        Array.from(ol.children as HTMLCollectionOf<HTMLElement>)
+          .sort((a, b) => (MARK_RANK[a.dataset.mark ?? ''] - MARK_RANK[b.dataset.mark ?? '']) || (Number(a.dataset.order) - Number(b.dataset.order)))
+          .forEach(li => ol.appendChild(li));
+      });
+      const highIds = new Set(allPoints.filter(li => li.dataset.mark === 'high').map(li => li.dataset.pointId));
+      if (highWrap) highWrap.hidden = highIds.size === 0;
+      if (highCount) highCount.textContent = String(highIds.size);
+      if (highIds.size === 0 && highOnly && highChip) { highOnly = false; setPressed(highChip, false); }
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.mu-mark-btn').forEach(btn => btn.addEventListener('click', () => {
+      const id = btn.closest<HTMLElement>('.mu-point')?.dataset.pointId;
+      const mark = btn.dataset.mark as Mark;
+      if (!id) return;
+      // もう一度押すと外す（普通に戻す）
+      if (marks[id] === mark) delete marks[id]; else marks[id] = mark;
+      saveMarks();
+      renderMarks();
+      apply();
+    }));
+    blocks.forEach(block => block.querySelector<HTMLButtonElement>('[data-hidden-toggle]')?.addEventListener('click', () => {
+      const a = block.dataset.block ?? '';
+      if (showHidden.has(a)) showHidden.delete(a); else showHidden.add(a);
+      apply();
+    }));
+    highChip?.addEventListener('click', () => {
+      highOnly = !highOnly;
+      setPressed(highChip, highOnly);
+      apply();
+    });
+
+    function apply() {
+      let visible = 0;
+      let anyHidden = false;
+      for (const block of blocks) {
+        let inBlock = 0;
+        let hiddenInBlock = 0;
+        const open = showHidden.has(block.dataset.block ?? '');
+        block.querySelectorAll<HTMLElement>('.mu-point').forEach(point => {
+          const match = (!perspective || point.dataset.perspective === perspective)
+            && (topics.size === 0 || topics.has(point.dataset.topic ?? ''))
+            && (!highOnly || point.dataset.mark === 'high');
+          const markedHidden = point.dataset.mark === 'hidden';
+          if (match && markedHidden) hiddenInBlock++;
+          const on = match && (!markedHidden || open);
+          point.hidden = !on;
+          if (on) inBlock++;
+        });
+        const toggle = block.querySelector<HTMLButtonElement>('[data-hidden-toggle]');
+        if (toggle) {
+          toggle.hidden = hiddenInBlock === 0;
+          toggle.textContent = open ? `非表示 ${hiddenInBlock}件を隠す` : `非表示 ${hiddenInBlock}件を表示`;
+        }
+        const shown = inBlock > 0 || hiddenInBlock > 0;
+        block.hidden = !shown;
+        tocItems.filter(t => t.dataset.toc === block.dataset.block).forEach(t => { t.hidden = !shown; });
+        visible += inBlock;
+        if (hiddenInBlock > 0) anyHidden = true;
+      }
+      if (empty) empty.hidden = visible > 0 || anyHidden;
+      // 今の動画のポイントが隠れたら、見えている最初のポイントの場面に頭出しする
+      if (current?.closest<HTMLElement>('.mu-point')?.hidden) {
+        const firstVisible = Array.from(document.querySelectorAll<HTMLButtonElement>('.mu-point .mu-time'))
+          .find(b => !b.closest<HTMLElement>('.mu-point')?.hidden);
+        if (firstVisible) show(firstVisible, false);
+      }
+    }
+
+    perspectiveChips.forEach(btn => btn.addEventListener('click', () => {
+      perspective = btn.dataset.filterPerspective ?? '';
+      perspectiveChips.forEach(b => setPressed(b, b === btn));
+      apply();
+    }));
+    topicChips.forEach(btn => btn.addEventListener('click', () => {
+      const t = btn.dataset.filterTopic ?? '';
+      if (topics.has(t)) topics.delete(t); else topics.add(t);
+      setPressed(btn, topics.has(t));
+      apply();
+    }));
+
+    renderMarks();
+    apply();
+  </script>
+</Layout>

@@ -1,0 +1,42 @@
+---
+// 見出しの末尾の「あまり使わない N件」。押すとその見出しの畳んでいる行を開く（src/lib/combo-list-view.ts）
+import { FOLDED_PRIORITY } from '../mock-data/rashid-starters';
+
+interface Props {
+  bucket: string;
+  count: number;
+  colspan: number;
+}
+const { bucket, count, colspan } = Astro.props;
+---
+
+<tbody class="combo-low-row" data-low-bucket={bucket} style={count === 0 ? 'display:none;' : undefined}>
+  <tr>
+    <td colspan={colspan} class="combo-low-cell">
+      <button type="button" class="combo-low-toggle" aria-expanded="false">▸ {FOLDED_PRIORITY} {count}件</button>
+    </td>
+  </tr>
+</tbody>
+
+<style>
+  .combo-low-cell {
+    padding: 2px 8px 4px !important;
+    border-bottom: none !important;
+    background: transparent !important;
+  }
+  .combo-low-toggle {
+    background: transparent;
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 0.72rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+  .combo-low-toggle:hover {
+    background: var(--surface3);
+    color: var(--text);
+  }
+</style>

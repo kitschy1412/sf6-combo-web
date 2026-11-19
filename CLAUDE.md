@@ -1,54 +1,24 @@
-# SF6 Combo Web — Project Guide
+# SF6 Combo Web
 
-## Vision
 SF6コンボをYouTubeタイムスタンプ付きで検索・閲覧・投票できるWebサイト。
-パイプライン（sf6-combo-archiver）が収集したデータをSupabaseから取得して表示する。
+データは `sf6-combo-archiver` パイプラインが Supabase に投入したものを参照する。
 
-## Tech Stack
-- **Framework**: Astro + TypeScript
-- **DB Client**: @supabase/supabase-js
-- **Deploy**: Vercel
-- **Styling**: CSS（ライブラリなし、シンプルに保つ）
+## Stack
+Astro 6 + TypeScript (strict) / @supabase/supabase-js / TailwindCSS v4 / Vercel デプロイ
 
-## Coding Rules
-- TypeScript 必須（strict モード）
-- 環境変数は `.env` で管理、コードにハードコードしない
-- コンポーネントは src/components/ に配置
-- データ取得は src/lib/ に集約
+## ルール
+- TypeScript strict。環境変数は `.env`（ハードコード禁止）
+- データ取得は `src/lib/` に集約、UI は `src/components/`
+- Tailwind のみ使用（独自CSS禁止）
 
-## Project Structure
-```
-sf6-combo-web/
-├── src/
-│   ├── pages/
-│   │   ├── index.astro          # キャラ一覧
-│   │   ├── [character].astro    # キャラ別コンボ一覧
-│   │   └── combo/[id].astro     # コンボ詳細（YouTube埋め込み）
-│   ├── components/
-│   │   ├── ComboCard.astro      # コンボカード
-│   │   └── VoteButton.astro     # 投票ボタン
-│   └── lib/
-│       └── supabase.ts          # Supabaseクライアント
-├── .env                         # (gitignore済み)
-├── CLAUDE.md
-└── TODO.md
-```
+## 参考ドキュメント（on-demand）
+作業領域に応じて必要な時だけ読む：
+- `docs/ROADMAP.md` — プロジェクト全体の目的・現状・Phase 計画
+- `docs/UI.md` — UI/Tailwind 規約（色・レイアウト・キャラバッジ等）、画面のスクショ確認手順
+- `docs/DATA.md` — Supabase スキーマ、YouTube埋め込みURL生成（Phase 2 設計案は `docs/DATA_PHASE2.md`）
+- `docs/VOTING.md` — 投票システム（Wilson Score + IP制限）
+- `docs/backlog.md` — やりたいことリスト（`/sy-next-task` で先頭から実装）。完了時は項目を削除し `docs/done.md` の先頭に移す
+- `docs/done.md` — 完了タスクの履歴
 
-## Supabase テーブル（参照元: sf6-combo-archiver/schema.sql）
-- `characters`: キャラクターマスタ
-- `combos`: コンボデータ（youtube_id, start_sec でYouTube埋め込みURL生成）
-- `votes`: 投票データ
-
-## YouTube埋め込みURL生成
-```
-https://www.youtube.com/embed/{youtube_id}?start={start_sec}
-```
-
-## 接続先Supabase
-- パイプライン（sf6-combo-archiver）と同じプロジェクトを参照する
-
-## Status
-- [x] Astroプロジェクト初期化
-- [ ] Phase 4: ページ実装（現在）
-- [ ] Phase 5: 投票システム
-- [ ] Phase 6: Vercelデプロイ
+## 接続先
+Supabase は `sf6-combo-archiver` と同一プロジェクト。

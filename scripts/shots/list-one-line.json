@@ -1,0 +1,22 @@
+[
+  {
+    "name": "hub",
+    "url": "http://localhost:4321/mock/character/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "localStorage.removeItem('sf6-style'); localStorage.removeItem('sf6-combo-col-vis'); document.querySelectorAll('tbody.combo-low-row button').forEach(b => b.click())",
+      "window.__lines = () => { const rows = [...document.querySelectorAll('#combo-table tbody.combo-group')].filter(g => !g.querySelector('.combo-parent-row')); const stat = rows.map(g => { const n = g.querySelector('.notation-text'); const tops = new Set([...n.querySelectorAll('.recipe-step')].map(c => Math.round(c.getBoundingClientRect().top))); const cmd = g.querySelector('.combo-cmd').getBoundingClientRect(), sub = g.querySelector('.combo-sub').getBoundingClientRect(); return { id: g.dataset.comboId, lines: tops.size, subSame: Math.abs(sub.top - cmd.top) < cmd.height }; }); return JSON.stringify({ total: stat.length, oneLine: stat.filter(s => s.lines === 1).length, wrapped: stat.filter(s => s.lines > 1).map(s => s.id), subSameLine: stat.filter(s => s.subSame).length, overflowX: document.documentElement.scrollWidth > innerWidth }); }"
+    ],
+    "evals": ["window.__lines()"]
+  },
+  {
+    "name": "explore",
+    "url": "http://localhost:4321/mock/explore/rashid",
+    "width": 1400, "height": 1000, "chunk": 1000, "maxChunks": 1,
+    "actions": [
+      "document.querySelectorAll('tbody.combo-low-row button').forEach(b => b.click())",
+      "window.__lines = () => { const rows = [...document.querySelectorAll('#combo-table tbody.combo-group')].filter(g => !g.querySelector('.combo-parent-row')); const stat = rows.map(g => { const n = g.querySelector('.notation-text'); const tops = new Set([...n.querySelectorAll('.recipe-step')].map(c => Math.round(c.getBoundingClientRect().top))); const cmd = g.querySelector('.combo-cmd').getBoundingClientRect(), sub = g.querySelector('.combo-sub').getBoundingClientRect(); return { id: g.dataset.comboId, lines: tops.size, subSame: Math.abs(sub.top - cmd.top) < cmd.height }; }); return JSON.stringify({ total: stat.length, oneLine: stat.filter(s => s.lines === 1).length, wrapped: stat.filter(s => s.lines > 1).map(s => s.id), subSameLine: stat.filter(s => s.subSame).length, overflowX: document.documentElement.scrollWidth > innerWidth }); }"
+    ],
+    "evals": ["window.__lines()"]
+  }
+]

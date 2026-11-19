@@ -1,0 +1,185 @@
+---
+// 起き攻めの一覧。〆分類（〆技、または連携名）ごとに、その後に使える起き攻めを並べる（2026-11-14 ユーザー要望）。
+// 全部の〆を縦に並べると長すぎて見づらい（同日ユーザー指摘）ので、左の〆の一覧で1つ選び、その〆だけを右に出す。
+// 選んだ〆は URL の #〆分類ID に持つ（起き攻めパネルの「この〆の起き攻め一覧 →」もここへ飛ぶ）。JS が無ければ全部並ぶ。
+// 1件は「位置・コマンド・中段/下段/投げ/詐欺」を主役にし、補足は1行で切る。押すと補足の全文と動画へのリンクを出す。
+// 同じ〆技でも当たり方で有利Fが変わるものは分類を分けてあり、同じ連携でタイミングだけ違うもの（J中P 最速 +24F / 遅らせ +23F）は
+// pattern の小見出しに分ける。「参考」（〆は違うが有利Fが同じ）はコンボ側の起き攻めパネルにだけ出し、ここでは出さない
+import Layout from '../../../layouts/Layout.astro';
+import Notation from '../../../components/Notation.astro';
+import { COMBOS, ENDER_CLASSES, OKIZEME_SETUPS, getComboRoutes, okizemeSourceName as sourceName, type OkizemeSetup } from '../../../mock-data/rashid';
+
+const POSITION_ORDER = ['端', '中央', 'どこでも', undefined];
+const sections = ENDER_CLASSES.map(ec => {
+  // 位置（端 → 中央 → どこでも → 手書きの位置なし）の順。同じ位置の中は元の順
+  const items = OKIZEME_SETUPS
+    .filter(o => o.enderClassId === ec.id)
+    .map((o, i) => ({ o, i }))
+    .sort((a, b) => POSITION_ORDER.indexOf(a.o.position) - POSITION_ORDER.indexOf(b.o.position) || a.i - b.i)
+    .map(x => x.o);
+  // pattern の出てきた順に小見出しを作る。pattern の無いものは先頭にまとめる
+  const patterns = [...new Set(items.map(o => o.pattern ?? ''))].sort((a, b) => (a ? 1 : 0) - (b ? 1 : 0));
+  return {
+    ec,
+    patterns: patterns.map(p => ({ label: p, items: items.filter(o => (o.pattern ?? '') === p) })),
+    count: items.length,
+    combos: COMBOS.filter(c => getComboRoutes(c).some(r => r.leaf.enderClassId === ec.id)),
+  };
+});
+const filled = sections.filter(s => s.count > 0);
+const empty = sections.filter(s => s.count === 0);
+const total = filled.reduce((n, s) => n + s.count, 0);
+// 先頭行の「元レシピ: …」は取り込み元の日本語なので出さない（ほかの出典の解説も同じ形）
+const noteText = (notes?: string) => (notes ?? '').split('\n').filter(l => !l.startsWith('元レシピ:')).join(' ');
+const notesOf = (o: OkizemeSetup) => noteText(o.notes);
+// 手書き分は起き上がりへの対応（GD・暴れ・無敵・受身ずらし）を補足の代わりに出す
+const wakeupOf = (o: OkizemeSetup) => [
+  o.vsWakeup.guard && `GD: ${o.vsWakeup.guard}`,
+  o.vsWakeup.mash && `暴れ: ${o.vsWakeup.mash}`,
+  o.vsWakeup.invincible && `無敵: ${o.vsWakeup.invincible}`,
+  o.vsWakeup.delayedWakeup && `受身ずらし: ${o.vsWakeup.delayedWakeup}`,
+].filter(Boolean).join(' ／ ');
+const summaryOf = (o: OkizemeSetup) => notesOf(o) || wakeupOf(o);
+const videoUrl = (o: { youtubeId?: string; startSec?: number }) => o.youtubeId
+  ? `https://www.youtube.com/watch?v=${o.youtubeId}${o.startSec ? `&t=${o.startSec}s` : ''}` : null;// archiver 分の「端 弱スパイク後 #2」は位置と〆の繰り返しなので出さない。手書き分は名前に中身があるので出す
+const isGeneratedTitle = (o: OkizemeSetup) => o.id.startsWith('ax_');
+---
+
+<Layout title="起き攻め — モック" character="Rashid">
+  <nav class="breadcrumb">
+    <a href="/mock/">モックトップ</a>
+    <span class="sep">/</span>
+    <a href="/mock/character/rashid">Rashid</a>
+    <span class="sep">/</span>
+    <span class="text-[var(--text)]">起き攻め</span>
+  </nav>
+
+  <div class="page-head rounded-md">
+    <div class="flex flex-wrap items-baseline gap-3.5">
+      <h1>起き攻め</h1>
+      <span class="meta">〆 {filled.length}種 ・ {total}件</span>
+    </div>
+    <a href="/mock/okizeme/new" class="btn btn-sm" style="background:transparent; color:#fff; border-color:#444;">＋ 起き攻め</a>
+  </div>
+
+  <div class="mt-4 flex flex-col gap-4 md:flex-row md:items-start md:gap-6">
+    <!-- 〆の一覧。PC は左に縦、スマホは上に横スクロール -->
+    <nav id="okizeme-toc" aria-label="〆"
+      class="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 md:sticky md:top-16 md:mx-0 md:w-60 md:shrink-0 md:flex-col md:overflow-visible md:p-0">
+      {filled.map(s => (
+        <a href={`#${s.ec.id}`} data-toc={s.ec.id}
+          class="flex shrink-0 items-baseline justify-between gap-3 rounded border border-[var(--border)] bg-white px-2.5 py-1.5 text-[0.82rem] text-[var(--text-soft)] no-underline hover:border-[var(--border-strong)] md:border-transparent md:bg-transparent md:hover:bg-[var(--surface)] data-[active]:border-[#111] data-[active]:bg-[#111] data-[active]:text-white md:data-[active]:border-[#111] md:data-[active]:bg-[#111]">
+          <span class="whitespace-nowrap">{s.ec.displayName}</span>
+          <span class="text-[0.72rem] opacity-60">{s.count}</span>
+        </a>
+      ))}
+      {empty.length > 0 && (
+        <p id="okizeme-empty" class="hidden px-2.5 pt-3 text-[0.72rem] leading-relaxed text-[var(--muted)] md:block">
+          まだ起き攻めが無い〆: {empty.map(s => s.ec.displayName).join(' / ')}
+        </p>
+      )}
+    </nav>
+
+    <div class="min-w-0 flex-1">
+      {filled.map(s => (
+        <section id={s.ec.id} data-okizeme-ender={s.ec.id} class="scroll-mt-20 mb-8">
+          <div class="border-b-2 border-[#111] pb-2">
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 class="text-lg font-bold">{s.ec.displayName}</h2>
+              {s.ec.frameAdvantage && s.ec.frameAdvantage !== '—' && <span class="dmg text-[0.95rem]">{s.ec.frameAdvantage}</span>}
+              <span class="text-[0.76rem] text-[var(--muted)]">{s.count}件</span>
+            </div>
+            {s.ec.route && <p class="mt-0.5 text-[0.8rem] text-[var(--muted-strong)]">{s.ec.route}</p>}
+            {s.combos.length > 0 && (
+              <details class="mt-1 text-[0.76rem] text-[var(--muted)]">
+                <summary class="cursor-pointer select-none hover:text-[var(--text)]">この〆で終わるコンボ {s.combos.length}件</summary>
+                <p class="mt-0.5 leading-relaxed">
+                  {s.combos.map((c, i) => <>{i > 0 && ' ・ '}<a href={`/mock/combo/${c.id}`} class="text-[var(--muted-strong)] hover:text-[var(--text)]">{c.title}</a></>)}
+                </p>
+              </details>
+            )}
+          </div>
+
+          {s.patterns.map(p => (
+            <div data-okizeme-pattern={p.label || undefined}>
+              {p.label && <div class="mt-4 mb-0.5 text-[0.8rem] font-bold">{p.label}</div>}
+              <ul class="m-0 list-none p-0">
+                {p.items.map(o => (
+                  <li data-okizeme-id={o.id} data-okizeme-rel="main" class="border-b border-[var(--border)]">
+                    <details class="group">
+                      <summary class="flex cursor-pointer list-none items-start gap-3 py-2.5 hover:bg-[var(--surface)] [&::-webkit-details-marker]:hidden">
+                        <span class="w-8 shrink-0 pt-0.5 sm:w-12 text-[0.72rem] font-semibold text-[var(--muted-strong)]">{o.position ?? ''}</span>
+                        <span class="min-w-0 flex-1">
+                          <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <Notation inputs={o.inputs} size="sm" />
+                            {o.flags.mid && <span class="tag tag-warn">中段</span>}
+                            {o.flags.low && <span class="tag tag-personal">下段</span>}
+                            {o.flags.throw && <span class="tag tag-shared">投げ</span>}
+                            {o.flags.safeJump && <span class="tag">詐欺</span>}
+                          </span>
+                          {!isGeneratedTitle(o) && <span class="mt-0.5 block text-[0.74rem] font-semibold text-[var(--muted-strong)]">{o.title}</span>}
+                          {summaryOf(o) && (
+                            <span class="mt-0.5 block truncate text-[0.76rem] text-[var(--muted)] group-open:hidden">{summaryOf(o)}</span>
+                          )}
+                        </span>
+                        {o.ownerLabel && (
+                          <span class="hidden shrink-0 pt-0.5 text-[0.7rem] text-[var(--muted)] sm:inline">
+                            {o.ownerLabel}{o.alsoIn && ` ほか${o.alsoIn.length}件`}
+                          </span>
+                        )}
+                        <span class="shrink-0 pt-0.5 text-[0.7rem] text-[var(--muted)] transition-transform group-open:rotate-90">▶</span>
+                      </summary>
+                      <div class="pb-3 pl-[2.75rem] pr-6 sm:pl-[3.75rem] text-[0.8rem] leading-relaxed text-[var(--text-soft)]">
+                        {summaryOf(o) && <p>{summaryOf(o)}</p>}
+                        <p class="mt-1 text-[0.74rem] text-[var(--muted)]">
+                          {videoUrl(o)
+                            ? <a href={videoUrl(o)} target="_blank" rel="noopener" class="hover:text-[var(--text)]">▶ 動画で見る（{sourceName(o)}）</a>
+                            : o.sourceUrl
+                              ? <a href={o.sourceUrl} target="_blank" rel="noopener" class="hover:text-[var(--text)]">記事を読む（{sourceName(o)}・note）</a>
+                              : o.sourceType === 'personal' ? '自分のメモ' : `共有 / ${o.ownerLabel}`}
+                        </p>
+                        {/* 同じ起き攻めを紹介しているほかの動画・記事（取り込みで1件にまとめた残り。新しい順）。区分は出典ごとの書き方のまま */}
+                        {o.alsoIn && (
+                          <div class="mt-2">
+                            <p class="text-[0.72rem] font-semibold text-[var(--muted-strong)]">ほかの出典 {o.alsoIn.length}件</p>
+                            <ul class="m-0 list-none p-0">
+                              {o.alsoIn.map(s => (
+                                <li data-okizeme-source={s.id} class="mt-1 text-[0.74rem] leading-snug text-[var(--muted)]">
+                                  <a href={videoUrl(s) ?? s.sourceUrl} target="_blank" rel="noopener" class="hover:text-[var(--text)]">
+                                    {s.youtubeId ? '▶ ' : '記事 '}{sourceName(s)}
+                                  </a>
+                                  <span class="ml-1.5 font-semibold text-[var(--muted-strong)]">{s.section}</span>
+                                  {noteText(s.notes) && <span class="block truncate" title={noteText(s.notes)}>{noteText(s.notes)}</span>}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      ))}
+    </div>
+  </div>
+
+  <script>
+    // 選んだ〆（#〆分類ID）の節だけを出す。ハッシュが無いか合わなければ先頭の〆
+    const sections = Array.from(document.querySelectorAll<HTMLElement>('section[data-okizeme-ender]'));
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc]'));
+    function show() {
+      const want = decodeURIComponent(location.hash.slice(1));
+      const current = sections.find(s => s.id === want) ?? sections[0];
+      for (const s of sections) s.hidden = s !== current;
+      for (const a of links) a.toggleAttribute('data-active', a.dataset.toc === current?.id);
+      links.find(a => a.dataset.toc === current?.id)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      window.scrollTo({ top: 0 });
+    }
+    window.addEventListener('hashchange', show);
+    show();
+  </script>
+</Layout>

@@ -1,0 +1,136 @@
+---
+import Layout from '../../layouts/Layout.astro';
+
+const screens = [
+  { path: '/mock/explore/rashid', title: '公開コンボ一覧 (Rashid)', desc: '世界全体の公開コンボ一覧・読み取り専用。ソートトグル・fork ボタン・投票スコア表示' },
+  { path: '/mock/character/rashid', title: 'キャラハブ (Rashid)', desc: 'コンボ・起き攻め・ダウン状況の一覧 + フィルタ。コンボの入力・編集は一覧の中のインラインエディタ（「＋ コンボ」/ ✎）' },
+  { path: '/mock/okizeme/', title: '起き攻め 一覧', desc: '〆分類（〆技、または「もにょもにょ」などの連携名）ごとに起き攻めを並べる。同じ連携でタイミングだけ違うもの（+24F / +23F）は小見出しで分ける' },
+  { path: '/mock/vs/', title: 'キャラ対策 一覧', desc: 'キャラごとの強い技・連携と、その対策のポイント数。技名で検索でき、押すとそのキャラのページのその技に飛ぶ' },
+  { path: '/mock/vs/sagat', title: 'キャラ対策 (サガット)', desc: '強い技・連携ごとに対策を並べる（ACQUA さん＝共通、doskonnbu＝ラシード目線）。▶ / 時刻で右の動画がその場面から再生。目線・種類で絞り込み' },
+  { path: '/mock/combo/c_001', title: 'コンボ詳細 (自分のメモ)', desc: '投票UI非表示・編集ボタン表示' },
+  { path: '/mock/combo/c_002', title: 'コンボ詳細 (共有)', desc: '投票UI表示 (Good/Bad + 現verでは不可)' },
+  { path: '/mock/combo/c_003', title: 'コンボ詳細 (現ver不可票あり)', desc: '不可票5件の状態' },
+  { path: '/mock/combo/c_004', title: 'コンボ詳細 (fork済)', desc: '他人のコンボを自分用にコピー' },
+  { path: '/mock/combo/c_005', title: 'コンボ詳細 (⭐ 2分岐)', desc: '2MK>236LPの後に2ルート (弱イーグル / OD強化)' },
+  { path: '/mock/combo/c_006', title: 'コンボ詳細 (⭐ 3葉ツリー)', desc: 'カウンター始動 + 再帰分岐 (弱スパイク〆 / OD-強イーグル / OD-SA2)' },
+  { path: '/mock/okizeme/new', title: '起き攻め入力フォーム', desc: '〆分類への紐付け + 相手行動別タブ' },
+  { path: '/mock/situation/new', title: 'ダウン状況入力フォーム', desc: '状況ラベル + 〆分類割当' },
+  { path: '/mock/situation/s_003', title: 'ダウン状況詳細 (投げ後)', desc: '〆分類経由で起き攻めが自動表示' },
+  { path: '/mock/ender-class/list', title: '〆分類管理', desc: '分類タグの一覧・編集' },
+  { path: '/mock/admin/broken-list', title: '「現verでは不可」一覧', desc: '管理人ビュー・削除導線' },
+  { path: '/mock/me/notes/', title: 'マイノート一覧', desc: 'コンボ/起き攻めノートの一覧・visibility バッジ' },
+  { path: '/mock/me/notes/combos/note_c_001', title: 'コンボノート詳細', desc: '並び順編集（↑↓）・コンボを追加・除去' },
+  { path: '/mock/me/notes/okizeme/note_o_001', title: '起き攻めノート詳細', desc: '並び順編集（↑↓）・起き攻めを追加・除去' },
+];
+
+const points = [
+  { title: '一覧の見直し（2026-10-23 の方針、見出しは 2026-11-02 に変更）', desc: '中央 / 端 と場面の見出しでまとめ、優先度で並べる・行はコマンドが主役・分岐はルートを1本ずつ書く・詳細は動画の横でルートを選ぶ（backlog で順に反映中）', target: '/mock/character/rashid' },
+  { title: 'コマンド入力（C: ハイブリッド採用）', desc: 'テキスト直打ち + パレット補助。キャラハブの「＋ コンボ」/ ✎ で開くインラインエディタ', target: '/mock/character/rashid' },
+  { title: '〆分類による自動紐付け', desc: '同分類の起き攻めが全コンボ・状況から自動引き', target: '/mock/combo/c_001' },
+  { title: 'personal / shared / forked の視覚区別', desc: 'バッジ色とフィルタで切り分け', target: '/mock/character/rashid' },
+  { title: '重複アップロード検出', desc: 'インラインエディタの保存時にエラーモーダル → fork分岐', target: '/mock/character/rashid' },
+  { title: '「現verでは不可」票', desc: 'Good/Bad とは別軸の独立ボタン、共有のみに表示', target: '/mock/admin/broken-list' },
+  { title: 'コンボ分岐（ツリー）', desc: '共通プレフィックスから複数ルートに分岐。葉ごとに独立したダメージ・〆分類・投票', target: '/mock/combo/c_006' },
+  { title: 'ノート機能（コンボ/起き攻め）', desc: '種類別ノート一覧・並び順編集・visibility バッジ（案B: 種類ごとに別ノート）', target: '/mock/me/notes/' },
+];
+---
+
+<Layout title="モックトップ — Wiki型オーバーホール">
+  <div class="card" style="margin-bottom:20px;">
+    <div class="section-label">PHASE 1 MOCK — WIKI MODEL</div>
+    <h1 style="font-size:1.5rem; margin-bottom:6px;">入力UI設計モック</h1>
+    <p style="color:var(--muted-strong); font-size:0.9rem; margin:0 0 4px;">
+      Wiki型オーバーホールの入力画面・レイアウトを触って詰めるモック。バックエンド未接続。
+    </p>
+    <p style="color:var(--muted); font-size:0.78rem; margin:0;">
+      対象キャラ: Rashid ・ 全データはハードコード
+    </p>
+  </div>
+
+  <section style="margin-bottom:28px;">
+    <div class="section-head">
+      <h2>このモックで詰める論点</h2>
+    </div>
+    <div style="display:grid; gap:8px;">
+      {points.map(p => (
+        <a href={p.target} class="card" style="text-decoration:none; transition:background 0.12s; display:block;">
+          <div style="font-weight:700; font-size:0.92rem; margin-bottom:3px;">{p.title}</div>
+          <div style="color:var(--muted-strong); font-size:0.82rem;">{p.desc}</div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <section style="margin-bottom:28px;">
+    <div class="section-head">
+      <h2>Phase 2 への TODO</h2>
+      <span style="font-size:0.78rem; color:var(--muted);">モック確認後に着手する設計・実装項目</span>
+    </div>
+
+    <div style="display:grid; gap:16px; grid-template-columns: 1fr 1fr;">
+
+      <div class="card">
+        <div class="section-label">未決の論点</div>
+        <ul style="margin:0; padding-left:1.2em; font-size:0.88rem; color:var(--text-soft); display:flex; flex-direction:column; gap:8px;">
+          <li>
+            <strong>始動技・ヒット状態・位置・優先度の持ち方</strong><br />
+            <span style="font-size:0.78rem; color:var(--muted);">大分類/小分類は廃止。始動技のリストをマスタにするか定数にするか</span>
+          </li>
+          <li>
+            <strong>コンボ分岐ツリーの DB 表現</strong><br />
+            <span style="font-size:0.78rem; color:var(--muted);">暫定: combo_nodes（parent_id 再帰）を基本、当面は tree JSONB で仮実装（docs/DATA_PHASE2.md）</span>
+          </li>
+          <li>
+            <strong>〆分類マスタ設計</strong><br />
+            <span style="font-size:0.78rem; color:var(--muted);">暫定: マスタテーブル方式を維持（docs/DATA_PHASE2.md）</span>
+          </li>
+          <li>
+            <strong>ルート個別〆分類オーバーライド</strong><br />
+            <span style="font-size:0.78rem; color:var(--muted);">同じ〆技でもフレーム状況が変わるケースの扱い</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="section-label">次のステップ</div>
+        <ol style="margin:0; padding-left:1.4em; font-size:0.88rem; color:var(--text-soft); display:flex; flex-direction:column; gap:8px;">
+          <li>UI 見直しの方針をモックに反映（<code style="font-size:0.75rem;">docs/backlog.md</code>「モック / UI」）</li>
+          <li>始動技・コンボ分岐・〆分類の DB 表現を <code style="font-size:0.75rem;">docs/DATA.md</code> に確定</li>
+          <li>Supabase スキーマ更新（sf6-combo-archiver 側と同期）</li>
+          <li>本実装スタック判断（SSR / SSG、ISR の可否）</li>
+          <li>バックエンド実装 → モックから本ページへ切り替え</li>
+        </ol>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>全画面リスト</h2>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>画面</th>
+          <th>説明</th>
+          <th>パス</th>
+        </tr>
+      </thead>
+      <tbody>
+        {screens.map(s => (
+          <tr>
+            <td><a href={s.path} class="row-link col-title">{s.title}</a></td>
+            <td style="color:var(--muted-strong);">{s.desc}</td>
+            <td><code style="font-size:0.75rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">{s.path}</code></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+
+  <div class="card" style="margin-top:28px; background:var(--surface); border-style:dashed;">
+    <div class="section-label">NEXT</div>
+    モックでフィードバック反映 → データモデル確定 → Supabaseスキーマ → 本実装スタック判断 → バックエンド実装。
+  </div>
+</Layout>

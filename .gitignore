@@ -23,3 +23,12 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 .vercel
+
+# Office一時ファイル
+~$*.pptx
+~$*.xlsx
+~$*.docx
+
+# Claude Code ローカル設定
+.claude/settings.local.json
+

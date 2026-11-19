@@ -24,4 +24,8 @@ export type Combo = {
   patch_version: string;
   confidence: number;
   created_at: string;
+  // Phase 2 フィールド（現在はDB未定義、nullで返る）
+  ender_class?: string | null;
+  comment?: string | null;
+  poster?: string | null;
 };

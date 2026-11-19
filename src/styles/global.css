@@ -1,0 +1,406 @@
+@import "tailwindcss";
+
+/* ── Design tokens (Light / D-style) ───────────────────── */
+:root {
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --surface2: #f5f5f5;
+  --surface3: #ececec;
+  --border: #ececec;
+  --border-strong: #d4d4d4;
+  --text: #111111;
+  --text-soft: #333333;
+  --muted: #777777;
+  --muted-strong: #555555;
+
+  --accent: #111111;
+  --accent-soft: rgba(17,17,17,0.06);
+
+  --warn-bg: #fde6e6;
+  --warn-fg: #b32c2c;
+  --warn-border: #f4caca;
+  --info-bg: #e6f0fd;
+  --info-fg: #1d4ed8;
+  --good-bg: #e6f4ea;
+  --good-fg: #137333;
+}
+
+@theme {
+  --font-display: 'Meiryo UI', 'Meiryo', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Meiryo UI', 'Meiryo', ui-sans-serif, system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    line-height: 1.6;
+  }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0; margin: 0; }
+  a { color: inherit; }
+}
+
+/* ── Section label (small uppercase eyebrow) ───────────── */
+.section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* ── Notation (command display) ────────────────────────── */
+/* チップ式: 各トークンを小箱に、> はセパレータ記号 */
+.notation {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+.cmd-chip {
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cmd-chip-special {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+.cmd-sep {
+  color: #999;
+  font-size: 1rem;
+  font-weight: 400;
+  user-select: none;
+}
+/* Compact variant for dense tables */
+.notation-sm { font-size: 0.82rem; gap: 4px; }
+.notation-sm .cmd-chip { padding: 2px 6px; font-size: 0.78rem; }
+
+/* 文字表記（既定）: 動画の字幕の書き方。折り返すときは手順の切れ目で */
+.notation-text { font-size: 0.95rem; font-weight: 600; line-height: 1.5; color: var(--text); }
+.notation-text-sm { font-size: 0.84rem; }
+.recipe-step { white-space: nowrap; }
+.recipe-sep { color: #999; font-size: 0.8em; font-weight: 400; }
+
+/* 文字/チップの切り替え: チップを選ぶと <html data-notation-style="chip"> になる */
+.notation.notation-chips { display: none; }
+[data-notation-style="chip"] .notation.notation-chips { display: inline-flex; }
+[data-notation-style="chip"] .notation-text { display: none; }
+.only-chip-style { display: none; }
+[data-notation-style="chip"] .only-chip-style { display: inline; }
+[data-notation-style="chip"] .only-text-style { display: none; }
+
+/* ── Tag pills ─────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface3);
+  color: var(--muted-strong);
+  white-space: nowrap;
+}
+.tag-warn     { background: var(--warn-bg); color: var(--warn-fg); }
+.tag-personal { background: var(--info-bg); color: var(--info-fg); }
+.tag-shared   { background: #f3eee3; color: #8a6a00; }
+.tag-good     { background: var(--good-bg); color: var(--good-fg); }
+.tag-private  { background: #1e1e1e; color: #888; }
+.tag-unlisted { background: #e8e8e8; color: #555; }
+.tag-public   { background: #d1fae5; color: #065f46; }
+/* 優先度（rashid-starters.ts の priorityTagClass）: よく使う / ときどき / あまり使わない */
+.tag-priority-1 { background: var(--good-bg); color: var(--good-fg); font-weight: 600; }
+.tag-priority-3 { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
+/* ヒット状態（rashid-starters.ts の hitTagClass）: 幅をそろえて、後ろのコマンドの左端をそろえる */
+.tag-hit { width: 2.8em; justify-content: center; }
+.tag-hit-ch { background: var(--info-bg); color: var(--info-fg); }
+.tag-hit-pc { background: var(--warn-bg); color: var(--warn-fg); }
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 6px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.btn:hover { background: var(--surface2); }
+.btn-primary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+.btn-primary:hover { background: #2a2a2a; }
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted-strong);
+}
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+.btn-warn {
+  color: var(--warn-fg);
+  border-color: var(--warn-border);
+}
+.btn-warn:hover { background: var(--warn-bg); }
+.btn-sm { font-size: 0.76rem; padding: 4px 10px; }
+
+/* ── Filter chips ──────────────────────────────────────── */
+.chip {
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 4px 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.chip:hover { background: var(--surface2); }
+.chip-on { background: #111; color: #fff; border-color: #111; }
+.chip-on:hover { background: #2a2a2a; }
+
+/* ── Page header (dark slab) ───────────────────────────── */
+.page-head {
+  background: #111;
+  color: #fff;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.page-head h1, .page-head h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.page-head .meta { font-size: 0.78rem; color: #aaa; }
+
+/* ── Section header (page-level h2) ────────────────────── */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #111;
+  margin-bottom: 14px;
+}
+.section-head h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* ── Filter bar ────────────────────────────────────────── */
+.filter-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.filter-label {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+
+/* ── Data table ────────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.data-table th {
+  background: var(--surface);
+  border-bottom: 2px solid #111;
+  padding: 9px 14px;
+  text-align: left;
+  font-size: 0.72rem;
+  color: var(--muted-strong);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.data-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 11px 14px;
+  vertical-align: middle;
+  font-size: 0.88rem;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--surface); }
+.data-table .col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.data-table .col-title { font-weight: 600; color: var(--text); }
+.data-table .row-link {
+  color: var(--text);
+  text-decoration: none;
+  display: block;
+}
+.data-table .row-link:hover { color: var(--text); }
+
+/* ── Card ──────────────────────────────────────────────── */
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px 18px;
+}
+.card-emph {
+  border-color: #111;
+  border-top-width: 3px;
+}
+
+/* ── Vote bar ──────────────────────────────────────────── */
+.vote-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 18px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.vote-bar .vote-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-right: 4px;
+  font-weight: 600;
+}
+
+/* ── Form inputs ───────────────────────────────────────── */
+.input, .select, .textarea {
+  width: 100%;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: #111;
+  box-shadow: 0 0 0 3px rgba(17,17,17,0.08);
+}
+.textarea { resize: vertical; line-height: 1.6; }
+
+.field-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 5px;
+}
+.field-help {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+/* ── Breadcrumb ────────────────────────────────────────── */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.breadcrumb a { color: var(--muted); text-decoration: none; }
+.breadcrumb a:hover { color: var(--text); text-decoration: underline; }
+.breadcrumb .sep { color: var(--border-strong); }
+
+/* ── Damage value ──────────────────────────────────────── */
+.dmg {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* ── Notation toggle (方向 / 必殺技 トグルボタン) ───────── */
+.ntoggle-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ntoggle-btn {
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ntoggle-btn:hover { background: var(--surface2); }
+.ntoggle-group { display: flex; align-items: center; gap: 6px; }
+/* 方向・必殺技はチップのときの設定なので、文字表記では出さない */
+:root:not([data-notation-style="chip"]) .ntoggle-chip-only { display: none; }
+.ntoggle-btn.ntoggle-active {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* ── Animations ────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.25s ease both; }

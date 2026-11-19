@@ -1,0 +1,1089 @@
+---
+import {
+  ENDER_CLASSES, RASHID_PALETTE as PALETTE, STARTERS, STARTER_BY_TOKEN, HIT_STATES, POSITIONS,
+  PRIORITIES, DEFAULT_PRIORITY,
+} from '../mock-data/rashid';
+import type { ComboNode } from '../mock-data/rashid';
+import { treeToRoutes } from '../lib/routes';
+import { getRecipeTable } from '../lib/movenames';
+
+interface Props {
+  /** 'page' = 単独ページ（キャンセル→一覧へリンク）／'inline' = 一覧内展開（キャンセル→閉じるイベント） */
+  mode?: 'page' | 'inline';
+  /** 一覧戻りリンク（modeがpageの時のみ使用） */
+  backHref?: string;
+  /** 編集対象コンボのツリー（渡された場合はこの値で tree を初期化） */
+  initialTree?: ComboNode;
+  /** 編集対象コンボのID（既存コンボ編集時に設定） */
+  comboId?: string;
+  /** 技名の表（movenames.ts）を引くキャラ名 */
+  character?: string;
+}
+const { mode = 'page', backHref = '/mock/character/rashid', initialTree, comboId, character = 'Rashid' } = Astro.props;
+
+// 「技名」表記の呼び方は、一覧・詳細の文字表記と同じ表（movenames.ts の getRecipeTable）を使う。
+// エディタはトークン1つずつ置き換えるので、複数トークンで1つの技（'214LP>4K' など）は使わない
+const TOKEN_TO_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(getRecipeTable(character)).filter(([token]) => !token.includes('>'))
+);
+// 技名 → コマンド。同じ名前が2つあるとき（j.HK / J.HK → J大K）は先に出てくる方に戻す
+const NAME_TO_TOKEN: Record<string, string> = {};
+for (const [token, name] of Object.entries(TOKEN_TO_NAME)) NAME_TO_TOKEN[name] ??= token;
+
+const PALETTE_FOR_JS = PALETTE.map(g => ({
+  label: g.label,
+  moves: g.moves.map(m => ({ token: m.token, name: TOKEN_TO_NAME[m.token] ?? m.token })),
+}));
+const ENDER_CLASSES_FOR_JS = ENDER_CLASSES.map(ec => ({ id: ec.id, displayName: ec.displayName }));
+// 初期表示のルート（ページで initialTree を渡したとき）。実行時に読み込むコンボは下のモジュールスクリプトの treeToRoutes で直す
+const INITIAL_ROUTES = initialTree ? treeToRoutes(initialTree) : null;
+---
+
+<div class="combo-editor" data-editor-mode={mode}>
+  <form id="combo-form" style="display:grid; gap:16px;">
+
+    <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr; gap:12px;">
+      <div>
+        <label class="field-label">タイトル</label>
+        <input type="text" class="input" id="combo-title" placeholder="例: 基本コンボ" />
+      </div>
+      <div>
+        <label class="field-label">始動技</label>
+        <select class="select" id="combo-starter">
+          <option value="">（コマンドの先頭から）</option>
+          {STARTERS.map(s => <option value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">ヒット状態</label>
+        <select class="select" id="combo-hit-state">
+          {HIT_STATES.map(h => <option value={h}>{h}</option>)}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">位置</label>
+        <select class="select" id="combo-position">
+          {POSITIONS.map(p => <option value={p}>{p}</option>)}
+        </select>
+      </div>
+      <div>
+        <label class="field-label">優先度</label>
+        <select class="select" id="combo-priority">
+          {PRIORITIES.map(p => <option value={p}>{p}</option>)}
+        </select>
+      </div>
+    </div>
+
+    <!-- ⭐ ルート入力（ルートを1本ずつ書き、保存時に共通の先頭をまとめてツリーにする。変換は src/lib/routes.ts） -->
+    <div class="card card-emph" style="padding:18px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div>
+          <div class="field-label" style="color:var(--text); margin-bottom:2px;">ルート</div>
+          <div style="font-size:0.76rem; color:var(--muted);">
+            分岐するコンボは、始動から〆までをルートごとに1本ずつ書く。共通の先頭は保存時に自動でまとめる（下のツリーで確認）。
+          </div>
+        </div>
+        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="ntoggle-label">方向</span>
+            <button type="button" class="ntoggle-btn" data-editor-toggle="dir" data-value="numpad">数字</button>
+            <button type="button" class="ntoggle-btn" data-editor-toggle="dir" data-value="arrows">矢印</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="ntoggle-label">必殺技</span>
+            <button type="button" class="ntoggle-btn" data-editor-toggle="name" data-value="command">コマンド</button>
+            <button type="button" class="ntoggle-btn" data-editor-toggle="name" data-value="name">技名</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="route-list" class="route-list"></div>
+      <div id="route-error" class="route-warning" style="margin:8px 0 0;" role="alert"></div>
+      <div style="margin-top:10px;">
+        <button type="button" class="btn btn-sm" id="btn-add-route">＋ ルートを追加</button>
+        <span style="font-size:0.74rem; color:var(--muted); margin-left:8px;">選択中のルートをコピーして足す</span>
+      </div>
+
+      <div class="palette-pad">
+        <div class="palette-target" id="palette-target"></div>
+        <div class="palette-wrap" id="palette"></div>
+      </div>
+
+      <div class="tree-overview-wrap">
+        <div class="tov-header">まとめたツリー（確認用・保存時にこの形になる）</div>
+        <div id="route-warnings"></div>
+        <div id="tree-overview"></div>
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">YouTube URL（任意・ツリー全体に紐づく）</label>
+      <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px;">
+        <input type="text" class="input" id="combo-youtube-url" placeholder="https://youtu.be/..." />
+        <input type="number" class="input" id="combo-start-sec" placeholder="開始秒" min="0" />
+      </div>
+      <!-- URL から読み取った動画 ID と開始秒（t= が付いていれば開始秒の欄に入れる。開始秒は手で直せる） -->
+      <div id="combo-youtube-preview" style="font-size:0.78rem; color:var(--muted); margin-top:6px; min-height:1.2em;"></div>
+    </div>
+
+    <div class="card" style="background:var(--surface);">
+      <div class="section-label">保存先</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <label class="dest-radio-label">
+          <input type="radio" name="dest" id="dest-personal" checked />
+          <div>
+            <div style="font-weight:700; font-size:0.88rem;">自分のメモとして保存</div>
+            <div style="font-size:0.76rem; color:var(--muted);">他の人には見えない。あとで公開も可。</div>
+          </div>
+        </label>
+        <label class="dest-radio-label" style="border-color:#111;">
+          <input type="radio" name="dest" id="dest-upload" />
+          <div>
+            <div style="font-weight:700; font-size:0.88rem;">アップロード（公開）</div>
+            <div style="font-size:0.76rem; color:var(--muted);">投票対象になる。重複はブロックされる。</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; justify-content:flex-end;">
+      {mode === 'page'
+        ? <a href={backHref} class="btn">キャンセル</a>
+        : <button type="button" class="btn" id="combo-editor-cancel">キャンセル</button>}
+      <button type="submit" class="btn btn-primary">保存</button>
+    </div>
+  </form>
+
+  <!-- 重複検出モーダル -->
+  <div id="dup-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center;">
+    <div style="background:#fff; border:1px solid var(--border-strong); border-top:3px solid var(--warn-fg); border-radius:6px; padding:22px; max-width:480px; width:90%;">
+      <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+        <span style="font-size:1.4rem; line-height:1;">⚠</span>
+        <h3 style="color:var(--warn-fg); font-size:1.05rem;">重複コンボを検出しました</h3>
+      </div>
+      <p style="font-size:0.88rem; margin:0 0 10px;">同じ内容のコンボが既にアップロードされています:</p>
+      <div class="card" style="background:var(--surface); margin-bottom:14px;">
+        <div style="font-weight:700; margin-bottom:6px;">2MK始動 〆分岐コンボ群</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:0.82rem; background:#f5f5f5; border-radius:4px; padding:6px 10px;">2MK › 236LP › 214LK</div>
+        <div style="font-size:0.76rem; color:var(--muted); margin-top:6px;">投稿者: cobra_player ・ 2ルート ・ 弱イーグル〆 / 強イーグル〆</div>
+      </div>
+      <p style="color:var(--muted); font-size:0.8rem; margin:0 0 14px;">同じコンボのアップロードはできません。既存を確認するか、自分用にforkしてメモにコピーできます。</p>
+      <div style="display:flex; gap:6px; justify-content:flex-end;">
+        <button type="button" class="btn" id="close-dup-modal">閉じる</button>
+        <a href="/mock/combo/c_005" class="btn">既存を見る</a>
+        <a href="/mock/combo/c_005" class="btn btn-primary">自分用にfork</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  /* ── ルートのカード ── */
+  .route-list { display: grid; gap: 10px; }
+  .route-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    display: grid;
+    gap: 8px;
+  }
+  .route-card.route-selected { border-color: #111; box-shadow: 0 0 0 1px #111; }
+  .route-card.route-invalid { border-color: var(--warn-fg); box-shadow: 0 0 0 1px var(--warn-fg); }
+  .route-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .route-letter {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .route-card.route-selected .route-letter { color: var(--text); }
+  .route-name { max-width: 260px; flex: 1; }
+  .route-head .btn-warn { margin-left: auto; }
+
+  /* ── パレット（選択中のルートの末尾に足す） ── */
+  .palette-pad {
+    margin-top: 14px;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 8px;
+  }
+  .palette-target { font-size: 0.74rem; font-weight: 700; color: var(--muted-strong); }
+
+  /* ── まとめたツリー（確認用） ── */
+  .tree-overview-wrap {
+    margin-top: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 12px;
+  }
+  .tov-header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tov-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 3px 4px;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+  .tov-row[data-route-idx] { cursor: pointer; }
+  .tov-row[data-route-idx]:hover { background: #fff; }
+  .tov-prefix {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    white-space: pre;
+    flex-shrink: 0;
+  }
+  .tov-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--muted-strong);
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+  .tov-seg { font-size: 0.78rem; overflow-wrap: anywhere; min-width: 0; }
+  .tov-seg.empty { color: var(--muted); font-style: italic; }
+  .tov-ender {
+    font-size: 0.7rem;
+    color: var(--muted-strong);
+    margin-left: auto;
+    flex-shrink: 0;
+    padding-left: 8px;
+  }
+  .route-warning {
+    font-size: 0.78rem;
+    color: var(--warn-fg);
+    margin-bottom: 6px;
+  }
+
+  /* ── トークンチップ列 ── */
+  .token-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--surface);
+    border-radius: 4px;
+    flex-wrap: wrap;
+  }
+  .token-bar-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .token-chips {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+  }
+  .token-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+  }
+  .token-chip:hover { background: var(--accent-soft); border-color: #111; }
+  .token-sep {
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+  }
+  .token-empty {
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  /* ── トークンのポップアップ（空振りの切替） ── */
+  .branch-popover {
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 300;
+    min-width: 200px;
+  }
+
+  /* ── カテゴリパレット ── */
+  .palette-wrap { display: grid; gap: 6px; }
+  .palette-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .palette-group-label {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    min-width: 52px;
+    padding-right: 4px;
+    border-right: 1px solid var(--border);
+    margin-right: 3px;
+    white-space: nowrap;
+  }
+  .palette-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    padding: 2px 7px;
+  }
+  .palette-btn:hover { background: var(--accent-soft); }
+
+  /* ── 技強度カラー（パレット & トークンチップ共通） ── */
+  .move-l  { background:#dbeafe; border-color:#60a5fa; color:#1e3a8a; }
+  .move-l:hover  { background:#bfdbfe; }
+  .move-m  { background:#fef3c7; border-color:#eab308; color:#854d0e; }
+  .move-m:hover  { background:#fde68a; }
+  .move-h  { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+  .move-h:hover  { background:#fecaca; }
+  .move-od {
+    background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+    border-color:#b45309; color:#451a03;
+  }
+  .move-od:hover {
+    background: linear-gradient(135deg, #facc15 0%, #d97706 100%);
+  }
+
+  /* 他のルートと共通の部分（保存時に親にまとまる） */
+  .token-chip.token-ghost { opacity: 0.4; }
+
+  /* 空振りトークン */
+  .token-chip.token-whiff {
+    text-decoration: line-through;
+    opacity: 0.55;
+  }
+  .token-chip.token-whiff::after {
+    content: ' 空';
+    font-size: 0.68rem;
+    text-decoration: none;
+    margin-left: 2px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* ── 葉メタ ── */
+  .leaf-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  /* ── 保存先ラジオ ── */
+  .dest-radio-label {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    cursor: pointer;
+    background: #fff;
+  }
+</style>
+
+<!-- ルート ↔ ツリーの変換とゲージ計算を、下の is:inline スクリプトから使えるように window に出す。
+     モジュールなので読み込みは inline より後になる。届いたら combo-editor:lib-ready で描き直す -->
+<script>
+  import { routesToTree, treeToRoutes, findPrefixRoutes } from '../lib/routes';
+  import { calcGaugesFromSegs } from '../lib/gauges';
+  import { parseYoutubeUrl, formatMmSs } from '../lib/youtube';
+  Object.assign(window, { comboEditorLib: { routesToTree, treeToRoutes, findPrefixRoutes, calcGaugesFromSegs, parseYoutubeUrl, formatMmSs } });
+  document.dispatchEvent(new CustomEvent('combo-editor:lib-ready'));
+</script>
+
+<script is:inline define:vars={{ TOKEN_TO_NAME, NAME_TO_TOKEN, PALETTE_FOR_JS, ENDER_CLASSES_FOR_JS, STARTERS, STARTER_BY_TOKEN, DEFAULT_PRIORITY, INITIAL_ROUTES, INITIAL_ROOT_ID: initialTree?.id ?? null, COMBO_ID: comboId ?? null }}>
+  // ── State ──
+  // ルートを1本ずつ持つ（routes[i] = { inputs: 始動から〆までのコマンド, leaf: 葉の内容 }）。
+  // ツリーは保存時とツリーの確認表示のときだけ src/lib/routes.ts の routesToTree で作る
+  const uid = () => 'n_' + Math.random().toString(36).slice(2, 10);
+  const ROUTE_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const TAG_OPTIONS = ['画面中央', '画面端', 'ドライブラッシュ', 'カウンター', 'Dゲージあり'];
+  const ENDER_DISPLAY = Object.fromEntries(ENDER_CLASSES_FOR_JS.map(ec => [ec.id, ec.displayName]));
+  const lib = () => window.comboEditorLib ?? null;
+
+  let paletteMode = (localStorage.getItem('sf6-name') === 'name') ? 'name' : 'cmd';
+  let dirMode = localStorage.getItem('sf6-dir') ?? 'numpad';
+
+  // numpad → 矢印 変換（lib/notation.ts と同等のロジックをインライン）
+  const NUMPAD_TO_ARROW = {
+    '1': '↙', '2': '↓', '3': '↘',
+    '4': '←', '5': '',
+    '6': '→', '7': '↖', '8': '↑', '9': '↗',
+  };
+  function numpadToArrows(input) {
+    return input.replace(
+      /[1-9]+(?=LP|MP|HP|LK|MK|HK|PP|KK|P|K)/g,
+      (digits) => [...digits].map((d) => NUMPAD_TO_ARROW[d] ?? d).join(''),
+    );
+  }
+  function applyDirMode(seg) {
+    return dirMode === 'arrows' ? numpadToArrows(seg) : seg;
+  }
+
+  // 葉の内容のうちエディタで扱うものだけ残す（ゲージは保存時に計算し直す。投票・メモなど閲覧用の値は落とす）
+  function normalizeLeaf(leaf) {
+    const out = { id: leaf?.id || uid() };
+    if (leaf?.routeLabel != null) out.routeLabel = leaf.routeLabel;
+    if (leaf?.condition != null) out.condition = leaf.condition;
+    if (leaf?.damage != null) out.damage = leaf.damage;
+    if (leaf?.enderClassId != null) out.enderClassId = leaf.enderClassId;
+    out.situationTags = Array.isArray(leaf?.situationTags) ? [...leaf.situationTags] : [];
+    return out;
+  }
+  function normalizeRoutes(list) {
+    return list.map(r => ({ inputs: r.inputs ?? '', leaf: normalizeLeaf(r.leaf) }));
+  }
+  // 新規コンボは空のルート1本から始める（見本は入れない）
+  function makeEmptyRoutes() {
+    return [{ inputs: '', leaf: normalizeLeaf(null) }];
+  }
+
+  let routes = INITIAL_ROUTES ? normalizeRoutes(INITIAL_ROUTES) : makeEmptyRoutes();
+  let rootId = INITIAL_ROOT_ID ?? uid();
+  let comboId = COMBO_ID ?? null;
+  let selected = 0;
+  // 保存しようとしたときにコマンドが空だったルート（赤枠で出す。入力すると消える）
+  let invalidRoutes = new Set();
+
+  // ── Helpers ──
+  function parseTokens(s) { return String(s ?? '').split('>').map(t => t.trim()).filter(Boolean); }
+  function joinTokens(toks) { return toks.join(' > '); }
+  function gaugesOf(inputs) {
+    return lib()?.calcGaugesFromSegs([inputs]) ?? { saGauge: 0, dGauge: 0 };
+  }
+  // 技強度判定: 'l' | 'm' | 'h' | 'od' | null
+  // OD = 末尾PP/KK / L = 末尾LP/LK / M = 末尾MP/MK / H = 末尾HP/HK
+  // SA(236236K等) はK/P単独で終わるためどれにも該当しない
+  function moveStrength(rawTok) {
+    const tok = stripWhiff(rawTok);
+    if (/(PP|KK)$/.test(tok)) return 'od';
+    if (/(LP|LK)$/.test(tok)) return 'l';
+    if (/(MP|MK)$/.test(tok)) return 'm';
+    if (/(HP|HK)$/.test(tok)) return 'h';
+    return null;
+  }
+  function strengthClass(s) {
+    return s === 'l' ? 'move-l'
+         : s === 'm' ? 'move-m'
+         : s === 'h' ? 'move-h'
+         : s === 'od' ? 'move-od'
+         : '';
+  }
+
+  // 空振りマーカー: トークン末尾の (空) で表現
+  const WHIFF_MARK = '(空)';
+  function isWhiff(tok) { return tok.endsWith(WHIFF_MARK); }
+  function stripWhiff(tok) { return isWhiff(tok) ? tok.slice(0, -WHIFF_MARK.length) : tok; }
+  function toggleWhiffToken(tok) { return isWhiff(tok) ? stripWhiff(tok) : tok + WHIFF_MARK; }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  // 「236LP or 236MP」「236K(最大溜め)」のように語が付いたトークンは、コマンド・技名の部分だけ置き換える（lib/notation.ts と同じ）
+  const MOVE_COMMAND = /(?:j\.)?[1-9]+(?:PP|KK|[LMH][PK]|P|K)/g;
+  const MOVE_NAME = new RegExp(
+    Object.keys(NAME_TO_TOKEN).sort((a, b) => b.length - a.length)
+      .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
+  function tokenToName(tok) {
+    return TOKEN_TO_NAME[tok] ?? tok.replace(MOVE_COMMAND, cmd => TOKEN_TO_NAME[cmd] ?? cmd);
+  }
+  function nameToToken(tok) {
+    return NAME_TO_TOKEN[tok] ?? tok.replace(MOVE_NAME, name => NAME_TO_TOKEN[name]);
+  }
+  function convertInput(text, toName) {
+    return text.split('>').map(t => {
+      const tok = t.trim();
+      if (!tok) return tok;
+      return toName ? tokenToName(tok) : nameToToken(tok);
+    }).join(' > ');
+  }
+  function displaySegment(seg) {
+    const named = paletteMode === 'name' ? convertInput(seg, true) : seg;
+    return applyDirMode(named);
+  }
+  // 入力欄用: 技名は NAME_TO_TOKEN で戻せるが、矢印は戻せない（5 を省略する）ので出さない
+  function editableSegment(seg) {
+    return paletteMode === 'name' ? convertInput(seg, true) : seg;
+  }
+  function routeName(i) { return 'ルート ' + (ROUTE_LABELS[i] ?? String(i + 1)); }
+
+  // 各ルートで、ほかのルートと先頭から一致している長さ（その分は保存時に親へまとまるので薄く出す）
+  function sharedPrefixLengths() {
+    const toks = routes.map(r => parseTokens(r.inputs));
+    return toks.map((a, i) => toks.reduce((best, b, j) => {
+      if (j === i) return best;
+      let n = 0;
+      while (n < a.length && n < b.length && a[n] === b[n]) n++;
+      return Math.max(best, n);
+    }, 0));
+  }
+
+  // ── ルートのカード ──
+  function buildTokenChipsHTML(route, ghostLen) {
+    const toks = parseTokens(route.inputs);
+    if (!toks.length) return '<span class="token-empty">コマンドを入力 or パレットから追加</span>';
+    return toks.map((tok, i) => {
+      const bare = stripWhiff(tok);
+      const disp = applyDirMode(paletteMode === 'name' ? tokenToName(bare) : bare);
+      const sCls = strengthClass(moveStrength(tok));
+      const whiffCls = isWhiff(tok) ? ' token-whiff' : '';
+      const ghostCls = i < ghostLen ? ' token-ghost' : '';
+      return `<button type="button" class="token-chip mono ${sCls}${whiffCls}${ghostCls}" data-token-idx="${i}" title="クリックで空振りの切替">${escapeHtml(disp)}</button>`;
+    }).join('<span class="token-sep">›</span>');
+  }
+
+  function buildGaugeHTML(route) {
+    const { saGauge, dGauge } = gaugesOf(route.inputs);
+    const autoLabel = `<span style="font-size:0.65rem; color:var(--muted); font-weight:400; margin-left:4px;">自動</span>`;
+    const autoVal = (v) => `<div style="font-size:1.05rem; font-weight:700; padding:5px 10px; background:var(--surface); border-radius:4px; border:1px solid var(--border); min-height:32px; line-height:1.6;">${v}</div>`;
+    return `<div><label class="field-label">SAゲージ${autoLabel}</label>${autoVal(saGauge)}</div>` +
+      `<div><label class="field-label">Dゲージ消費${autoLabel}</label>${autoVal(dGauge)}</div>`;
+  }
+
+  function routeCardHTML(route, i, ghostLen) {
+    const leaf = route.leaf;
+    const enderOpts = ENDER_CLASSES_FOR_JS.map(ec =>
+      `<option value="${escapeHtml(ec.id)}"${ec.id === leaf.enderClassId ? ' selected' : ''}>${escapeHtml(ec.displayName)}</option>`
+    ).join('');
+    const tagBtns = TAG_OPTIONS.map(t => {
+      const on = (leaf.situationTags ?? []).includes(t);
+      return `<button type="button" class="chip${on ? ' chip-on' : ''}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`;
+    }).join('');
+    const deleteBtn = routes.length > 1
+      ? `<button type="button" class="btn btn-sm btn-warn" data-route-delete>このルートを削除</button>`
+      : '';
+    return `
+      <div class="route-card${i === selected ? ' route-selected' : ''}${invalidRoutes.has(i) ? ' route-invalid' : ''}" data-route-idx="${i}">
+        <div class="route-head">
+          <span class="route-letter">${escapeHtml(routeName(i))}</span>
+          <input type="text" class="input route-name" data-field="routeLabel" placeholder="ルート名（例: 弱イーグル〆）" value="${escapeHtml(leaf.routeLabel ?? '')}" />
+          <input type="text" class="input route-name" data-field="condition" placeholder="条件（任意・例: 画面端が近い場合）" value="${escapeHtml(leaf.condition ?? '')}" />
+          ${deleteBtn}
+        </div>
+        <input type="text" class="input mono" data-field="inputs"
+          value="${escapeHtml(editableSegment(route.inputs))}" placeholder="例: 2MK > 236LP > 214LK" />
+        <div class="token-bar"><div class="token-chips" data-chips>${buildTokenChipsHTML(route, ghostLen)}</div></div>
+        <div class="leaf-meta-grid">
+          <div><label class="field-label">ダメージ</label><input type="number" class="input" data-field="damage" value="${leaf.damage ?? ''}" /></div>
+          <div class="route-gauges" style="display:contents;">${buildGaugeHTML(route)}</div>
+          <div><label class="field-label">〆分類</label>
+            <select class="select" data-field="enderClassId">
+              <option value="">（未選択）</option>
+              ${enderOpts}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="field-label">状況タグ</label>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">${tagBtns}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── まとめたツリー（確認用） ──
+  // 保存するツリー。コマンドは ' > ' でつなぎ直し、葉にゲージを入れる
+  function buildTree() {
+    const L = lib();
+    if (!L) return null;
+    const list = routes.map(r => {
+      const inputs = joinTokens(parseTokens(r.inputs));
+      const leaf = JSON.parse(JSON.stringify(r.leaf));
+      if (!leaf.routeLabel?.trim()) delete leaf.routeLabel;
+      if (!leaf.condition?.trim()) delete leaf.condition; else leaf.condition = leaf.condition.trim();
+      if (!leaf.enderClassId) delete leaf.enderClassId;
+      if (leaf.damage == null) delete leaf.damage;
+      const { saGauge, dGauge } = gaugesOf(inputs);
+      leaf.gauge = saGauge;
+      leaf.driveGauge = dGauge;
+      return { inputs, leaf };
+    });
+    return L.routesToTree(list, rootId);
+  }
+
+  function renderTreeOverview() {
+    const tree = buildTree();
+    if (!tree) return '';
+    const idxOf = new Map(routes.map((r, i) => [r.leaf.id, i]));
+    const out = [];
+    function walk(node, prefix, isLast, depth) {
+      const leaf = !node.children || node.children.length === 0;
+      const branchChar = depth === 0 ? '' : (isLast ? '└─ ' : '├─ ');
+      const idx = leaf ? idxOf.get(node.id) : undefined;
+      const label = leaf ? (ROUTE_LABELS[idx] ?? '?') + ': ' : '◆ ';
+      const segText = node.segment
+        ? displaySegment(node.segment)
+        : leaf ? '（ここで終わり）' : '（共通の先頭なし）';
+      const ender = leaf && node.enderClassId && ENDER_DISPLAY[node.enderClassId]
+        ? `<span class="tov-ender">▲ ${escapeHtml(ENDER_DISPLAY[node.enderClassId])}</span>` : '';
+      const name = (leaf && node.routeLabel ? `<span class="tov-label">${escapeHtml(node.routeLabel)}</span>` : '') +
+        (leaf && node.condition ? `<span class="tag" style="font-size:0.68rem;">${escapeHtml(node.condition)}</span>` : '');
+      out.push(
+        `<div class="tov-row"${idx !== undefined ? ` data-route-idx="${idx}"` : ''}>` +
+        `<span class="tov-prefix">${prefix}${branchChar}</span>` +
+        `<span class="tov-label">${label}</span>` +
+        `<span class="tov-seg mono${node.segment ? '' : ' empty'}">${escapeHtml(segText)}</span>` +
+        name + ender +
+        `</div>`
+      );
+      if (!leaf) {
+        const nextPrefix = depth === 0 ? '' : prefix + (isLast ? '    ' : '│   ');
+        node.children.forEach((c, i) => walk(c, nextPrefix, i === node.children.length - 1, depth + 1));
+      }
+    }
+    walk(tree, '', true, 0);
+    return out.join('');
+  }
+
+  // 別のルートの途中で終わるルートは、一覧で親と同じコマンドの行になるので知らせる（src/lib/routes.ts の findPrefixRoutes）
+  function renderWarnings() {
+    const L = lib();
+    if (!L) return '';
+    return L.findPrefixRoutes(routes).map(({ short, long }) =>
+      `<div class="route-warning">⚠ ${escapeHtml(routeName(short))} は ${escapeHtml(routeName(long))} の途中で終わっています（一覧では分岐点と同じコマンドの行になります）</div>`
+    ).join('');
+  }
+
+  function buildPaletteHTML() {
+    return PALETTE_FOR_JS.map(group => {
+      const btns = group.moves.map(m => {
+        const label = paletteMode === 'name' ? m.name : applyDirMode(m.token);
+        const sCls = strengthClass(moveStrength(m.token));
+        return `<button type="button" class="chip palette-btn ${sCls}" data-token="${escapeHtml(m.token)}">${escapeHtml(label)}</button>`;
+      }).join('');
+      return `<div class="palette-group"><span class="palette-group-label">${escapeHtml(group.label)}</span>${btns}</div>`;
+    }).join('');
+  }
+
+  // ── コマンドが空のルート（保存しない） ──
+  function showRouteError() {
+    const el = document.getElementById('route-error');
+    if (!el) return;
+    el.textContent = invalidRoutes.size
+      ? `⚠ ${[...invalidRoutes].sort((a, b) => a - b).map(routeName).join('・')} のコマンドが空です。入力するか、ルートを削除してください`
+      : '';
+  }
+  function clearInvalid(i) {
+    if (!invalidRoutes.delete(i)) return;
+    document.querySelector(`#route-list .route-card[data-route-idx="${i}"]`)?.classList.remove('route-invalid');
+    showRouteError();
+  }
+
+  // ── 描画 ──
+  // render は入力欄ごと作り直す（ルートの追加・削除・読み込み・表記の切替）。
+  // 入力中は refreshDerived でチップ・ゲージ・ツリーだけ直し、入力欄のフォーカスを保つ
+  function render() {
+    if (selected >= routes.length) selected = routes.length - 1;
+    const ghosts = sharedPrefixLengths();
+    document.getElementById('route-list').innerHTML = routes.map((r, i) => routeCardHTML(r, i, ghosts[i])).join('');
+    document.getElementById('palette').innerHTML = buildPaletteHTML();
+    showRouteError();
+    updateSelection();
+    refreshTree();
+    syncAutoStarter();
+  }
+  function refreshTree() {
+    document.getElementById('tree-overview').innerHTML = renderTreeOverview();
+    document.getElementById('route-warnings').innerHTML = renderWarnings();
+  }
+  function refreshDerived() {
+    const ghosts = sharedPrefixLengths();
+    document.querySelectorAll('#route-list .route-card').forEach(card => {
+      const i = Number(card.dataset.routeIdx);
+      const r = routes[i];
+      if (!r) return;
+      const chips = card.querySelector('[data-chips]');
+      if (chips) chips.innerHTML = buildTokenChipsHTML(r, ghosts[i]);
+      const g = card.querySelector('.route-gauges');
+      if (g) g.innerHTML = buildGaugeHTML(r);
+    });
+    refreshTree();
+    syncAutoStarter();
+  }
+  function updateSelection() {
+    document.querySelectorAll('#route-list .route-card').forEach(card => {
+      card.classList.toggle('route-selected', Number(card.dataset.routeIdx) === selected);
+    });
+    const target = document.getElementById('palette-target');
+    if (target) target.textContent = `パレット → ${routeName(selected)} の末尾に追加`;
+  }
+  function selectRoute(i) {
+    if (i === selected || !routes[i]) return;
+    selected = i;
+    updateSelection();
+  }
+
+  // ── 始動技・ヒット状態（手で選ぶまではコマンドの先頭から自動で入れる） ──
+  // 推定は mock-data/rashid-starters.ts の inferStarter と同じ。先頭のルートのコマンドから決める
+  function inferStarter(segment) {
+    const first = (segment.split('>')[0] ?? '').split(' or ')[0].trim();
+    const hitState = first.includes('(CH)') ? 'CH' : first.includes('(PC)') ? 'PC' : '通常';
+    const token = first.replace(/\((CH|PC)\)/, '');
+    const starter = STARTER_BY_TOKEN[token] ?? (STARTERS.find(s => s === token) ?? null);
+    return { starter, hitState };
+  }
+  let starterTouched = false;
+  let hitStateTouched = false;
+  function syncAutoStarter() {
+    const inferred = inferStarter(routes[0]?.inputs ?? '');
+    const starterSel = document.getElementById('combo-starter');
+    const hitSel = document.getElementById('combo-hit-state');
+    if (starterSel && !starterTouched) starterSel.value = inferred.starter ?? '';
+    if (hitSel && !hitStateTouched) hitSel.value = inferred.hitState;
+  }
+  document.getElementById('combo-starter')?.addEventListener('change', () => { starterTouched = true; });
+  document.getElementById('combo-hit-state')?.addEventListener('change', () => { hitStateTouched = true; });
+
+  // ── ルートの追加・削除 ──
+  // 選択中のルートをコピーして足す（ルート名と条件はそのルートを表すものなので写さない）
+  function addRoute() {
+    const base = routes[selected] ?? routes[routes.length - 1];
+    const leaf = { ...JSON.parse(JSON.stringify(base.leaf)), id: uid() };
+    delete leaf.routeLabel;
+    delete leaf.condition;
+    routes.splice(selected + 1, 0, { inputs: base.inputs, leaf });
+    invalidRoutes = new Set([...invalidRoutes].map(j => (j > selected ? j + 1 : j)));
+    selected = selected + 1;
+    render();
+    const input = document.querySelector(`#route-list .route-card[data-route-idx="${selected}"] [data-field="inputs"]`);
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  }
+  function deleteRoute(i) {
+    if (routes.length <= 1) return;
+    routes.splice(i, 1);
+    invalidRoutes = new Set([...invalidRoutes].filter(j => j !== i).map(j => (j > i ? j - 1 : j)));
+    if (selected >= i && selected > 0) selected--;
+    render();
+  }
+
+  // トークンのポップアップ（空振りの切替だけ）
+  function showTokenPopover(chipEl, routeIdx) {
+    document.querySelectorAll('.branch-popover').forEach(p => p.remove());
+    const idx = Number(chipEl.dataset.tokenIdx);
+    const tok = parseTokens(routes[routeIdx]?.inputs)[idx] ?? '';
+    const pop = document.createElement('div');
+    pop.className = 'branch-popover';
+    pop.innerHTML = `<button type="button" class="btn btn-sm" data-act="whiff">${isWhiff(tok) ? '空振りを解除' : '空振りにする'}</button>`;
+    const rect = chipEl.getBoundingClientRect();
+    pop.style.position = 'fixed';
+    pop.style.top = (rect.bottom + 4) + 'px';
+    pop.style.left = rect.left + 'px';
+    document.body.appendChild(pop);
+
+    const close = () => {
+      pop.remove();
+      document.removeEventListener('click', onOutside, true);
+    };
+    pop.addEventListener('click', e => {
+      if (e.target?.dataset?.act === 'whiff') {
+        const r = routes[routeIdx];
+        const toks = parseTokens(r?.inputs);
+        if (r && idx >= 0 && idx < toks.length) {
+          toks[idx] = toggleWhiffToken(toks[idx]);
+          r.inputs = joinTokens(toks);
+          render();
+        }
+      }
+      close();
+    });
+    const onOutside = (ev) => { if (!pop.contains(ev.target)) close(); };
+    setTimeout(() => document.addEventListener('click', onOutside, true), 0);
+  }
+
+  // ── イベント ──
+  const routeList = document.getElementById('route-list');
+  const cardIdx = (el) => {
+    const card = el?.closest?.('.route-card');
+    return card ? Number(card.dataset.routeIdx) : -1;
+  };
+  routeList.addEventListener('focusin', e => { const i = cardIdx(e.target); if (i >= 0) selectRoute(i); });
+  routeList.addEventListener('click', e => {
+    const t = e.target;
+    const i = cardIdx(t);
+    if (i < 0) return;
+    selectRoute(i);
+    const r = routes[i];
+    if (t.classList?.contains('token-chip')) { showTokenPopover(t, i); return; }
+    if (t.dataset?.routeDelete !== undefined) {
+      if (!parseTokens(r.inputs).length || confirm(`${routeName(i)} を削除しますか？`)) deleteRoute(i);
+      return;
+    }
+    if (t.dataset?.tag) {
+      const tag = t.dataset.tag;
+      t.classList.toggle('chip-on');
+      const tags = r.leaf.situationTags ?? [];
+      r.leaf.situationTags = tags.includes(tag) ? tags.filter(x => x !== tag) : [...tags, tag];
+    }
+  });
+  routeList.addEventListener('input', e => {
+    const t = e.target;
+    const r = routes[cardIdx(t)];
+    if (!r) return;
+    const field = t.dataset?.field;
+    if (field === 'inputs') {
+      r.inputs = paletteMode === 'name' ? convertInput(t.value, false) : t.value;
+      clearInvalid(cardIdx(t));
+      refreshDerived();
+    } else if (field === 'routeLabel' || field === 'condition') {
+      r.leaf[field] = t.value;
+      refreshTree();
+    } else if (field === 'damage') {
+      const v = Number(t.value);
+      if (t.value === '' || isNaN(v)) delete r.leaf.damage; else r.leaf.damage = v;
+    }
+  });
+  routeList.addEventListener('change', e => {
+    const t = e.target;
+    const r = routes[cardIdx(t)];
+    if (r && t.dataset?.field === 'enderClassId') {
+      r.leaf.enderClassId = t.value || null;
+      refreshTree();
+    }
+  });
+
+  // パレット: 選択中のルートの末尾に足す
+  document.getElementById('palette').addEventListener('click', e => {
+    const btn = e.target?.closest?.('.palette-btn');
+    const r = routes[selected];
+    if (!btn || !r) return;
+    r.inputs = joinTokens([...parseTokens(r.inputs), btn.dataset.token]);
+    clearInvalid(selected);
+    const input = document.querySelector(`#route-list .route-card[data-route-idx="${selected}"] [data-field="inputs"]`);
+    if (input) input.value = editableSegment(r.inputs);
+    refreshDerived();
+  });
+  document.getElementById('btn-add-route').addEventListener('click', addRoute);
+  // ツリーの葉をクリックすると、そのルートを選ぶ
+  document.getElementById('tree-overview').addEventListener('click', e => {
+    const row = e.target?.closest?.('[data-route-idx]');
+    if (!row) return;
+    selectRoute(Number(row.dataset.routeIdx));
+    document.querySelector(`#route-list .route-card[data-route-idx="${selected}"]`)?.scrollIntoView({ block: 'nearest' });
+  });
+
+  // ── YouTube URL（動画 ID と開始秒を読み取る。解析は src/lib/youtube.ts） ──
+  const ytUrlEl = document.getElementById('combo-youtube-url');
+  const ytSecEl = document.getElementById('combo-start-sec');
+  function youtubeRef() {
+    return lib()?.parseYoutubeUrl(ytUrlEl?.value ?? '') ?? null;
+  }
+  function startSecValue() {
+    const v = ytSecEl?.value ?? '';
+    const n = Number(v);
+    return v === '' || isNaN(n) || n < 0 ? null : Math.floor(n);
+  }
+  function renderYoutubePreview() {
+    const el = document.getElementById('combo-youtube-preview');
+    if (!el) return;
+    const raw = (ytUrlEl?.value ?? '').trim();
+    const ref = youtubeRef();
+    if (!raw) { el.textContent = ''; return; }
+    if (!ref) { el.innerHTML = '<span style="color:var(--warn-fg);">⚠ YouTube の URL として読めません</span>'; return; }
+    const sec = startSecValue();
+    const fmt = lib()?.formatMmSs ?? (n => String(n));
+    el.innerHTML = `動画ID <span class="mono" style="color:var(--text); font-weight:700;">${escapeHtml(ref.id)}</span>` +
+      ` ・ 開始 <span class="mono" style="color:var(--text); font-weight:700;">${sec == null ? '0:00（先頭から）' : escapeHtml(fmt(sec))}</span>`;
+  }
+  ytUrlEl?.addEventListener('input', () => {
+    const ref = youtubeRef();
+    if (ref && ref.startSec != null && ytSecEl) ytSecEl.value = String(ref.startSec);
+    renderYoutubePreview();
+  });
+  ytSecEl?.addEventListener('input', renderYoutubePreview);
+
+  // ── 表記トグル（方向 + 必殺技、コンボ一覧と localStorage 共有） ──
+  // 切り替えたら notation:change（lib/notation.ts の NOTATION_CHANGE_EVENT）を流し、
+  // ページ側のチップ（Layout.astro）・一覧のトグル・このエディタを同じ設定に揃える
+  function syncEditorToggleUI() {
+    document.querySelectorAll('.ntoggle-btn[data-editor-toggle="dir"]').forEach(b => {
+      b.classList.toggle('ntoggle-active', b.dataset.value === dirMode);
+    });
+    document.querySelectorAll('.ntoggle-btn[data-editor-toggle="name"]').forEach(b => {
+      const nameVal = paletteMode === 'name' ? 'name' : 'command';
+      b.classList.toggle('ntoggle-active', b.dataset.value === nameVal);
+    });
+  }
+  syncEditorToggleUI();
+  document.querySelectorAll('.ntoggle-btn[data-editor-toggle]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.editorToggle === 'dir' ? 'sf6-dir' : 'sf6-name';
+      localStorage.setItem(key, btn.dataset.value ?? '');
+      document.dispatchEvent(new CustomEvent('notation:change'));
+    });
+  });
+  document.addEventListener('notation:change', () => {
+    paletteMode = (localStorage.getItem('sf6-name') === 'name') ? 'name' : 'cmd';
+    dirMode = localStorage.getItem('sf6-dir') ?? 'numpad';
+    syncEditorToggleUI();
+    render();
+  });
+
+  document.getElementById('combo-form').addEventListener('submit', e => {
+    e.preventDefault();
+    // コマンドが空のルートがあれば保存しない。最初の空のルートを選んで知らせる
+    const empty = routes.map((r, i) => (parseTokens(r.inputs).length ? -1 : i)).filter(i => i >= 0);
+    if (empty.length) {
+      invalidRoutes = new Set(empty);
+      selected = empty[0];
+      render();
+      const input = document.querySelector(`#route-list .route-card[data-route-idx="${selected}"] [data-field="inputs"]`);
+      input?.focus();
+      input?.scrollIntoView({ block: 'center' });
+      return;
+    }
+    const uploadRadio = document.getElementById('dest-upload');
+    if (uploadRadio && uploadRadio.checked) {
+      document.getElementById('dup-modal').style.display = 'flex';
+      return;
+    }
+    const tree = buildTree();
+    if (!tree) return;
+
+    // 「自分のメモとして保存」→ 一覧へ新しいコンボ行を挿入するイベントを発火（モック挙動）。
+    // 行に出す代表はダメージのいちばん大きいルート
+    const rep = routes.reduce((best, cur) => ((cur.leaf.damage ?? 0) > (best.leaf.damage ?? 0) ? cur : best), routes[0]);
+    const repInputs = joinTokens(parseTokens(rep.inputs));
+    const detail = {
+      id: 'c_local_' + uid(),
+      // 既存コンボを ✎ で開いて保存したときの元のコンボの id（新規は null）。置き換えるか fork にするかはページが決める
+      sourceId: comboId,
+      title: document.getElementById('combo-title')?.value || '(無題コンボ)',
+      // 始動技が空（先頭の技がリストに無い）なら「その他」
+      starter: document.getElementById('combo-starter')?.value || 'その他',
+      hitState: document.getElementById('combo-hit-state')?.value || '通常',
+      position: document.getElementById('combo-position')?.value || '中央',
+      priority: document.getElementById('combo-priority')?.value || DEFAULT_PRIORITY,
+      root: tree,
+      fullInputs: repInputs,
+      fullInputsDisplay: displaySegment(repInputs),
+      damage: rep.leaf.damage ?? 0,
+      enderDisplayName: rep.leaf.enderClassId ? (ENDER_DISPLAY[rep.leaf.enderClassId] ?? null) : null,
+      situationTags: rep.leaf.situationTags ?? [],
+      routeCount: routes.length,
+      // 動画（URL が読めたときだけ）
+      youtubeId: youtubeRef()?.id ?? null,
+      startSec: youtubeRef() ? startSecValue() : null,
+    };
+    document.querySelector('.combo-editor')?.dispatchEvent(
+      new CustomEvent('combo-editor:save', { detail, bubbles: true })
+    );
+  });
+  document.getElementById('close-dup-modal').addEventListener('click', () => {
+    document.getElementById('dup-modal').style.display = 'none';
+  });
+
+  // inline モード: キャンセルボタンでカスタムイベント発火（親が listen して閉じる）
+  const cancelBtn = document.getElementById('combo-editor-cancel');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      cancelBtn.closest('.combo-editor')?.dispatchEvent(new CustomEvent('combo-editor:cancel', { bubbles: true }));
+    });
+  }
+
+  // ── ランタイム API（共有インラインエディタを既存コンボで読み込む／新規に戻す） ──
+  function setFieldValue(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.value = val ?? '';
+  }
+  // ルート以外の入力欄を空に戻す（前に開いたコンボの値を次に持ち越さない）。入力欄を足したらここにも足す
+  function resetFields() {
+    ['combo-title', 'combo-starter', 'combo-youtube-url', 'combo-start-sec']
+      .forEach(id => setFieldValue(id, ''));
+    setFieldValue('combo-hit-state', '通常');
+    setFieldValue('combo-position', '中央');
+    setFieldValue('combo-priority', DEFAULT_PRIORITY);
+    starterTouched = false;
+    hitStateTouched = false;
+    const personal = document.getElementById('dest-personal');
+    if (personal) personal.checked = true;
+  }
+  // 変換（treeToRoutes）がまだ届いていないうちに読み込みを頼まれたら、届いてから読む
+  let pendingCombo = null;
+  window.comboEditorAPI = {
+    // 既存コンボを読み込んで編集モードにする
+    loadCombo(combo) {
+      if (!combo || !combo.root) return;
+      const L = lib();
+      if (!L) { pendingCombo = combo; return; }
+      routes = normalizeRoutes(L.treeToRoutes(combo.root));
+      invalidRoutes = new Set();
+      rootId = combo.root.id || uid();
+      comboId = combo.id ?? null;
+      selected = 0;
+      resetFields();
+      setFieldValue('combo-title', combo.title ?? '');
+      setFieldValue('combo-starter', combo.starter ?? '');
+      setFieldValue('combo-hit-state', combo.hitState ?? '通常');
+      setFieldValue('combo-position', combo.position ?? '中央');
+      setFieldValue('combo-priority', combo.priority ?? DEFAULT_PRIORITY);
+      starterTouched = true;
+      hitStateTouched = true;
+      if (combo.youtubeId) {
+        setFieldValue('combo-youtube-url', `https://youtu.be/${combo.youtubeId}`);
+        setFieldValue('combo-start-sec', combo.startSec);
+      }
+      renderYoutubePreview();
+      render();
+    },
+    // 新規コンボ入力用に、すべての入力欄を空にする。preset（位置・始動技・ヒット状態・優先度）を渡すとその値を入れた状態で開く
+    reset(preset) {
+      pendingCombo = null;
+      routes = makeEmptyRoutes();
+      invalidRoutes = new Set();
+      rootId = uid();
+      comboId = null;
+      selected = 0;
+      resetFields();
+      if (preset?.position) setFieldValue('combo-position', preset.position);
+      if (preset?.priority) setFieldValue('combo-priority', preset.priority);
+      if (preset?.starter) {
+        setFieldValue('combo-starter', preset.starter);
+        starterTouched = true;
+      }
+      if (preset?.hitState) {
+        setFieldValue('combo-hit-state', preset.hitState);
+        hitStateTouched = true;
+      }
+      renderYoutubePreview();
+      render();
+    },
+    get comboId() { return comboId; },
+  };
+  document.addEventListener('combo-editor:lib-ready', () => {
+    if (pendingCombo) { const c = pendingCombo; pendingCombo = null; window.comboEditorAPI.loadCombo(c); }
+    else render();
+  });
+
+  render();
+</script>
